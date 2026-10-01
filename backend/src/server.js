@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 import { connectDB, getConnectionStatus } from "./config/db.js";
 import config from "./config/env.js";
 import { startCleanupJobs } from "./services/cleanupJob.js";
-import { securityMiddleware, sanitizeInput, errorHandler } from "./middleware/security.js";
+import {
+  securityMiddleware,
+  sanitizeInput,
+  errorHandler,
+} from "./middleware/security.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
 import authRoutes from "./routes/authRoutes.js";
 import challengeRoutes from "./routes/challengeRoutes.js";
@@ -17,6 +21,7 @@ import battleRoomRoutes from "./routes/battleRoomRoutes.js";
 import creatorVerificationRoutes from "./routes/creatorVerificationRoutes.js";
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = config.PORT || 5000;
 
 // Request ID middleware - must be first
@@ -74,7 +79,9 @@ app.use(errorHandler);
 export async function start() {
   const dbConnected = await connectDB();
   if (!dbConnected) {
-    throw new Error("Database connection is required before the API can start.");
+    throw new Error(
+      "Database connection is required before the API can start.",
+    );
   }
   startCleanupJobs();
 
