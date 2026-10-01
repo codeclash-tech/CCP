@@ -1,5 +1,5 @@
 import config from "../config/env.js";
-import { getResendClient, RESEND_FROM } from "./resendClient.js";
+import { BREVO_SENDER, getBrevoClient } from "./brevoClient.js";
 
 const EMAIL_REGEX =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -65,30 +65,28 @@ export async function sendVerificationEmail(
       : 5;
 
   try {
-    const resend = getResendClient();
-    const { data, error } = await resend.emails.send({
-      from: RESEND_FROM,
-      to: cleanEmail,
+    const brevo = getBrevoClient();
+    const response = await brevo.transactionalEmails.sendTransacEmail({
+      sender: BREVO_SENDER,
+      to: [{ email: cleanEmail }],
       subject: isPasswordReset
         ? "Reset your CodeClash password"
         : isCreatorVerification
           ? "Verify your email to create a CodeClash battle"
           : "Verify your CodeClash account",
-      text:
+      textContent:
         `Your ${emailPurpose} code is: ${otpCode}\n\n` +
         `This code expires in ${safeTtlMinutes} minutes.\n` +
         "If you did not request this code, please ignore this email.\n",
-      html: createOtpEmailHtml(otpCode, safeTtlMinutes, emailPurpose),
+      htmlContent: createOtpEmailHtml(otpCode, safeTtlMinutes, emailPurpose),
     });
 
-    if (error) throw new Error(error.message || "Resend could not send the email.");
-
     console.log(
-      `[EmailDispatch] Verification email sent to ${cleanEmail} (id=${data?.id || "unknown"}).`,
+      `[EmailDispatch] Verification email sent to ${cleanEmail} (id=${response?.messageId || "unknown"}).`,
     );
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: response?.messageId };
   } catch (error) {
-    console.error("[EmailDispatch] Resend email send failed:", error.message);
+    console.error("[EmailDispatch] Brevo email send failed:", error.message);
     if (config.NODE_ENV !== "production") {
       console.warn(
         `[EmailDispatch][DEV FALLBACK] Email to ${cleanEmail} was not delivered. Verification code: ${otpCode}`,
@@ -96,7 +94,7 @@ export async function sendVerificationEmail(
       return { success: true, devMode: true };
     }
 
-    return { success: false, reason: "RESEND_FAILED" };
+    return { success: false, reason: "BREVO_FAILED" };
   }
 }
 

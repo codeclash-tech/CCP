@@ -9,7 +9,7 @@ const optionalVars = {
   NODE_ENV: "development",
   CLIENT_URL: "http://localhost:5173",
   API_PUBLIC_URL: "",
-  RESEND_API_KEY: "",
+  BREVO_API_KEY: "",
   SECURE_CODE_ENGINE_URL:
     "https://secure-code-engine.onrender.com/api/v1/execute",
   SECURE_CODE_ENGINE_TIMEOUT_MS: "120000",
@@ -74,8 +74,8 @@ function validateEnv() {
     if (!process.env.CLIENT_URL || !/^https:\/\//i.test(config.CLIENT_URL)) {
       productionErrors.push("CLIENT_URL must be set to the HTTPS frontend origin");
     }
-    if (!config.RESEND_API_KEY) {
-      productionErrors.push("RESEND_API_KEY must be configured");
+    if (!config.BREVO_API_KEY) {
+      productionErrors.push("BREVO_API_KEY must be configured");
     }
     if (productionErrors.length > 0) {
       console.error(

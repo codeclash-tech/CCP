@@ -13,6 +13,7 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^6.0.3",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -26,7 +27,6 @@
     "morgan": "^1.11.0",
     "node-cron": "^3.0.3",
     "pdfkit": "^0.20.2",
-    "resend": "^6.31.0",
     "uuid": "^11.1.1"
   },
   "overrides": {

@@ -1,4 +1,4 @@
-import { getResendClient, RESEND_FROM } from "./resendClient.js";
+import { BREVO_SENDER, getBrevoClient } from "./brevoClient.js";
 
 export async function sendBattleRoomResultEmail({
   email,
@@ -15,7 +15,7 @@ export async function sendBattleRoomResultEmail({
   completedAt,
 }) {
   try {
-    const resend = getResendClient();
+    const brevo = getBrevoClient();
 
     const passRate =
       totalTestCases > 0 ? Math.round((totalPassed / totalTestCases) * 100) : 0;
@@ -223,19 +223,18 @@ Share your verified achievement on LinkedIn.
 CodeClash Technical Assessments
     `;
 
-    const { data, error } = await resend.emails.send({
-      from: RESEND_FROM,
-      to: email,
+    const response = await brevo.transactionalEmails.sendTransacEmail({
+      sender: BREVO_SENDER,
+      to: [{ email }],
       subject: `Assessment Complete: ${roomTitle} - Performance Summary`,
-      text: textContent,
-      html: htmlContent,
+      textContent,
+      htmlContent,
     });
-    if (error) throw new Error(error.message || "Resend could not send the email.");
 
     console.log(
-      `[EmailService] Result email sent to ${email}: ${data?.id || "unknown"}`,
+      `[EmailService] Result email sent to ${email}: ${response?.messageId || "unknown"}`,
     );
-    return { success: true, messageId: data?.id };
+    return { success: true, messageId: response?.messageId };
   } catch (error) {
     console.error(
       `[EmailService] Failed to send email to ${email}:`,
