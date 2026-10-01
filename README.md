@@ -636,7 +636,12 @@ open http://localhost:5173
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend API base URL | http://localhost:5000/api |
+| `VITE_API_URL` | Backend API base URL, including `/api` | `https://ccp-backend-qylz.onrender.com/api` |
+
+When deploying the frontend, set `VITE_API_URL` to the deployed backend URL
+including `/api` in the frontend host's build environment. The backend's
+`CLIENT_URL` must be set to the frontend's HTTPS origin so its CORS policy
+allows browser requests from the deployed site.
 
 ---
 
