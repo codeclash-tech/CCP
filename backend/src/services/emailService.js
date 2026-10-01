@@ -1,24 +1,4 @@
-import nodemailer from "nodemailer";
-import config from "../config/env.js";
-
-let transporter = null;
-
-function getTransporter() {
-  if (transporter) return transporter;
-
-  transporter = nodemailer.createTransport({
-    host: config.EMAIL_HOST,
-    port: Number(config.EMAIL_PORT),
-    secure: Number(config.EMAIL_PORT) === 465,
-    requireTLS: Number(config.EMAIL_PORT) !== 465,
-    auth: {
-      user: config.EMAIL_USER,
-      pass: config.EMAIL_PASS,
-    },
-  });
-
-  return transporter;
-}
+import { getResendClient, RESEND_FROM } from "./resendClient.js";
 
 export async function sendBattleRoomResultEmail({
   email,
@@ -35,13 +15,7 @@ export async function sendBattleRoomResultEmail({
   completedAt,
 }) {
   try {
-    if (!config.EMAIL_USER || !config.EMAIL_PASS) {
-      return {
-        success: false,
-        error: "Result email delivery is not configured.",
-      };
-    }
-    const transport = getTransporter();
+    const resend = getResendClient();
 
     const passRate =
       totalTestCases > 0 ? Math.round((totalPassed / totalTestCases) * 100) : 0;
@@ -249,18 +223,19 @@ Share your verified achievement on LinkedIn.
 CodeClash Technical Assessments
     `;
 
-    const info = await transport.sendMail({
-      from: `"CodeClash" <${config.EMAIL_USER || "noreply@codeclash.com"}>`,
+    const { data, error } = await resend.emails.send({
+      from: RESEND_FROM,
       to: email,
       subject: `Assessment Complete: ${roomTitle} - Performance Summary`,
       text: textContent,
       html: htmlContent,
     });
+    if (error) throw new Error(error.message || "Resend could not send the email.");
 
     console.log(
-      `[EmailService] Result email sent to ${email}: ${info.messageId}`,
+      `[EmailService] Result email sent to ${email}: ${data?.id || "unknown"}`,
     );
-    return { success: true, messageId: info.messageId };
+    return { success: true, messageId: data?.id };
   } catch (error) {
     console.error(
       `[EmailService] Failed to send email to ${email}:`,

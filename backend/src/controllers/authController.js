@@ -17,8 +17,8 @@ import {
  *
  * Security notes:
  *  - Registration OTPs verify email only; organization is collected at room join.
- *  - Registration errors are explicit, while SMTP internals remain private.
- *  - NO LEAKAGE: internal SMTP errors are never surfaced to the client; a clean,
+ *  - Registration errors are explicit, while email-provider internals remain private.
+ *  - NO LEAKAGE: internal email-provider errors are never surfaced to the client; a clean,
  *    generic message is returned instead. Detailed logs stay server-side.
  *  - Successful registration verification and password login both create a
  *    signed access token and a refreshable session.
@@ -60,7 +60,7 @@ export async function requestOTP(req, res) {
     if (error.message === "Invalid email format.") {
       return res.status(400).json({ error: error.message });
     }
-    // Generic failure — never leak SMTP internals.
+    // Generic failure — never leak email-provider internals.
     console.error("[AuthController] request-otp failed:", error.message);
     return res
       .status(500)
