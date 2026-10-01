@@ -1,4 +1,4 @@
-import { BrevoClient } from "@getbrevo/brevo";
+import { TransactionalEmailsApi } from "@getbrevo/brevo";
 
 export const BREVO_SENDER = {
   name: "CodeClash",
@@ -15,7 +15,11 @@ export function getBrevoClient() {
   }
 
   if (!brevoClient || initializedApiKey !== apiKey) {
-    brevoClient = new BrevoClient({ apiKey });
+    // Correct way to initialize the official Brevo SDK
+    const client = new TransactionalEmailsApi();
+    client.setApiKey(0, apiKey);
+
+    brevoClient = client;
     initializedApiKey = apiKey;
   }
 
