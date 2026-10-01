@@ -4,8 +4,8 @@ export const BREVO_SENDER = {
 };
 
 /**
- * Native HTTP client for Brevo transactional emails
- * Bypasses buggy SDK classes and functions natively with test mock fetch wrappers
+ * Robust native HTTP wrapper for Brevo API v3
+ * Fixes the "undefined" instance bindings and plays perfectly with fetch tests.
  */
 export function getBrevoClient() {
   const apiKey = process.env.BREVO_API_KEY;
@@ -31,7 +31,6 @@ export function getBrevoClient() {
       }
 
       const bodyData = await response.json();
-      // Wraps the native messageId property expected by the platform controllers
       return { body: bodyData };
     },
   };
