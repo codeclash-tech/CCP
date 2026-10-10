@@ -1,5 +1,4 @@
-import config from "../config/env.js";
-import { BREVO_SENDER, getBrevoClient } from "./brevoClient.js";
+import { getResendClient } from "./resendClient.js";
 
 const EMAIL_REGEX =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
@@ -65,36 +64,34 @@ export async function sendVerificationEmail(
       : 5;
 
   try {
-    const brevo = getBrevoClient();
-    const response = await brevo.transactionalEmails.sendTransacEmail({
-      sender: BREVO_SENDER,
-      to: [{ email: cleanEmail }],
+    const { resend, from } = getResendClient();
+    const { data, error } = await resend.emails.send({
+      from,
+      to: [cleanEmail],
       subject: isPasswordReset
         ? "Reset your CodeClash password"
         : isCreatorVerification
           ? "Verify your email to create a CodeClash battle"
           : "Verify your CodeClash account",
-      textContent:
+      text:
         `Your ${emailPurpose} code is: ${otpCode}\n\n` +
         `This code expires in ${safeTtlMinutes} minutes.\n` +
         "If you did not request this code, please ignore this email.\n",
-      htmlContent: createOtpEmailHtml(otpCode, safeTtlMinutes, emailPurpose),
+      html: createOtpEmailHtml(otpCode, safeTtlMinutes, emailPurpose),
     });
 
-    console.log(
-      `[EmailDispatch] Verification email sent to ${cleanEmail} (id=${response?.messageId || "unknown"}).`,
-    );
-    return { success: true, messageId: response?.messageId };
-  } catch (error) {
-    console.error("[EmailDispatch] Brevo email send failed:", error.message);
-    if (config.NODE_ENV !== "production") {
-      console.warn(
-        `[EmailDispatch][DEV FALLBACK] Email to ${cleanEmail} was not delivered. Verification code: ${otpCode}`,
-      );
-      return { success: true, devMode: true };
+    if (error) {
+      console.error("[EmailDispatch] Resend email send failed:", error);
+      return { success: false, reason: "RESEND_FAILED" };
     }
 
-    return { success: false, reason: "BREVO_FAILED" };
+    console.log(
+      `[EmailDispatch] Verification email sent to ${cleanEmail} (id=${data?.id || "unknown"}).`,
+    );
+    return { success: true, messageId: data?.id };
+  } catch (error) {
+    console.error("[EmailDispatch] Resend email delivery error:", error);
+    return { success: false, reason: "RESEND_FAILED" };
   }
 }
 

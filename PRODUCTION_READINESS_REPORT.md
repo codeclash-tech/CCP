@@ -502,9 +502,8 @@ Existing indexes are appropriate. No new indexes needed.
    - Status: Does not affect production functionality
    - Recommendation: Fix in future sprint
 
-4. **Email configuration**: Using Ethereal in development
-   - Impact: None (proper for dev environment)
-   - Required: Real SMTP setup for production
+4. **Email configuration**: Resend API delivery
+   - Required: `RESEND_API_KEY` and verified `EMAIL_FROM` in production
 
 ### UNRESOLVED (Non-Critical)
 
@@ -526,7 +525,8 @@ Existing indexes are appropriate. No new indexes needed.
 
 **Optional but Recommended**:
 - `CLIENT_URL` - Frontend URL for CORS
-- `EMAIL_HOST`, `EMAIL_USER`, `EMAIL_PASS` - SMTP configuration
+- `RESEND_API_KEY` - Resend API key for backend email delivery
+- `EMAIL_FROM` - Verified sender address configured in Resend
 - `SECURE_CODE_ENGINE_URL` - Code execution engine endpoint (default: Render service)
 
 ### Build Commands
@@ -560,7 +560,7 @@ npm run lint  # Check code quality
 - [ ] All environment variables set (see .env.example)
 - [ ] MongoDB connection verified
 - [ ] Secure Code Engine URL accessible
-- [ ] SMTP credentials configured (for email)
+- [ ] Resend API key and verified sender configured (for email)
 - [ ] JWT_SECRET is strong random value (32+ chars)
 - [ ] NODE_ENV=production
 - [ ] CORS CLIENT_URL configured correctly

@@ -81,7 +81,7 @@ This platform is designed for **academic institutions and coding bootcamps** to 
 | **Backend** | Node.js / Express | v18+/4.x |
 | **ODM** | Mongoose | Latest |
 | **Database** | MongoDB | v6+ (local or Atlas) |
-| **Authentication** | JWT password login + registration OTP via Nodemailer | Access/refresh sessions |
+| **Authentication** | JWT password login + registration OTP via Resend | Access/refresh sessions |
 | **Scheduling** | node-cron + MongoDB TTL indexes | Daily rank recalibration; expiring OTPs are removed by TTL indexes |
 | **Security Headers** | Helmet | CSP, HSTS, X-Frame-Options |
 | **Rate Limiting** | express-rate-limit | Tiered: general, auth, submissions |
@@ -207,7 +207,7 @@ Incoming Request
 ```
 1. Register (name, email, password)
    → Server stores a bcrypt-hashed password and creates a pending account
-   → Sends a six-digit email verification OTP (or logs to console in dev)
+   → Sends a six-digit email verification OTP through Resend
    
 2. Verify registration OTP (userId + otp)
    → Checks expiry, max attempts, and the registration purpose
@@ -579,7 +579,7 @@ coding-challenge-platform/
 
 - **Node.js** v18+ and npm
 - **MongoDB** v6+ (local or cloud Atlas)
-- **SMTP credentials** for email (Ethereal for dev, Gmail for production)
+- **Resend API credentials** for outbound email (`RESEND_API_KEY` and `EMAIL_FROM`)
 
 ### Quick Start (5 minutes)
 
@@ -616,10 +616,8 @@ open http://localhost:5173
 | `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/coding-challenge-platform | Database access |
 | `JWT_SECRET` | Secret for JWT signing | (required) | **Must be strong random string** |
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens | (required) | **Must be different from JWT_SECRET** |
-| `EMAIL_HOST` | SMTP host | (required for email delivery) | Creator OTP and battle result/certificate email |
-| `EMAIL_PORT` | SMTP port | 587 | Email delivery |
-| `EMAIL_USER` | SMTP username | (required for email delivery) | Email delivery |
-| `EMAIL_PASS` | SMTP password | (required for email delivery) | Email delivery |
+| `RESEND_API_KEY` | Resend API key | (required for email delivery) | Backend email delivery |
+| `EMAIL_FROM` | Verified Resend sender address | (required for email delivery) | Backend email delivery |
 | `RENDER_EXECUTOR_URL` | Remote code executor | https://code-executor.onrender.com | Sandboxed execution |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window | 900000 (15min) | DoS protection |
 | `RATE_LIMIT_MAX` | Max requests per window | 100 | DoS protection |
