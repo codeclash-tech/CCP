@@ -137,7 +137,7 @@ export default function BattleRoom() {
   }, []);
 
   return (
-    <div style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
+    <div className="battle-room-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
       <div style={{ marginBottom: 32, padding: "28px 32px", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: 12 }}>
         <h1 style={{ color: "var(--text-primary)", fontSize: 22, margin: "0 0 8px", fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
           <Swords size={24} color="var(--accent-blue-bright)" />

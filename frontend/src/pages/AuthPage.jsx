@@ -39,6 +39,9 @@ export default function AuthPage({ mode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(
+    Boolean(location.state?.termsAccepted),
+  );
 
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -72,6 +75,10 @@ export default function AuthPage({ mode }) {
       setError("Your password must be between 8 and 72 bytes.");
       return;
     }
+    if (!termsAccepted) {
+      setError("Please read and agree to the Terms and Conditions.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -79,6 +86,7 @@ export default function AuthPage({ mode }) {
         name: name.trim(),
         email: normalizedEmail,
         password,
+        termsAccepted,
       });
       setUserId(result.userId);
       setRequested(true);
@@ -213,6 +221,7 @@ export default function AuthPage({ mode }) {
 
   return (
     <main
+      className="auth-page"
       style={{
         minHeight: "calc(100vh - 112px)",
         display: "grid",
@@ -250,6 +259,41 @@ export default function AuthPage({ mode }) {
 
         <form onSubmit={submitHandler}>
           <div style={{ display: "grid", gap: 14 }}>
+            {isRegistration && (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 8,
+                  color: "var(--text-secondary)",
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => setTermsAccepted(event.target.checked)}
+                  disabled={requested}
+                  required
+                  style={{
+                    marginTop: 3,
+                    accentColor: "var(--accent-blue-bright)",
+                  }}
+                />
+                <span>
+                  I agree to the{" "}
+                  <Link
+                    to="/terms"
+                    state={{ returnToRegistration: true }}
+                    style={{ color: "var(--accent-blue-bright)" }}
+                  >
+                    Terms and Conditions
+                  </Link>
+                  .
+                </span>
+              </label>
+            )}
             {isRegistration && (
               <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>
                 Full name
@@ -359,6 +403,7 @@ export default function AuthPage({ mode }) {
             type="submit"
             disabled={
               busy ||
+              (isRegistration && !termsAccepted) ||
               ((isRegistration && requested) || (resetMode && resetRequested)) &&
                 (otp.length !== 6 || password.length < 8)
             }

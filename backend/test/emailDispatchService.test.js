@@ -166,6 +166,8 @@ test("sends battle-result email through Resend", async () => {
       rank: 1,
       totalParticipants: 5,
       roomCode: "ROOM1",
+      certificateUrl:
+        "https://api.example.com/api/battle-rooms/certificate/test-token",
       startTime: "2026-01-01T10:00:00.000Z",
       endTime: "2026-01-01T12:00:00.000Z",
       submissionStatus: "COMPLETED",
@@ -184,11 +186,22 @@ test("sends battle-result email through Resend", async () => {
     assert.match(requestBody.text, /Battle start: Jan 1, 2026/);
     assert.match(requestBody.html, /Question results/);
     assert.match(requestBody.html, /Download your certificate/);
-    assert.match(requestBody.html, /Joined Rooms/);
+    assert.match(
+      requestBody.html,
+      /href="https:\/\/api\.example\.com\/api\/battle-rooms\/certificate\/test-token"/,
+    );
+    assert.match(
+      requestBody.html,
+      /Download within 5 minutes of receiving this email; the battle room will then be deleted\./,
+    );
+    assert.match(
+      requestBody.text,
+      /Download: https:\/\/api\.example\.com\/api\/battle-rooms\/certificate\/test-token/,
+    );
     assert.doesNotMatch(requestBody.html, /CERTIFICATE OF EXCELLENCE|Download PDF Certificate/);
+    assert.doesNotMatch(requestBody.html, /Joined Rooms/);
     assert.doesNotMatch(requestBody.text, /secret input/);
     assert.doesNotMatch(requestBody.html, /secret input/);
-    assert.doesNotMatch(requestBody.html, /\/battle-rooms\/certificate\//);
   } finally {
     globalThis.fetch = originalFetch;
     process.env.RESEND_API_KEY = originalApiKey;

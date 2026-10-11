@@ -2,6 +2,7 @@ import cron from "node-cron";
 import Organization from "../models/Organization.js";
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import User from "../models/User.js";
 import { closeBattleRoomAndNotify } from "./battleRoomClosureService.js";
 
 export function startCleanupJobs() {
@@ -55,6 +56,56 @@ export function startCleanupJobs() {
       }
     } catch (error) {
       console.error("[CleanupJob] Battle room cleanup failed:", error.message);
+    }
+  });
+
+  // Keep completed rooms available briefly for result and certificate downloads.
+  cron.schedule("*/10 * * * * *", async () => {
+    try {
+      const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+      const expiredRoomFilter = {
+        $and: [
+          { status: "CLOSED", isDeleted: false },
+          {
+            $or: [
+              { closedAt: { $lte: cutoff } },
+              {
+                closedAt: null,
+                resultEmailsCompletedAt: { $lte: cutoff },
+              },
+              {
+                closedAt: null,
+                resultEmailsCompletedAt: null,
+                updatedAt: { $lte: cutoff },
+              },
+            ],
+          },
+        ],
+      };
+      const expiredRooms = await BattleRoom.find(expiredRoomFilter)
+        .select("createdBy")
+        .lean();
+      if (expiredRooms.length === 0) return;
+
+      const creatorIds = [
+        ...new Set(expiredRooms.map((room) => String(room.createdBy))),
+      ];
+      await User.updateMany(
+        {
+          _id: { $in: creatorIds },
+          role: "USER",
+          firstBattleCreatedAt: null,
+        },
+        { $set: { firstBattleCreatedAt: new Date() } },
+      );
+      const result = await BattleRoom.deleteMany(expiredRoomFilter);
+      if (result.deletedCount > 0) {
+        console.log(
+          `[CleanupJob] Deleted ${result.deletedCount} battle room(s) closed for at least 5 minutes.`,
+        );
+      }
+    } catch (error) {
+      console.error("[CleanupJob] Closed room deletion failed:", error.message);
     }
   });
 

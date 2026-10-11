@@ -105,6 +105,7 @@ export default function BattleRoomLeaderboard() {
   const [resultDelivery, setResultDelivery] = useState(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const loadedRoomCodeRef = useRef(null);
+  const loadedDeliveryRoomRef = useRef(null);
   const hasLoadedDataRef = useRef(false);
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export default function BattleRoomLeaderboard() {
     const isNewRoom = loadedRoomCodeRef.current !== roomCode;
     if (isNewRoom) {
       loadedRoomCodeRef.current = roomCode;
+      loadedDeliveryRoomRef.current = null;
       hasLoadedDataRef.current = false;
       setRoom(null);
       setLeaderboard([]);
@@ -133,16 +135,24 @@ export default function BattleRoomLeaderboard() {
         setIsCreator(data.isCreator);
         setError("");
         hasLoadedDataRef.current = true;
-        if (data.isCreator && data.room?.status === "CLOSED") {
+        if (
+          data.isCreator &&
+          data.room?.status === "CLOSED" &&
+          loadedDeliveryRoomRef.current !== roomCode
+        ) {
           const delivery = await getRoomResultDelivery(roomCode);
-          if (active) setResultDelivery(delivery);
+          if (active) {
+            setResultDelivery(delivery);
+            loadedDeliveryRoomRef.current = roomCode;
+          }
         } else {
           setResultDelivery(null);
         }
-        if (data.room?.status === "CLOSED" && interval) {
-          clearInterval(interval);
-        }
       } catch (err) {
+        if (active && /not found/i.test(err.message || "")) {
+          navigate("/", { replace: true });
+          return;
+        }
         if (active && !hasLoadedDataRef.current) {
           setError(err.message || "Failed to load leaderboard.");
         }
@@ -158,7 +168,7 @@ export default function BattleRoomLeaderboard() {
       active = false;
       clearInterval(interval);
     };
-  }, [roomCode, refreshVersion]);
+  }, [navigate, roomCode, refreshVersion]);
 
   const handleCloseRoom = async () => {
     if (
@@ -228,6 +238,7 @@ export default function BattleRoomLeaderboard() {
 
   return (
     <div
+      className="leaderboard-page"
       style={{
         padding: "24px 32px",
         margin: "0 auto",

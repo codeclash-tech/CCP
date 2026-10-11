@@ -3,7 +3,7 @@ import PDFDocument from "pdfkit";
 import config from "../config/env.js";
 
 const CERTIFICATE_AUDIENCE = "codeclash-battle-certificate";
-const CERTIFICATE_TOKEN_LIFETIME = "365d";
+const CERTIFICATE_TOKEN_LIFETIME = "5m";
 
 function normalizedCertificateData(data) {
   const requiredText = ["participantName", "roomTitle", "roomCode"];

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createRoom } from "../services/battleRoomService";
+import { saveCreatorProfile } from "../services/platformService";
 import RoomKeyModal from "../components/battleRoom/RoomKeyModal";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -87,7 +88,16 @@ function formatTestCasesForPreview(tcs, params, max = 3) {
 
 export default function CreateBattleRoom() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signIn } = useAuth();
+  const [creatorProfileComplete, setCreatorProfileComplete] = useState(
+    Boolean(user?.creatorType),
+  );
+  const [creatorType, setCreatorType] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [partnerAgreed, setPartnerAgreed] = useState(false);
+  const [logoData, setLogoData] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
 
   // Room-level state
   const [title, setTitle] = useState("");
@@ -116,6 +126,87 @@ export default function CreateBattleRoom() {
     () => questions[currentQuestionIndex] || { ...emptyQuestion },
     [questions, currentQuestionIndex],
   );
+
+  const handlePartnerLogoChange = async (event) => {
+    setProfileError("");
+    const file = event.target.files?.[0];
+    if (!file) {
+      setLogoData("");
+      return;
+    }
+    if (file.type !== "image/png" || file.size > 128 * 1024) {
+      setLogoData("");
+      setProfileError("Choose a PNG logo that is 128 KB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || "");
+      const image = new Image();
+      image.onload = () => {
+        if (image.naturalWidth !== image.naturalHeight) {
+          setLogoData("");
+          setProfileError("Your organization logo must be square (1:1).");
+          event.target.value = "";
+          return;
+        }
+        setLogoData(dataUrl);
+      };
+      image.onerror = () => {
+        setLogoData("");
+        setProfileError("The selected logo could not be read.");
+        event.target.value = "";
+      };
+      image.src = dataUrl;
+    };
+    reader.onerror = () => {
+      setLogoData("");
+      setProfileError("The selected logo could not be read.");
+      event.target.value = "";
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCreatorProfileSubmit = async (event) => {
+    event.preventDefault();
+    setProfileError("");
+    if (!creatorType) {
+      setProfileError("Choose Individual or Organization to continue.");
+      return;
+    }
+    if (creatorType === "ORGANIZATION") {
+      if (!organizationName.trim()) {
+        setProfileError("Enter your organization name.");
+        return;
+      }
+      if (!logoData) {
+        setProfileError("Upload your square PNG organization logo.");
+        return;
+      }
+      if (!partnerAgreed) {
+        setProfileError("Agree to the partner program to continue.");
+        return;
+      }
+    }
+
+    setProfileSaving(true);
+    try {
+      const result = await saveCreatorProfile({
+        creatorType,
+        organizationName,
+        logoData,
+        partnerAgreed,
+      });
+      signIn(result.user);
+      setCreatorProfileComplete(true);
+    } catch (saveError) {
+      setProfileError(saveError.message || "Could not save your creator profile.");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const updateCurrentQuestion = (updated) => {
     const updatedQuestions = [...questions];
@@ -267,8 +358,144 @@ export default function CreateBattleRoom() {
 
   const currentStepId = STEPS[currentStep]?.id;
 
+  if (!creatorProfileComplete) {
+    return (
+      <main
+        style={{
+          width: "100%",
+          maxWidth: 1600,
+          margin: "48px auto",
+          padding: "24px clamp(20px, 4vw, 64px)",
+          boxSizing: "border-box",
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-color)",
+          borderRadius: 12,
+          fontFamily: "var(--font-ui)",
+        }}
+      >
+        <span className="about-eyebrow">Before your first battle</span>
+        <h1 style={{ color: "var(--text-primary)", fontSize: 23, marginTop: 10 }}>
+          How will you create battles?
+        </h1>
+        <p style={{ color: "var(--text-secondary)", fontSize: 13, lineHeight: 1.7, marginTop: 8 }}>
+          Tell us whether you are creating as an individual or on behalf of an
+          organization. You can set this up once before building your first battle.
+        </p>
+
+        <form onSubmit={handleCreatorProfileSubmit}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 22 }}>
+            {[
+              { value: "INDIVIDUAL", label: "Individual", detail: "I am creating on my own." },
+              { value: "ORGANIZATION", label: "Organization", detail: "I represent a school, team, or company." },
+            ].map((option) => {
+              const selected = creatorType === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setCreatorType(option.value);
+                    setProfileError("");
+                  }}
+                  aria-pressed={selected}
+                  style={{
+                    padding: 16,
+                    textAlign: "left",
+                    color: "var(--text-primary)",
+                    background: selected ? "var(--accent-blue-soft)" : "var(--bg-card)",
+                    border: `1px solid ${selected ? "var(--accent-blue-bright)" : "var(--border-color)"}`,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontFamily: "var(--font-ui)",
+                  }}
+                >
+                  <strong style={{ display: "block", fontSize: 14 }}>{option.label}</strong>
+                  <span style={{ display: "block", color: "var(--text-muted)", fontSize: 12, marginTop: 6 }}>{option.detail}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {creatorType === "ORGANIZATION" && (
+            <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
+              <label style={{ ...labelStyle, fontSize: 12 }}>
+                Organization name
+                <input
+                  value={organizationName}
+                  onChange={(event) => setOrganizationName(event.target.value)}
+                  maxLength={120}
+                  required
+                  style={{ ...inputStyle, marginTop: 6 }}
+                />
+              </label>
+              <label style={{ ...labelStyle, fontSize: 12 }}>
+                Organization logo (square PNG, 1:1, up to 128 KB)
+                <input
+                  type="file"
+                  accept="image/png"
+                  onChange={handlePartnerLogoChange}
+                  required
+                  style={{ ...inputStyle, marginTop: 6 }}
+                />
+              </label>
+              {logoData && (
+                <img
+                  src={logoData}
+                  alt="Organization logo preview"
+                  width="88"
+                  height="88"
+                  style={{ objectFit: "contain", background: "#fff", borderRadius: 8, padding: 6 }}
+                />
+              )}
+              <div style={{ padding: 16, background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8 }}>
+                <h2 style={{ color: "var(--text-primary)", fontSize: 14 }}>Benefits of becoming a CodeClash partner</h2>
+                <ul style={{ display: "grid", gap: 8, margin: "12px 0 0 18px", color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.6 }}>
+                  <li>Priority access to upcoming CodeClash features.</li>
+                  <li>Reduced pricing on eligible future platform features.</li>
+                  <li>Access to partner discounts on AMUX products when available.</li>
+                  <li>Priority handling for AMUX service requests.</li>
+                </ul>
+                <p style={{ color: "var(--text-muted)", fontSize: 11, lineHeight: 1.5, marginTop: 10 }}>
+                  Benefits apply to future releases and offers and are subject to their published eligibility and availability.
+                </p>
+              </div>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 8, color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.6 }}>
+                <input
+                  type="checkbox"
+                  checked={partnerAgreed}
+                  onChange={(event) => setPartnerAgreed(event.target.checked)}
+                  required
+                  style={{ marginTop: 3, accentColor: "var(--accent-blue-bright)" }}
+                />
+                <span>
+                  I am authorized to represent this organization, agree to the
+                  partner program, and allow AMUX to display its name and logo
+                  on the CodeClash About page.
+                </span>
+              </label>
+            </div>
+          )}
+
+          {profileError && (
+            <p role="alert" style={{ color: "var(--color-danger)", fontSize: 12, marginTop: 14 }}>
+              {profileError}
+            </p>
+          )}
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={profileSaving}
+            style={{ marginTop: 18 }}
+          >
+            {profileSaving ? "Saving..." : "Continue to battle creation"}
+          </button>
+        </form>
+      </main>
+    );
+  }
+
   return (
-    <div style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
+    <div className="create-battle-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ color: "var(--text-primary)", fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>
           Create Battle Room

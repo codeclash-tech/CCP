@@ -65,7 +65,17 @@ function isRateLimited(ip) {
  * Existing verified accounts must use password login; OTP is only for
  * completing registration and verifying the email address.
  */
-export async function requestOtp({ email, name, password, ip }) {
+export async function requestOtp({
+  email,
+  name,
+  password,
+  termsAccepted,
+  ip,
+}) {
+  if (termsAccepted !== true) {
+    throw new Error("You must agree to the Terms and Conditions to register.");
+  }
+
   const cleanEmail = sanitizeEmail(email);
   if (!cleanEmail) throw new Error("Invalid email format.");
 
@@ -98,12 +108,17 @@ export async function requestOtp({ email, name, password, ip }) {
       password, // hashed via pre-save hook
       role: isSuperAdmin ? "ADMIN" : "USER",
       isVerified: false,
+      termsAcceptedAt: new Date(),
+      termsVersion: "2026-10-11",
     });
     await user.save();
   } else {
     if (user.isVerified) {
       throw new Error("Email is already registered. Sign in with your password.");
     }
+    user.termsAcceptedAt = new Date();
+    user.termsVersion = "2026-10-11";
+    await user.save();
     // A pending registration may request another code, but cannot replace
     // the password or profile details already attached to that account.
   }

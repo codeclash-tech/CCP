@@ -10,7 +10,10 @@ import {
   Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { getPlatformStats } from "../services/platformService";
+import {
+  getPlatformPartners,
+  getPlatformStats,
+} from "../services/platformService";
 import "./About.css";
 
 function formatCount(value) {
@@ -20,6 +23,7 @@ function formatCount(value) {
 export default function About() {
   const [stats, setStats] = useState(null);
   const [statsError, setStatsError] = useState("");
+  const [partners, setPartners] = useState([]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -34,6 +38,17 @@ export default function About() {
             error.message || "Platform statistics could not be loaded.",
           );
         }
+      });
+
+    getPlatformPartners()
+      .then((result) => {
+        if (isCurrent) setPartners(result.partners || []);
+      })
+      .catch((error) => {
+        console.error(
+          "[About] Partner organizations could not be loaded:",
+          error.message,
+        );
       });
 
     return () => {
@@ -51,8 +66,8 @@ export default function About() {
           <h1>Make coding practice a shared challenge.</h1>
           <p>
             CodeClash helps people turn programming questions into focused,
-            timed coding battles. Creators set the challenge; participants
-            solve it, see how they did, and learn through the experience.
+            timed coding battles. Creators set the challenge; participants solve
+            it, see how they did, and learn through the experience.
           </p>
           <div className="about-hero-actions">
             <Link className="btn-primary" to="/register">
@@ -68,46 +83,64 @@ export default function About() {
             </a>
           </div>
         </div>
-        <div className="about-hero-mark" aria-hidden="true">
-          <div className="about-mark-ring">
-            <Swords size={58} strokeWidth={1.4} />
+        <aside className="about-hero-stats" aria-label="CodeClash community">
+          <div className="about-stat-card">
+            <span className="about-stat-icon">
+              <Users size={19} />
+            </span>
+            <div>
+              <strong>{stats ? formatCount(stats.memberCount) : "—"}</strong>
+              <span>Verified members</span>
+            </div>
           </div>
-          <span>Think. Code. Compete.</span>
-        </div>
+          <div className="about-stat-card">
+            <span className="about-stat-icon">
+              <Lightbulb size={19} />
+            </span>
+            <div>
+              <strong>{stats ? formatCount(stats.creatorCount) : "—"}</strong>
+              <span>Battle creators</span>
+            </div>
+          </div>
+          <p className="about-stats-note" aria-live="polite">
+            {statsError
+              ? statsError
+              : stats
+                ? "Creators are counted once per email."
+                : "Loading community totals…"}
+          </p>
+        </aside>
       </section>
 
-      <section className="about-stats" aria-label="CodeClash community">
-        <div className="about-stat-card">
-          <span className="about-stat-icon"><Users size={19} /></span>
-          <div>
-            <strong>{stats ? formatCount(stats.memberCount) : "—"}</strong>
-            <span>Registered members</span>
+      {partners.length > 0 && (
+        <section className="about-partners" aria-label="CodeClash partners">
+          <div className="about-partners-heading">
+            <span className="about-eyebrow">Growing together</span>
+            <h2>Our partners</h2>
           </div>
-        </div>
-        <div className="about-stat-card">
-          <span className="about-stat-icon"><Lightbulb size={19} /></span>
-          <div>
-            <strong>{stats ? formatCount(stats.creatorCount) : "—"}</strong>
-            <span>Battle creators</span>
+          <div className="about-partners-row">
+            {partners.map((partner) => (
+              <article className="about-partner" key={partner.name}>
+                <img src={partner.logo} alt={`${partner.name} logo`} />
+                <span>{partner.name}</span>
+              </article>
+            ))}
           </div>
-        </div>
-        <p className="about-stats-note" aria-live="polite">
-          {statsError
-            ? statsError
-            : stats
-              ? "Members are counted by account. Creators are counted once per email, no matter how many battles they create."
-              : "Loading current community totals…"}
-        </p>
-      </section>
+        </section>
+      )}
 
       <section className="about-section">
         <div className="about-section-heading">
-          <span className="about-eyebrow">One platform, two ways to take part</span>
+          <span className="about-eyebrow">
+            One platform, two ways to take part
+          </span>
           <h2>Create a challenge or take one on.</h2>
         </div>
         <div className="about-audience-grid">
           <article className="about-audience-card">
-            <span className="about-card-icon"><Lightbulb size={21} /></span>
+            <span className="about-card-icon">
+              <Lightbulb size={21} />
+            </span>
             <h3>For creators</h3>
             <p>
               Build a battle around your own coding questions, choose its
@@ -115,16 +148,24 @@ export default function About() {
               Track participation and review results from one place.
             </p>
             <ul>
-              <li><CheckCircle2 size={16} /> Create and configure coding battles</li>
-              <li><CheckCircle2 size={16} /> Share a room with participants</li>
-              <li><CheckCircle2 size={16} /> Review submissions and results</li>
+              <li>
+                <CheckCircle2 size={16} /> Create and configure coding battles
+              </li>
+              <li>
+                <CheckCircle2 size={16} /> Share a room with participants
+              </li>
+              <li>
+                <CheckCircle2 size={16} /> Review submissions and results
+              </li>
             </ul>
             <Link to="/battle-room/create" className="about-card-link">
               Create a battle <ArrowRight size={15} />
             </Link>
           </article>
           <article className="about-audience-card">
-            <span className="about-card-icon"><Swords size={21} /></span>
+            <span className="about-card-icon">
+              <Swords size={21} />
+            </span>
             <h3>For challengers</h3>
             <p>
               Join a battle with its room code, solve problems in the coding
@@ -132,9 +173,15 @@ export default function About() {
               your results and sharpen your problem-solving skills.
             </p>
             <ul>
-              <li><CheckCircle2 size={16} /> Join a shared coding challenge</li>
-              <li><CheckCircle2 size={16} /> Write, run, and submit solutions</li>
-              <li><CheckCircle2 size={16} /> See your score and leaderboard</li>
+              <li>
+                <CheckCircle2 size={16} /> Join a shared coding challenge
+              </li>
+              <li>
+                <CheckCircle2 size={16} /> Write, run, and submit solutions
+              </li>
+              <li>
+                <CheckCircle2 size={16} /> See your score and leaderboard
+              </li>
             </ul>
             <Link to="/battle-room" className="about-card-link">
               Find a battle <ArrowRight size={15} />
@@ -144,15 +191,17 @@ export default function About() {
       </section>
 
       <section className="about-platform">
-        <div className="about-platform-icon"><BarChart3 size={22} /></div>
+        <div className="about-platform-icon">
+          <BarChart3 size={22} />
+        </div>
         <div>
           <span className="about-eyebrow">Built for practical practice</span>
           <h2>Focused coding battles, with clear outcomes.</h2>
           <p>
             CodeClash brings challenge authoring, timed problem solving, code
             execution, and result tracking together. It gives creators a
-            straightforward way to run an exercise and gives challengers a
-            clear place to put their skills to work.
+            straightforward way to run an exercise and gives challengers a clear
+            place to put their skills to work.
           </p>
         </div>
       </section>
@@ -168,7 +217,10 @@ export default function About() {
       </section>
       <p className="about-byline">
         CodeClash is a product of{" "}
-        <a href="https://amux.in" target="_blank" rel="noreferrer">AMUX</a>.
+        <a href="https://amux.in" target="_blank" rel="noreferrer">
+          AMUX
+        </a>
+        .
       </p>
     </div>
   );

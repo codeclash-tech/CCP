@@ -15,6 +15,7 @@ import BattleRoomLeaderboard from "../pages/BattleRoomLeaderboard";
 import AuthPage from "../pages/AuthPage";
 import Profile from "../pages/Profile";
 import About from "../pages/About";
+import Terms from "../pages/Terms";
 
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
@@ -120,6 +121,14 @@ export default function AppRouter() {
             element={
               <AppLayout>
                 <About />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <AppLayout>
+                <Terms />
               </AppLayout>
             }
           />

@@ -22,6 +22,37 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    creatorType: {
+      type: String,
+      enum: ["INDIVIDUAL", "ORGANIZATION", null],
+      default: null,
+    },
+    firstBattleCreatedAt: {
+      type: Date,
+      default: null,
+    },
+    partnerLogo: {
+      type: String,
+      default: "",
+      maxlength: 700000,
+      select: false,
+    },
+    partnerAcceptedAt: {
+      type: Date,
+      default: null,
+    },
+    partnerTermsVersion: {
+      type: String,
+      default: "",
+    },
+    termsAcceptedAt: {
+      type: Date,
+      default: null,
+    },
+    termsVersion: {
+      type: String,
+      default: "",
+    },
     role: {
       type: String,
       enum: ["USER", "ADMIN"],
@@ -63,6 +94,8 @@ userSchema.methods.toPublicJSON = function () {
     email: this.email,
     name: this.name,
     organization: this.organization,
+    creatorType: this.creatorType,
+    isPartner: Boolean(this.partnerAcceptedAt),
     role: this.role,
     isVerified: this.isVerified,
     totalScore: this.totalScore,

@@ -233,6 +233,11 @@ const battleRoomSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    closedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -423,6 +428,7 @@ battleRoomSchema.methods.toPublicJSON = function () {
     endDate: this.endDate || this.endTime,
     startTime: this.startTime,
     endTime: this.endTime,
+    closedAt: this.closedAt,
     timezone: this.timezone || "UTC",
     scheduledDate: this.scheduledDate,
     scheduledStartTime: this.scheduledStartTime,
@@ -454,6 +460,7 @@ battleRoomSchema.methods.toLeaderboardJSON = function () {
     endDate: this.endDate || this.endTime,
     startTime: this.startTime,
     endTime: this.endTime,
+    closedAt: this.closedAt,
     timezone: this.timezone || "UTC",
     participantCount: this.participantCount,
     questionCount: this.questions.length,

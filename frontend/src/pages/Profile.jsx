@@ -10,13 +10,16 @@ export default function Profile() {
     <main className="profile-page">
       <style>{`
         .profile-page {
+          width: 100%;
+          max-width: 1600px;
+          margin: 0 auto;
           min-height: calc(100vh - 64px);
-          padding: 34px 24px 56px;
+          padding: 20px clamp(20px, 4vw, 64px) 48px;
           color: var(--text-primary);
         }
 
         .profile-container {
-          width: min(920px, 100%);
+          width: 100%;
           margin: 0 auto;
         }
 

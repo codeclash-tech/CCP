@@ -32,6 +32,7 @@ import {
   Timer,
   ListOrdered,
   RefreshCw,
+  Monitor,
   KeyRound,
   AlertTriangle,
   Code2,
@@ -137,6 +138,11 @@ function saveRoomEditorCache(roomCode, codeByQuestion, resultByQuestion) {
 export default function BattleRoomChallenge() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
+  const [hasLaptopViewport, setHasLaptopViewport] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 1024px)").matches,
+  );
 
   const [room, setRoom] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -173,6 +179,14 @@ export default function BattleRoomChallenge() {
   const resultByQuestionRef = useRef({});
   const activeQuestionIdRef = useRef(null);
   const startTimeRef = useRef(null);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const updateViewport = () => setHasLaptopViewport(mediaQuery.matches);
+    updateViewport();
+    mediaQuery.addEventListener("change", updateViewport);
+    return () => mediaQuery.removeEventListener("change", updateViewport);
+  }, []);
 
   const fetchRoom = useCallback(async () => {
     setLoading(true);
@@ -954,6 +968,27 @@ export default function BattleRoomChallenge() {
   }
 
   if (!room) return null;
+
+  if (!isCreator && !hasLaptopViewport) {
+    return (
+      <main className="challenge-device-notice">
+        <Monitor size={40} />
+        <h1>Continue this challenge on a laptop</h1>
+        <p>
+          The coding editor and challenge workspace are designed for a laptop
+          screen. Your room access is saved; open this challenge again on a
+          laptop to continue.
+        </p>
+        <button
+          className="btn-primary"
+          type="button"
+          onClick={() => navigate("/battle-room", { replace: true })}
+        >
+          Back to Battle Room
+        </button>
+      </main>
+    );
+  }
 
   // Participant blocked by the schedule (before start or after end).
   const isBlockedBySchedule =

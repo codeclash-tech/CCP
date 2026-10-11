@@ -15,6 +15,7 @@ export async function sendBattleRoomResultEmail({
   endTime,
   submissionStatus = "COMPLETED",
   completedAt,
+  certificateUrl,
 }) {
   try {
     const { resend, from } = getResendClient();
@@ -59,10 +60,12 @@ export async function sendBattleRoomResultEmail({
       : `<tr><td colspan="4" style="padding: 12px 10px; color: #64748b;">No question-level results were recorded.</td></tr>`;
 
     const downloadInstructions =
-      "To download your certificate, sign in to CodeClash, open Joined Rooms, select this battle room, click My Result, and choose Download Certificate.";
-    const certificateDeadline = endTime
-      ? `Please download your certificate by the battle room end time (${battleEnd}).`
-      : "Please download your certificate by the battle room end time shown in the platform.";
+      "Use the secure link below to download your certificate. You do not need to reopen the battle room.";
+    const certificateDeadline =
+      "Download within 5 minutes of receiving this email; the battle room will then be deleted.";
+    const certificateLink = certificateUrl
+      ? `<p style="margin: 16px 0 0;"><a href="${escapeHtml(certificateUrl)}" style="display: inline-block; padding: 11px 16px; color: #ffffff; background: #1d4ed8; border-radius: 6px; font-weight: bold; text-decoration: none;">Download your certificate</a></p>`
+      : "";
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -104,6 +107,7 @@ export async function sendBattleRoomResultEmail({
         <h2 style="margin: 0 0 8px; font-size: 17px;">Download your certificate</h2>
         <p style="margin: 0; color: #334155; line-height: 1.6;">${downloadInstructions}</p>
         <p style="margin: 8px 0 0; color: #334155; line-height: 1.6;">${certificateDeadline}</p>
+        ${certificateLink}
       </section>
     </section>
     <footer style="padding: 16px 32px; color: #64748b; background: #f8fafc; font-size: 12px;">CodeClash &copy; ${new Date().getFullYear()}</footer>
@@ -136,6 +140,7 @@ ${questionResults.map((question, index) => {
 DOWNLOAD YOUR CERTIFICATE
 ${downloadInstructions}
 ${certificateDeadline}
+${certificateUrl ? `Download: ${certificateUrl}` : ""}
 
 CodeClash
     `;

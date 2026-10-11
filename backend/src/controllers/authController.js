@@ -16,7 +16,8 @@ import {
  * Password-based authentication controller with email-verified registration.
  *
  * Security notes:
- *  - Registration OTPs verify email only; organization is collected at room join.
+ *  - Registration OTPs verify email; creator organization details are collected
+ *    before the first battle is created.
  *  - Registration errors are explicit, while email-provider internals remain private.
  *  - NO LEAKAGE: internal email-provider errors are never surfaced to the client; a clean,
  *    generic message is returned instead. Detailed logs stay server-side.
@@ -26,18 +27,24 @@ import {
 
 /**
  * POST /request-otp
- * Body: { email, name, password }
+ * Body: { email, name, password, termsAccepted }
  */
 export async function requestOTP(req, res) {
   try {
-    const { email, name, password } = req.body || {};
+    const { email, name, password, termsAccepted } = req.body || {};
     const ip = req.ip || req.connection?.remoteAddress || "";
 
     if (!email) {
       return res.status(400).json({ error: "Email is required." });
     }
 
-    const result = await requestOtp({ email, name, password, ip });
+    const result = await requestOtp({
+      email,
+      name,
+      password,
+      termsAccepted,
+      ip,
+    });
 
                 return res.status(200).json({
       message: "Registration verification code sent.",
@@ -50,7 +57,8 @@ export async function requestOTP(req, res) {
     }
     if (
       error.message?.includes("Password") ||
-      error.message?.includes("Full name")
+      error.message?.includes("Full name") ||
+      error.message?.includes("Terms and Conditions")
     ) {
       return res.status(400).json({ error: error.message });
     }

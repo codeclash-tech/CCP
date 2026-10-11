@@ -38,6 +38,7 @@ export default function Navbar() {
 
   return (
     <nav
+      className="app-navbar"
       style={{
         background: "var(--bg-elevated)",
         borderBottom: "1px solid var(--border-color)",
