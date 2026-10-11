@@ -543,3 +543,244 @@ input:-webkit-autofill:focus {
     font-size: 34px;
   }
 }
+
+html,
+body,
+#root {
+  min-width: 0;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.home-page,
+.about-page,
+.terms-page,
+.profile-page,
+.battle-room-page,
+.create-battle-page,
+.leaderboard-page {
+  min-width: 0;
+}
+
+.home-page h1,
+.home-page h2,
+.home-page h3,
+.about-page h1,
+.about-page h2,
+.about-page h3,
+.terms-page h1,
+.terms-page h2,
+.profile-page h1,
+.profile-page h2,
+.battle-room-page h1,
+.battle-room-page h2,
+.create-battle-page h1,
+.create-battle-page h2,
+.leaderboard-page h1,
+.leaderboard-page h2 {
+  overflow-wrap: anywhere;
+}
+
+.app-navbar-main,
+.app-navbar-links,
+.app-navbar-account {
+  min-width: 0;
+}
+
+.room-list-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.room-list-created .room-list-row,
+.room-list-joined .room-list-row {
+  min-width: 650px;
+}
+
+.room-list-created .room-list-row {
+  grid-template-columns: 100px minmax(180px, 1fr) 90px 70px 90px 90px;
+}
+
+.room-list-joined .room-list-row {
+  grid-template-columns: 100px minmax(180px, 1fr) 80px 80px 100px;
+}
+
+@media (max-width: 600px) {
+  .app-navbar {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 8px !important;
+  }
+
+  .app-navbar-main {
+    display: contents !important;
+  }
+
+  .app-navbar-main > a:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 16px !important;
+  }
+
+  .app-navbar-main > a:first-child svg {
+    width: 20px;
+  }
+
+  .app-navbar-links {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 2px !important;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .app-navbar-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-navbar-links a {
+    flex: 0 0 auto;
+    min-height: 38px;
+    white-space: nowrap;
+  }
+
+  .app-navbar-account {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0 !important;
+  }
+
+  .app-navbar-account > button {
+    gap: 6px !important;
+    padding: 3px 4px !important;
+  }
+
+  .app-navbar-account > button > span {
+    max-width: min(26vw, 120px) !important;
+  }
+
+  .app-footer {
+    align-items: flex-start !important;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 12px 16px !important;
+  }
+
+  .app-footer > div:last-child {
+    flex-wrap: wrap;
+    gap: 6px 12px !important;
+  }
+
+  .tab-btn {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 7px 11px;
+    white-space: nowrap;
+  }
+
+  .battle-room-page > div:nth-child(2) {
+    gap: 4px !important;
+    margin-right: -16px;
+    padding-right: 16px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .battle-room-page .room-list-created .room-list-row {
+    min-width: 690px !important;
+    grid-template-columns: 100px minmax(180px, 1fr) 90px 70px 90px 90px !important;
+  }
+
+  .battle-room-page .room-list-joined .room-list-row {
+    min-width: 600px !important;
+    grid-template-columns: 100px minmax(180px, 1fr) 80px 80px 100px !important;
+  }
+
+  .create-step-tabs {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .create-step-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .create-battle-page > div[style*="padding: 24px"],
+  .create-battle-page > div[style*="padding: 28px"] {
+    padding: 16px !important;
+  }
+
+  .leaderboard-page > div:first-child > div:last-child {
+    width: 100%;
+  }
+
+  .leaderboard-page > div:first-child > div:last-child > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .leaderboard-page p {
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .battle-room-page input,
+  .battle-room-page select,
+  .battle-room-page textarea,
+  .create-battle-page input,
+  .create-battle-page select,
+  .create-battle-page textarea,
+  .auth-page input,
+  .auth-page select,
+  .auth-page textarea {
+    font-size: 16px !important;
+  }
+
+  .challenge-device-notice {
+    min-height: 100dvh;
+    padding: 24px 18px;
+  }
+}
+
+@media (max-width: 380px) {
+  .app-navbar {
+    padding: 8px 10px !important;
+  }
+
+  .app-navbar-links a {
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+  }
+
+  .app-footer {
+    font-size: 11px !important;
+  }
+
+  .battle-room-page,
+  .create-battle-page,
+  .leaderboard-page {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
+}

@@ -55,6 +55,7 @@ export default function Navbar() {
     >
       {/* Brand and navigation */}
       <div
+        className="app-navbar-main"
         style={{
           display: "flex",
           alignItems: "center",
@@ -78,7 +79,7 @@ export default function Navbar() {
           <span>CodeClash</span>
         </Link>
 
-        <div style={{ display: "flex", gap: 2 }}>
+        <div className="app-navbar-links" style={{ display: "flex", gap: 2 }}>
             {NAV_LINKS.filter((link) => user || link.path === "/about").map((link) => {
               const isActive =
                 location.pathname === link.path ||
@@ -118,7 +119,7 @@ export default function Navbar() {
 
       {/* User menu */}
       {user ? (
-        <div style={{ position: "relative" }}>
+        <div className="app-navbar-account" style={{ position: "relative" }}>
           <button
             type="button"
             aria-haspopup="menu"
@@ -225,15 +226,17 @@ export default function Navbar() {
           )}
         </div>
       ) : (
-        <Link
-          to="/login"
-          style={{
-            color: "var(--accent-blue-bright)",
-            fontSize: 13,
-          }}
-        >
-          Sign in
-        </Link>
+        <div className="app-navbar-account">
+          <Link
+            to="/login"
+            style={{
+              color: "var(--accent-blue-bright)",
+              fontSize: 13,
+            }}
+          >
+            Sign in
+          </Link>
+        </div>
       )}
     </nav>
   );

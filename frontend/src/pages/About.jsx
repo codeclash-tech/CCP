@@ -111,23 +111,25 @@ export default function About() {
           </p>
         </aside>
       </section>
+      {/*
+{partners.length > 0 && (
+  <section className="about-partners" aria-label="CodeClash partners">
+    <div className="about-partners-heading">
+      <span className="about-eyebrow">Growing together</span>
+      <h2>Our partners</h2>
+    </div>
 
-      {partners.length > 0 && (
-        <section className="about-partners" aria-label="CodeClash partners">
-          <div className="about-partners-heading">
-            <span className="about-eyebrow">Growing together</span>
-            <h2>Our partners</h2>
-          </div>
-          <div className="about-partners-row">
-            {partners.map((partner) => (
-              <article className="about-partner" key={partner.name}>
-                <img src={partner.logo} alt={`${partner.name} logo`} />
-                <span>{partner.name}</span>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+    <div className="about-partners-row">
+      {partners.map((partner) => (
+        <article className="about-partner" key={partner.name}>
+          <img src={partner.logo} alt={`${partner.name} logo`} />
+          <span>{partner.name}</span>
+        </article>
+      ))}
+    </div>
+  </section>
+)}
+*/}
 
       <section className="about-section">
         <div className="about-section-heading">

@@ -3,6 +3,7 @@ import { Code2, ShieldCheck } from "lucide-react";
 export default function Footer() {
   return (
     <footer
+      className="app-footer"
       style={{
         background: "var(--bg-elevated)",
         borderTop: "1px solid var(--border-color)",

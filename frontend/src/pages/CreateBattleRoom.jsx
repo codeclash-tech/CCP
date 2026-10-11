@@ -507,7 +507,7 @@ export default function CreateBattleRoom() {
       </div>
 
       {/* Step indicator */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
+      <div className="create-step-tabs" style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
         {STEPS.map((s, i) => {
           const active = i === currentStep;
           const done = i < currentStep;
@@ -515,6 +515,7 @@ export default function CreateBattleRoom() {
             <button
               key={s.id}
               onClick={() => setCurrentStep(i)}
+              className="create-step-tab"
               style={{
                 display: "flex",
                 alignItems: "center",

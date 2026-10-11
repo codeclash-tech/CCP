@@ -305,8 +305,8 @@ export default function BattleRoom() {
               You haven't created any rooms yet.
             </div>
           ) : (
-            <div>
-              <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 90px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <div className="room-list-scroll room-list-created">
+              <div className="room-list-row room-list-header" style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 90px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                 <div>Key</div>
                 <div>Title</div>
                 <div>Status</div>
@@ -322,6 +322,7 @@ export default function BattleRoom() {
                     else if (room.status === "ACTIVE") navigate(`/battle-room/${room.roomCode}/challenge`);
                     else navigate(`/battle-room/${room.roomCode}/leaderboard`);
                   }}
+                  className="room-list-row"
                   style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 90px", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-color)", fontSize: 12, fontFamily: "var(--font-ui)", alignItems: "center", cursor: "pointer" }}
                 >
                   <CopyableCode
@@ -374,8 +375,8 @@ export default function BattleRoom() {
               You haven't joined any rooms yet.
             </div>
           ) : (
-            <div>
-              <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 80px 80px 100px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            <div className="room-list-scroll room-list-joined">
+              <div className="room-list-row room-list-header" style={{ display: "grid", gridTemplateColumns: "100px 1fr 80px 80px 100px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                 <div>Key</div>
                 <div>Title</div>
                 <div>Score</div>
@@ -392,6 +393,7 @@ export default function BattleRoom() {
                       navigate(`/battle-room/${room.roomCode}/leaderboard`);
                     }
                   }}
+                  className="room-list-row"
                   style={{ display: "grid", gridTemplateColumns: "100px 1fr 80px 80px 100px", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-color)", fontSize: 12, fontFamily: "var(--font-ui)", alignItems: "center", cursor: "pointer" }}
                 >
                   <span style={{ color: "var(--color-warning)", fontWeight: 700, letterSpacing: 2, fontFamily: "var(--font-code)" }}>
