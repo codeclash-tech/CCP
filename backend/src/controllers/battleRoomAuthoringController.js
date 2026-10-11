@@ -129,8 +129,8 @@ export async function generateOutputs(req, res) {
     });
   } catch (error) {
     console.error("Generate outputs error:", error.message);
-    // Pass the full engine error message through to the frontend
-    return res.status(500).json({ error: error.message });
+    const status = error.message.includes("temporarily rate-limiting") ? 503 : 500;
+    return res.status(status).json({ error: error.message });
   }
 }
 

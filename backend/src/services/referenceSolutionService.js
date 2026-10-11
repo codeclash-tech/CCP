@@ -51,6 +51,12 @@ export async function generateExpectedOutputs(question, referenceSolution, langu
     memoryLimit: 131072,
   });
 
+  if (result.error?.includes("HTTP 429")) {
+    throw new Error(
+      "Secure Code Engine is temporarily rate-limiting requests (HTTP 429). Wait a moment and try generating expected outputs again."
+    );
+  }
+
   // Engine-level failures (e.g. compilation error, engine down) with no
   // per-test-case results block publishing with the required message.
   if (result.error && (!result.results || result.results.length === 0)) {

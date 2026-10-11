@@ -7,6 +7,8 @@ const DEFAULT_ENGINE_URL =
 const DEFAULT_TIMEOUT_MS = 120000;
 const SUPPORTED_EXECUTION_LANGUAGES = ["java"];
 const WARM_UP_COOLDOWN_MS = 5 * 60 * 1000;
+const MAX_RATE_LIMIT_RETRIES = 2;
+const DEFAULT_RATE_LIMIT_RETRY_DELAY_MS = 1000;
 const FATAL_TEST_CASE_STATUSES = [
   "COMPILATION_ERROR",
   "RUNTIME_ERROR",
@@ -87,6 +89,44 @@ function outputString(value) {
 
 function outputsMatch(actual, expected) {
   return compareOutput(actual, expected).passed;
+}
+
+function getRateLimitRetryDelay(response, retryCount) {
+  const retryAfter = response.headers?.get?.("retry-after");
+  if (retryAfter === null || retryAfter === undefined || retryAfter === "") {
+    return DEFAULT_RATE_LIMIT_RETRY_DELAY_MS * (2 ** retryCount);
+  }
+
+  const seconds = Number(retryAfter);
+  const delay = Number.isFinite(seconds)
+    ? Math.max(0, seconds * 1000)
+    : Math.max(0, Date.parse(retryAfter) - Date.now());
+  return Number.isFinite(delay)
+    ? delay
+    : DEFAULT_RATE_LIMIT_RETRY_DELAY_MS * (2 ** retryCount);
+}
+
+function waitForRetry(delayMs, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      const error = new Error("Execution request timed out.");
+      error.name = "AbortError";
+      reject(error);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, delayMs);
+    const abort = () => {
+      clearTimeout(timeoutId);
+      const error = new Error("Execution request timed out.");
+      error.name = "AbortError";
+      reject(error);
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+  });
 }
 
 function failedCase(testCase, index, error, status = "SYSTEM_ERROR") {
@@ -342,15 +382,29 @@ export class ExecutionService {
       const finishEngineWait = beginExecutionPhase("ENGINE_WAIT");
       let response;
       try {
-        response = await fetch(this.engineUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": this.apiKey,
-          },
-          body: JSON.stringify(payload),
-          signal: controller?.signal,
-        });
+        let retries = 0;
+        while (true) {
+          response = await fetch(this.engineUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": this.apiKey,
+            },
+            body: JSON.stringify(payload),
+            signal: controller?.signal,
+          });
+          if (response.status !== 429 || retries >= MAX_RATE_LIMIT_RETRIES) {
+            break;
+          }
+
+          const retryDelay = getRateLimitRetryDelay(response, retries);
+          const remainingMs =
+            this.timeoutMs - (performance.now() - requestStartedAt);
+          if (retryDelay >= remainingMs) break;
+
+          retries += 1;
+          await waitForRetry(retryDelay, controller?.signal);
+        }
       } finally {
         finishEngineWait();
       }
@@ -390,7 +444,7 @@ export class ExecutionService {
           engineError = "";
         }
         const message = engineError
-          ? `Secure Code Engine error: ${engineError}`
+          ? `Secure Code Engine returned HTTP ${response.status}: ${engineError}`
           : `Secure Code Engine returned HTTP ${response.status}`;
         return summarizeResults(
           testCases.map((testCase, index) =>

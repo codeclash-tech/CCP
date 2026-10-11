@@ -8,10 +8,10 @@ const testCases = [
   { _id: "case-3", input: "3", expectedOutput: "6" },
 ];
 
-function engineResponse(body, status = 200) {
+function engineResponse(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 }
 
@@ -193,6 +193,61 @@ test("converts engine HTTP failures into failed results for every case", async (
     assert.equal(result.accepted, false);
     assert.equal(result.results.length, testCases.length);
     assert.match(result.error, /engine unavailable/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("retries a rate-limited engine request once and returns the successful batch", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return engineResponse({ error: "rate limit exceeded" }, 429, {
+        "retry-after": "0",
+      });
+    }
+    return engineResponse({
+      status: "ACCEPTED",
+      results: [
+        { actualOutput: "2" },
+        { actualOutput: "4" },
+        { actualOutput: "6" },
+      ],
+    });
+  };
+
+  try {
+    const service = new ExecutionService("https://engine.test/execute");
+    const result = await service.execute("class Solution {}", testCases);
+
+    assert.equal(requestCount, 2);
+    assert.equal(result.accepted, true);
+    assert.equal(result.passed, testCases.length);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("stops retrying after the retry limit is reached", async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  globalThis.fetch = async () => {
+    requestCount += 1;
+    return engineResponse({ error: "rate limit exceeded" }, 429, {
+      "retry-after": "0",
+    });
+  };
+
+  try {
+    const service = new ExecutionService("https://engine.test/execute");
+    const result = await service.execute("class Solution {}", testCases);
+
+    assert.equal(requestCount, 3);
+    assert.equal(result.status, "SYSTEM_ERROR");
+    assert.match(result.error, /HTTP 429: rate limit exceeded/);
+    assert.ok(result.results.every(({ status }) => status === "SYSTEM_ERROR"));
   } finally {
     globalThis.fetch = originalFetch;
   }
