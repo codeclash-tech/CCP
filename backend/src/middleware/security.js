@@ -50,6 +50,7 @@ export const reportLimiter = rateLimit({
 
 export function requireJudgeCallbackSecret(req, res, next) {
   const configuredSecret = config.JUDGE_CALLBACK_SECRET;
+
   if (!configuredSecret) {
     return res.status(503).json({
       error: "Judge callback authentication is not configured.",
@@ -57,50 +58,80 @@ export function requireJudgeCallbackSecret(req, res, next) {
   }
 
   const suppliedSecret = req.headers["x-judge-callback-key"];
+
   if (
     typeof suppliedSecret !== "string" ||
     Buffer.byteLength(suppliedSecret) !== Buffer.byteLength(configuredSecret) ||
     !timingSafeEqual(Buffer.from(suppliedSecret), Buffer.from(configuredSecret))
   ) {
-    return res.status(401).json({ error: "Invalid judge callback credentials." });
+    return res.status(401).json({
+      error: "Invalid judge callback credentials.",
+    });
   }
+
   next();
 }
 
 export function securityMiddleware(app) {
+  // Normalize CLIENT_URL so an accidental trailing slash does not
+  // break exact CORS origin matching.
+  const clientUrl = config.CLIENT_URL?.replace(/\/+$/, "");
+
+  // CodeClash production frontend.
+  // Keeping this explicit ensures the custom domain works even if
+  // CLIENT_URL is temporarily missing or misconfigured.
+  const productionFrontendUrl = "https://codeclash.amux.in";
+
   // Helmet with strict CSP
   app.use(
     helmet({
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
+
           scriptSrc: [
             "'self'",
             "'unsafe-inline'",
             "'unsafe-eval'",
             "cdn.jsdelivr.net",
           ],
+
           styleSrc: [
             "'self'",
             "'unsafe-inline'",
             "cdn.jsdelivr.net",
             "fonts.googleapis.com",
           ],
+
           fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
+
           imgSrc: ["'self'", "data:", "blob:"],
+
           connectSrc: [
             "'self'",
-            config.CLIENT_URL,
+            clientUrl,
+            productionFrontendUrl,
             "https://code-executor.onrender.com",
-          ],
+          ].filter(Boolean),
+
           frameSrc: ["'none'"],
+
           objectSrc: ["'none'"],
+
           upgradeInsecureRequests: [],
         },
       },
+
       crossOriginEmbedderPolicy: false,
-      crossOriginResourcePolicy: { policy: "cross-origin" },
-      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+
+      crossOriginResourcePolicy: {
+        policy: "cross-origin",
+      },
+
+      referrerPolicy: {
+        policy: "strict-origin-when-cross-origin",
+      },
+
       hsts: {
         maxAge: 31536000,
         includeSubDomains: true,
@@ -111,7 +142,7 @@ export function securityMiddleware(app) {
 
   // Rate limiting
   // Skip OPTIONS preflight requests (they carry no auth and browsers send them
-  // before every CORS request). Counting them exhausts the limiter quickly.
+  // before CORS requests). Counting them exhausts the limiter quickly.
   const generalLimiter = rateLimit({
     windowMs: parseInt(config.RATE_LIMIT_WINDOW_MS),
     max: parseInt(config.RATE_LIMIT_MAX),
@@ -130,7 +161,7 @@ export function securityMiddleware(app) {
     legacyHeaders: false,
     skip: skipPreflight,
     message: {
-      error: "Too many authentication attempts, please try again later.",
+      error: "Too many authentication attempts. Please try again later.",
     },
   });
 
@@ -141,7 +172,7 @@ export function securityMiddleware(app) {
     legacyHeaders: false,
     skip: skipPreflight,
     message: {
-      error: "Too many submission attempts, please slow down.",
+      error: "Too many submission attempts. Please slow down.",
     },
   });
 
@@ -150,34 +181,68 @@ export function securityMiddleware(app) {
   app.use("/api/submissions", submissionLimiter);
 
   // CORS hardening
+  //
+  // Production:
+  //   https://codeclash.amux.in
+  //
+  // CLIENT_URL is also retained so existing configured environments
+  // continue to work.
   const allowedOrigins = [
-    config.CLIENT_URL,
+    clientUrl,
+
+    // Explicit production CodeClash domain.
+    productionFrontendUrl,
+
+    // Local development origins.
     ...(config.NODE_ENV === "production"
       ? []
       : ["http://localhost:5173", "http://localhost:3000"]),
   ].filter(Boolean);
 
+  // Remove duplicates.
+  const uniqueAllowedOrigins = [...new Set(allowedOrigins)];
+
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && allowedOrigins.includes(origin)) {
+
+    if (origin && uniqueAllowedOrigins.includes(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
     } else if (!origin) {
-      res.setHeader("Access-Control-Allow-Origin", config.CLIENT_URL || "*");
+      // Non-browser/server-to-server requests generally do not send Origin.
+      // Keep the configured client URL for compatibility.
+      res.setHeader(
+        "Access-Control-Allow-Origin",
+        clientUrl || productionFrontendUrl,
+      );
     }
+
     res.setHeader("Access-Control-Allow-Credentials", "true");
+
     res.setHeader(
       "Access-Control-Allow-Methods",
       "GET, POST, PUT, DELETE, PATCH, OPTIONS",
     );
+
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Guest-ID, X-Creator-Credential, X-Judge-Callback-Key, X-Request-Id, X-CSRF-Token",
+      [
+        "Content-Type",
+        "Authorization",
+        "X-Guest-ID",
+        "X-Creator-Credential",
+        "X-Judge-Callback-Key",
+        "X-Request-Id",
+        "X-CSRF-Token",
+      ].join(", "),
     );
+
     res.setHeader("Access-Control-Expose-Headers", "X-Request-Id");
 
+    // Explicitly terminate CORS preflight requests.
     if (req.method === "OPTIONS") {
       return res.status(204).end();
     }
+
     next();
   });
 }
@@ -192,11 +257,13 @@ export function sanitizeInput(req, res, next) {
           /[\x00-\x08\x0B\x0C\x0E-\x1F]/g,
           "",
         );
+
         // Trim whitespace
         req.body[key] = req.body[key].trim();
       }
     }
   }
+
   next();
 }
 
@@ -242,6 +309,7 @@ export function errorHandler(err, req, res, next) {
   }
 
   const statusCode = err.statusCode || 500;
+
   const response = {
     error: statusCode === 500 ? "Internal server error" : err.message,
     requestId,
