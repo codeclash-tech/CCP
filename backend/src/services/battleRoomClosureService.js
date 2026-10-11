@@ -2,7 +2,6 @@ import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
 import { countRoomTestCases } from "./battleRoomScoring.js";
 import { sendBattleRoomResultEmail } from "./emailService.js";
-import { createBattleRoomCertificateUrl } from "./battleRoomCertificateService.js";
 
 const STALE_DELIVERY_MS = 5 * 60 * 1000;
 
@@ -107,21 +106,14 @@ async function deliverRoomResults(room) {
         totalScore: submission.totalScore,
         totalPassed: submission.totalPassed,
         totalTestCases,
-        codingBehavior: submission.codingBehavior,
+        questionResults: submission.questionResults,
         rank: index + 1,
         totalParticipants: submissions.length,
         roomCode: room.roomCode,
+        startTime: room.startTime || room.startDate,
+        endTime: room.endTime || room.endDate,
+        submissionStatus: submission.status,
         completedAt: submission.submittedAt || room.endDate || new Date(),
-        certificateUrl: createBattleRoomCertificateUrl({
-          participantName:
-            submission.participantName || user?.name || user?.email || "Participant",
-          roomTitle: room.title,
-          roomCode: room.roomCode,
-          rank: index + 1,
-          totalParticipants: submissions.length,
-          totalScore: submission.totalScore,
-          completedAt: submission.submittedAt || room.endDate || new Date(),
-        }),
       });
     } catch (error) {
       delivery = { success: false, error: error.message };

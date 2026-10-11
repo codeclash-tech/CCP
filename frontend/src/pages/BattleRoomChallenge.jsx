@@ -19,6 +19,10 @@ import {
   LANGUAGE_BY_ID,
 } from "../utils/constants";
 import {
+  beginExecutionTrace,
+  finishExecutionTrace,
+} from "../utils/executionPerformance";
+import {
   Swords,
   Clock,
   Trophy,
@@ -375,6 +379,7 @@ export default function BattleRoomChallenge() {
     const question = room.questions[currentQuestionIndex];
     if (!question) return;
 
+    const performanceTraceId = beginExecutionTrace("submit");
     setSubmitting(true);
     setError("");
 
@@ -482,6 +487,7 @@ export default function BattleRoomChallenge() {
       setError(err.message || "Failed to submit solution.");
     } finally {
       setSubmitting(false);
+      finishExecutionTrace(performanceTraceId);
     }
   };
 
@@ -512,6 +518,7 @@ export default function BattleRoomChallenge() {
     const question = room.questions[currentQuestionIndex];
     if (!question) return;
 
+    const performanceTraceId = beginExecutionTrace("run");
     setRunning(true);
     setError("");
 
@@ -604,6 +611,7 @@ export default function BattleRoomChallenge() {
       setError(err.message || "Failed to run code.");
     } finally {
       setRunning(false);
+      finishExecutionTrace(performanceTraceId);
     }
   };
 
@@ -719,7 +727,7 @@ export default function BattleRoomChallenge() {
           gap: 16,
         }}
       >
-        <p style={{ color: "var(--color-danger)", fontSize: 14 }}>{error}</p>
+        <p role="alert" style={{ color: "var(--color-danger)", fontSize: 14 }}>{error}</p>
         {error.includes("organization before accessing") && (
           <button
             className="btn-primary"

@@ -3,24 +3,35 @@ import { KeyRound, Copy, Check, ShieldCheck, Share2, X, Users, Clock } from "luc
 
 export default function RoomKeyModal({ isOpen, onClose, roomCode, room }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
 
   if (!isOpen) return null;
 
   const handleCopy = async () => {
+    setCopyError("");
     try {
       await navigator.clipboard.writeText(roomCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback
-      const ta = document.createElement("textarea");
-      ta.value = roomCode;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      const textarea = document.createElement("textarea");
+      textarea.value = roomCode;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      try {
+        textarea.select();
+        if (!document.execCommand("copy")) {
+          throw new Error("Clipboard copy was rejected.");
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        setCopyError("Couldn't copy the key. Please select and copy it manually.");
+      } finally {
+        textarea.remove();
+      }
     }
   };
 
@@ -125,6 +136,19 @@ export default function RoomKeyModal({ isOpen, onClose, roomCode, room }) {
         >
           {roomCode}
         </div>
+
+        {copyError && (
+          <p
+            role="alert"
+            style={{
+              color: "var(--color-danger)",
+              fontSize: 12,
+              margin: "0 0 14px",
+            }}
+          >
+            {copyError}
+          </p>
+        )}
 
         {room?.timeLimit && (
           <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 20, flexWrap: "wrap" }}>

@@ -10,6 +10,8 @@ import { getProfile, signOut as signOutRequest } from "../services/authService";
 
 const AuthContext = createContext(null);
 const AUTH_EVENT_KEY = "ccp-auth-event";
+const ACCESS_TOKEN_KEY = "ccp_access_token";
+const REFRESH_TOKEN_KEY = "ccp_refresh_token";
 
 function clearPrivateClientState() {
   localStorage.removeItem("ccp_access_token");
@@ -26,11 +28,29 @@ function clearPrivateClientState() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState("");
 
   const refreshProfile = useCallback(async () => {
-    const profile = await getProfile();
-    setUser(profile);
-    return profile;
+    setLoading(true);
+    setSessionError("");
+    try {
+      const profile = await getProfile();
+      setUser(profile);
+      return profile;
+    } catch (error) {
+      setUser(null);
+      if (
+        localStorage.getItem(ACCESS_TOKEN_KEY) ||
+        localStorage.getItem(REFRESH_TOKEN_KEY)
+      ) {
+        setSessionError(
+          error.message || "Unable to verify your session. Please try again.",
+        );
+      }
+      return null;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const signOut = useCallback(async ({ notifyOtherTabs = true } = {}) => {
@@ -38,6 +58,7 @@ export function AuthProvider({ children }) {
       await signOutRequest();
     } finally {
       setUser(null);
+      setSessionError("");
       clearPrivateClientState();
       if (notifyOtherTabs) {
         localStorage.setItem(AUTH_EVENT_KEY, String(Date.now()));
@@ -46,28 +67,20 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    getProfile()
-      .then((profile) => {
-        if (mounted) setUser(profile);
-      })
-      .catch(() => {
-        if (mounted) {
-          setUser(null);
-          clearPrivateClientState();
-        }
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (
+      !localStorage.getItem(ACCESS_TOKEN_KEY) &&
+      !localStorage.getItem(REFRESH_TOKEN_KEY)
+    ) {
+      setLoading(false);
+      return;
+    }
+    refreshProfile();
+  }, [refreshProfile]);
 
   useEffect(() => {
     const expireCurrentAuth = () => {
       setUser(null);
+      setSessionError("");
       clearPrivateClientState();
     };
     const handleStorage = (event) => {
@@ -87,13 +100,17 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       loading,
+      sessionError,
       isAuthenticated: Boolean(user),
       isAdmin: user?.role === "ADMIN",
       refreshProfile,
-      signIn: (profile) => setUser(profile),
+      signIn: (profile) => {
+        setSessionError("");
+        setUser(profile);
+      },
       signOut,
     }),
-    [user, loading, refreshProfile, signOut],
+    [user, loading, sessionError, refreshProfile, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

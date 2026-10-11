@@ -1,28 +1,48 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, KeyRound, PlusCircle, Swords, Mail } from "lucide-react";
+import {
+  ArrowRight,
+  KeyRound,
+  PlusCircle,
+  Swords,
+  Mail,
+  Terminal,
+  CheckCircle2,
+  Building2,
+  GraduationCap,
+  Briefcase,
+} from "lucide-react";
 
 const cards = [
   {
     icon: PlusCircle,
     title: "Create a Battle Room",
-    text: "Create questions, set limits and configure room rules.",
-    action: "Create Room",
+    text: "Add custom Java/DS questions, set time limits, and generate a secure battle key for your candidates or students.",
+    action: "Create Arena",
     to: "/battle-room/create",
+    badge: "For Hosts & Recruiters",
   },
   {
     icon: KeyRound,
-    title: "Join a Battle",
-    text: "Enter a six-character room key to participate.",
-    action: "Join Room",
+    title: "Join with Key",
+    text: "Received an invitation key? Enter your 6-character room code to start solving challenges in real time.",
+    action: "Enter Battle",
     to: "/battle-room",
+    badge: "For Candidates & Coders",
   },
   {
     icon: Mail,
-    title: "Contact Us",
-    text: "Get in touch for support, partnerships and enquiries.",
-    action: "Send an Enquiry",
+    title: "Enterprise & Support",
+    text: "Looking for custom platform integration for your startup, university, or academy? Get in touch with our team.",
+    action: "Contact Support",
     to: "mailto:helloamux@gmail.com?subject=CodeClash%20Enquiry",
+    badge: "Partnerships",
   },
+];
+
+const targetAudiences = [
+  { icon: Briefcase, label: "Technical Hiring & Interviews" },
+  { icon: GraduationCap, label: "Colleges & Universities" },
+  { icon: Building2, label: "Bootcamps & Training Centers" },
 ];
 
 export default function Home() {
@@ -33,7 +53,7 @@ export default function Home() {
           width: 100%;
           max-width: 1600px;
           margin: 0 auto;
-          padding: 20px clamp(20px, 4vw, 64px) 36px;
+          padding: 20px clamp(20px, 4vw, 64px) 48px;
           font-family: var(--font-ui);
           color: var(--text-primary);
           box-sizing: border-box;
@@ -44,264 +64,343 @@ export default function Home() {
         }
 
         /* HERO */
+        .home-hero {
+          position: relative;
+          isolation: isolate;
+          overflow: hidden;
+          padding: clamp(28px, 4vw, 52px) clamp(24px, 4vw, 48px);
+          margin-bottom: 32px;
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          border-radius: 20px;
+          background:
+            radial-gradient(
+              ellipse at 88% 12%,
+              rgba(0, 119, 255, 0.25),
+              transparent 45%
+            ),
+            radial-gradient(
+              ellipse at 10% 100%,
+              rgba(0, 212, 255, 0.12),
+              transparent 45%
+            ),
+            linear-gradient(
+              120deg,
+              #050b1c 0%,
+              #07132e 55%,
+              #071027 100%
+            );
+          box-shadow:
+            0 20px 40px rgba(0, 0, 0, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          display: grid;
+          grid-template-columns: 1fr 460px;
+          gap: 36px;
+          align-items: center;
+        }
 
-        
-/* HERO */
-.home-hero {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  padding: clamp(22px, 3vw, 40px);
-  margin-bottom: 24px;
-  border: 1px solid rgba(59,130,246,.2);
-  border-radius: 16px;
-  background:
-    radial-gradient(
-      ellipse at 88% 12%,
-      rgba(0,119,255,.23),
-      transparent 37%
-    ),
-    radial-gradient(
-      ellipse at 10% 100%,
-      rgba(0,212,255,.10),
-      transparent 40%
-    ),
-    linear-gradient(
-      120deg,
-      #050b1c 0%,
-      #07132e 55%,
-      #071027 100%
-    );
-  box-shadow: 0 12px 35px rgba(0,0,0,.12);
-}
+        /* Grid background */
+        .home-hero::before {
+          content: "";
+          position: absolute;
+          z-index: -1;
+          inset: 0;
+          opacity: 0.18;
+          background-image:
+            linear-gradient(rgba(76, 140, 255, 0.18) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(76, 140, 255, 0.18) 1px, transparent 1px);
+          background-size: 32px 32px;
+          mask-image: radial-gradient(circle at 60% 50%, black 30%, transparent 80%);
+          pointer-events: none;
+        }
 
-/* Grid background */
-.home-hero::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  opacity: .17;
-  background-image:
-    linear-gradient(rgba(76,140,255,.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(76,140,255,.18) 1px, transparent 1px);
-  background-size: 32px 32px;
-  mask-image: linear-gradient(90deg, black, transparent 85%);
-  pointer-events: none;
-}
+        /* Hero content */
+        .home-hero-content {
+          position: relative;
+          z-index: 1;
+        }
 
-/* Animated circular rings */
-.home-hero::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  width: 240px;
-  height: 240px;
-  right: 5%;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 1px solid rgba(0,196,255,.22);
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 30px rgba(0,140,255,.045),
-    0 0 0 60px rgba(0,140,255,.03),
-    0 0 35px rgba(0,140,255,.12);
-  opacity: .7;
-  pointer-events: none;
-  transition: opacity .4s ease;
-}
+        .home-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          border-radius: 100px;
+          background: rgba(37, 99, 235, 0.15);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: var(--accent-blue-bright, #38bdf8);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          margin-bottom: 20px;
+        }
 
-/* Animate rings on hover */
-@keyframes home-ring-motion {
-  0% {
-    transform: translateY(-50%) rotate(0deg) scale(1);
-  }
-  50% {
-    transform: translateY(-50%) rotate(180deg) scale(1.13);
-  }
-  100% {
-    transform: translateY(-50%) rotate(360deg) scale(1);
-  }
-}
+        .home-hero h1 {
+          margin: 0 0 14px;
+          color: #f8fafc;
+          font-size: clamp(32px, 4vw, 52px);
+          font-weight: 800;
+          line-height: 1.1;
+          letter-spacing: -1.5px;
+        }
 
-.home-hero:hover::after {
-  animation: home-ring-motion 5s linear infinite;
-  opacity: 1;
-}
+        .home-hero h1 span {
+          background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
 
-/* Hero content */
-.home-hero-content {
-  position: relative;
-  z-index: 1;
-  max-width: 760px;
-}
-
-.home-eyebrow {
-  margin-bottom: 14px;
-}
-
-.home-hero h1 {
-  max-width: 700px;
-  margin: 0 0 10px;
-  color: #f8fafc;
-  font-size: clamp(30px, 4.5vw, 52px);
-  font-weight: 800;
-  line-height: 1.12;
-  letter-spacing: -1.5px;
-}
-
-.home-hero-description {
-  max-width: 580px;
-  margin: 0 0 18px;
-  color: #a5b4cc;
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-/* Mobile adjustments */
-@media (max-width: 520px) {
-  .home-hero {
-    padding: 23px 20px;
-    margin-bottom: 20px;
-  }
-
-  .home-hero::after {
-    width: 150px;
-    height: 150px;
-    right: -65px;
-    top: 50%;
-  }
-
-  .home-hero:hover::after {
-    animation-duration: 5s;
-  }
-
-  .home-eyebrow {
-    margin-bottom: 12px;
-  }
-
-  .home-hero h1 {
-    font-size: clamp(29px, 8vw, 38px);
-    letter-spacing: -1px;
-  }
-
-  .home-hero-description {
-    margin-bottom: 16px;
-    font-size: 12px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home-hero:hover::after {
-    animation: none;
-  }
-}
+        .home-hero-description {
+          max-width: 600px;
+          margin: 0 0 26px;
+          color: #a5b4cc;
+          font-size: 15px;
+          line-height: 1.75;
+        }
 
         .home-actions {
           display: flex;
           flex-wrap: wrap;
-          gap: 12px;
+          gap: 14px;
+          margin-bottom: 32px;
         }
 
         .home-btn {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          min-height: 42px;
-          padding: 10px 16px;
+          gap: 10px;
+          min-height: 44px;
+          padding: 10px 20px;
           border: 1px solid transparent;
-          border-radius: 7px;
-          font-size: 13px;
+          border-radius: 8px;
+          font-size: 14px;
           font-weight: 600;
           text-decoration: none;
+          cursor: pointer;
           transition:
-            opacity .2s ease,
-            transform .2s ease,
-            background .2s ease,
-            box-shadow .2s ease;
+            opacity 0.2s ease,
+            transform 0.2s ease,
+            background 0.2s ease,
+            box-shadow 0.2s ease,
+            border-color 0.2s ease;
         }
 
         .home-btn:hover {
-          opacity: .9;
           transform: translateY(-2px);
         }
 
         .home-btn.primary {
           color: #fff;
-          background: var(--accent-blue-bright);
-          box-shadow: 0 4px 16px rgba(37,99,235,.22);
+          background: var(--accent-blue-bright, #2563eb);
+          box-shadow: 0 4px 18px rgba(37, 99, 235, 0.35);
         }
 
         .home-btn.primary:hover {
-          box-shadow: 0 6px 22px rgba(37,99,235,.38);
+          box-shadow: 0 8px 25px rgba(37, 99, 235, 0.5);
         }
 
         .home-btn.secondary {
-          border-color: rgba(148,163,184,.3);
+          border-color: rgba(148, 163, 184, 0.25);
           color: #e2e8f0;
-          background: rgba(255,255,255,.035);
+          background: rgba(255, 255, 255, 0.04);
+          backdrop-filter: blur(8px);
         }
 
         .home-btn.secondary:hover {
-          border-color: rgba(34,211,238,.55);
-          background: rgba(34,211,238,.08);
+          border-color: rgba(56, 189, 248, 0.5);
+          background: rgba(56, 189, 248, 0.08);
+          color: #ffffff;
+        }
+
+        /* Hero Target Audience Bar */
+        .home-hero-highlights {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 20px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .home-highlight-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #94a3b8;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .home-highlight-item svg {
+          color: var(--accent-blue-bright, #38bdf8);
+        }
+
+        /* JAVA TERMINAL PREVIEW WIDGET */
+        .home-hero-preview {
+          position: relative;
+          width: 100%;
+          border-radius: 12px;
+          background: rgba(10, 19, 40, 0.9);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          box-shadow:
+            0 15px 30px rgba(0, 0, 0, 0.5),
+            0 0 30px rgba(37, 99, 235, 0.15);
+          backdrop-filter: blur(12px);
+          overflow: hidden;
+        }
+
+        .preview-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 16px;
+          background: rgba(5, 12, 28, 0.85);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .preview-dots {
+          display: flex;
+          gap: 6px;
+        }
+
+        .preview-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+        }
+
+        .preview-dot.red { background: #ef4444; }
+        .preview-dot.yellow { background: #f59e0b; }
+        .preview-dot.green { background: #10b981; }
+
+        .preview-title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #64748b;
+          font-size: 11px;
+          font-family: monospace;
+          letter-spacing: 0.5px;
+        }
+
+        .preview-body {
+          padding: 18px 20px;
+          font-family: "Fira Code", "Courier New", monospace;
+          font-size: 12.5px;
+          line-height: 1.6;
+          color: #cbd5e1;
+        }
+
+        .code-keyword { color: #f472b6; }
+        .code-type { color: #38bdf8; }
+        .code-func { color: #60a5fa; }
+        .code-string { color: #34d399; }
+        .code-comment { color: #64748b; font-style: italic; }
+
+        .preview-status {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: 16px;
+          padding: 8px 12px;
+          border-radius: 6px;
+          background: rgba(16, 185, 129, 0.1);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          color: #34d399;
+          font-size: 12px;
+          font-weight: 600;
         }
 
         /* SECTION HEADING */
-
         .home-section-heading {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
-          margin-bottom: 16px;
+          margin-bottom: 20px;
         }
 
         .home-section-heading h2 {
-          margin: 0 0 5px;
-          font-size: 20px;
+          margin: 0 0 4px;
+          font-size: 22px;
           font-weight: 700;
-          letter-spacing: -.4px;
+          letter-spacing: -0.5px;
         }
 
         .home-section-heading p {
           margin: 0;
           color: var(--text-muted);
-          font-size: 12px;
-          line-height: 1.6;
+          font-size: 13px;
+          line-height: 1.5;
         }
 
         /* ACTION CARDS */
-
         .home-cards {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 18px;
-          margin-bottom: 20px;
+          gap: 20px;
+          margin-bottom: 24px;
         }
 
         .home-card {
+          position: relative;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
           min-width: 0;
-          min-height: 190px;
-          padding: 22px;
+          min-height: 210px;
+          padding: 24px;
           border: 1px solid var(--border-color);
-          border-radius: 10px;
+          border-radius: 14px;
           background: var(--bg-elevated);
           transition:
-            transform .2s ease,
-            box-shadow .2s ease,
-            border-color .2s ease;
+            transform 0.25s ease,
+            box-shadow 0.25s ease,
+            border-color 0.25s ease;
+          overflow: hidden;
+        }
+
+        .home-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, var(--accent-blue-bright), transparent);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .home-card-badge {
+          position: absolute;
+          top: 18px;
+          right: 18px;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: var(--text-muted);
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         @media (hover: hover) and (pointer: fine) {
           .home-card:hover {
-            transform: translateY(-3px);
-            border-color: var(--accent-blue-bright);
-            box-shadow: 0 5px 18px rgba(0,0,0,.12);
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+          }
+
+          .home-card:hover::before {
+            opacity: 1;
+          }
+
+          .home-card:hover .home-card-icon {
+            transform: scale(1.08);
+            border-color: rgba(56, 189, 248, 0.4);
+            background: rgba(37, 99, 235, 0.18);
           }
         }
 
@@ -309,35 +408,36 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 40px;
-          height: 40px;
-          border: 1px solid rgba(59,130,246,.2);
-          border-radius: 9px;
-          background: rgba(37,99,235,.09);
+          width: 44px;
+          height: 44px;
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          border-radius: 10px;
+          background: rgba(37, 99, 235, 0.1);
           color: var(--accent-blue-bright);
+          transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
         }
 
         .home-card h3 {
-          margin: 14px 0 6px;
-          font-size: 15px;
+          margin: 16px 0 8px;
+          font-size: 16px;
           font-weight: 600;
           line-height: 1.4;
         }
 
         .home-card p {
           flex: 1;
-          margin: 0 0 18px;
+          margin: 0 0 20px;
           color: var(--text-muted);
-          font-size: 12px;
-          line-height: 1.7;
+          font-size: 13px;
+          line-height: 1.6;
         }
 
         .home-card-link {
           display: inline-flex;
           align-items: center;
-          gap: 5px;
+          gap: 6px;
           color: var(--accent-blue-bright);
-          font-size: 12px;
+          font-size: 13px;
           font-weight: 600;
           text-decoration: none;
         }
@@ -347,11 +447,11 @@ export default function Home() {
         }
 
         .home-card-link svg {
-          transition: transform .2s ease;
+          transition: transform 0.2s ease;
         }
 
         .home-card-link:hover svg {
-          transform: translateX(3px);
+          transform: translateX(4px);
         }
 
         .home-btn:focus-visible,
@@ -360,25 +460,35 @@ export default function Home() {
           outline-offset: 4px;
         }
 
-        /* TABLET */
-
-        @media (max-width: 900px) {
-          .home-page {
-            max-width: 100%;
-            padding-left: 28px;
-            padding-right: 28px;
+        /* RESPONSIVE BREAKPOINTS */
+        @media (max-width: 1100px) {
+          .home-hero {
+            grid-template-columns: 1fr;
+            gap: 28px;
           }
 
-          .home-cards {
-            gap: 14px;
-          }
-
-          .home-card {
-            padding: 18px;
+          .home-hero-preview {
+            max-width: 580px;
+            margin: 0 auto;
           }
         }
 
-        @media (max-width: 680px) {
+        @media (max-width: 900px) {
+          .home-page {
+            padding-left: 24px;
+            padding-right: 24px;
+          }
+
+          .home-cards {
+            gap: 16px;
+          }
+
+          .home-card {
+            padding: 20px;
+          }
+        }
+
+        @media (max-width: 720px) {
           .home-cards {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
@@ -388,105 +498,176 @@ export default function Home() {
           }
         }
 
-        /* MOBILE */
-
         @media (max-width: 520px) {
           .home-page {
-            padding: 12px 16px 24px;
+            padding: 12px 16px 32px;
           }
 
           .home-hero {
-            padding: 28px 20px;
+            padding: 24px 20px;
             margin-bottom: 24px;
-            border-radius: 12px;
-          }
-
-          .home-hero::after {
-            right: -130px;
-            top: 30%;
+            border-radius: 14px;
           }
 
           .home-eyebrow {
-            margin-bottom: 16px;
-            font-size: 10px;
+            margin-bottom: 14px;
+            font-size: 11px;
           }
 
           .home-hero h1 {
-            font-size: clamp(29px, 8vw, 38px);
+            font-size: clamp(28px, 7vw, 36px);
             letter-spacing: -1px;
           }
 
           .home-hero-description {
-            font-size: 12px;
+            font-size: 13px;
             margin-bottom: 20px;
           }
 
           .home-actions {
             flex-direction: column;
             align-items: stretch;
+            margin-bottom: 24px;
           }
 
           .home-btn {
             width: 100%;
-            min-height: 42px;
+            min-height: 44px;
           }
 
-          .home-section-heading h2 {
-            font-size: 18px;
+          .home-hero-preview {
+            display: none;
           }
 
           .home-cards {
             grid-template-columns: 1fr;
-            gap: 12px;
+            gap: 14px;
           }
 
           .home-card,
           .home-card:last-child {
             grid-column: auto;
-            min-height: 175px;
-            padding: 18px;
+            min-height: auto;
+            padding: 20px;
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
           .home-card,
           .home-btn,
-          .home-card-link svg {
+          .home-card-link svg,
+          .home-card-icon {
             transition: none !important;
           }
         }
       `}</style>
 
-      {/* HERO */}
+      {/* HERO SECTION */}
       <section className="home-hero">
         <div className="home-hero-content">
           <div className="home-eyebrow">
             <Swords size={15} />
-            CodeClash Arena
+            <span>Java Coding Battle Engine</span>
           </div>
 
           <h1>
-            Think. Code.
+            Create Custom Battles.
             <br />
-            <span>Conquer the challenge.</span>
+            <span>Assess Java Talent.</span>
           </h1>
 
           <p className="home-hero-description">
-            Create coding battles, challenge developers and put your
-            problem-solving skills to the test, all in one place.
+            Host custom Java coding challenges, share secure 6-character room
+            keys, and evaluate solutions instantly. Built for technical
+            interviews, tech startups, colleges, and training academies.
           </p>
 
           <div className="home-actions">
             <Link to="/battle-room/create" className="home-btn primary">
               <PlusCircle size={16} />
-              Create a Battle
+              Create a Room
               <ArrowRight size={15} />
             </Link>
 
             <Link to="/battle-room" className="home-btn secondary">
               <KeyRound size={15} />
-              Join with Key
+              Join Room Key
             </Link>
+          </div>
+
+          <div className="home-hero-highlights">
+            {targetAudiences.map(({ icon: Icon, label }) => (
+              <div className="home-highlight-item" key={label}>
+                <Icon size={15} />
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* JAVA CODE TERMINAL PREVIEW WIDGET */}
+        <div className="home-hero-preview" aria-hidden="true">
+          <div className="preview-header">
+            <div className="preview-dots">
+              <div className="preview-dot red"></div>
+              <div className="preview-dot yellow"></div>
+              <div className="preview-dot green"></div>
+            </div>
+            <div className="preview-title">
+              <Terminal size={12} />
+              <span>Solution.java</span>
+            </div>
+          </div>
+          <div className="preview-body">
+            <div>
+              <span className="code-keyword">public class</span>{" "}
+              <span className="code-type">Solution</span> &#123;
+            </div>
+            <div style={{ paddingLeft: "16px" }}>
+              <span className="code-keyword">public static</span>{" "}
+              <span className="code-type">boolean</span>{" "}
+              <span className="code-func">evalClash</span>(
+              <span className="code-type">int</span>[] nums,{" "}
+              <span className="code-type">int</span> target) &#123;
+            </div>
+            <div style={{ paddingLeft: "32px" }}>
+              <span className="code-comment">
+                // Real-time Java evaluation engine
+              </span>
+            </div>
+            <div style={{ paddingLeft: "32px" }}>
+              <span className="code-keyword">var</span> seen ={" "}
+              <span className="code-keyword">new</span>{" "}
+              <span className="code-type">HashSet</span>&lt;
+              <span className="code-type">Integer</span>&gt;();
+            </div>
+            <div style={{ paddingLeft: "32px" }}>
+              <span className="code-keyword">for</span> (
+              <span className="code-type">int</span> n : nums) &#123;
+            </div>
+            <div style={{ paddingLeft: "48px" }}>
+              <span className="code-keyword">if</span> (seen.contains(target -
+              n)) <span className="code-keyword">return true</span>;
+            </div>
+            <div style={{ paddingLeft: "48px" }}>seen.add(n);</div>
+            <div style={{ paddingLeft: "32px" }}>&#125;</div>
+            <div style={{ paddingLeft: "32px" }}>
+              <span className="code-keyword">return false</span>;
+            </div>
+            <div style={{ paddingLeft: "16px" }}>&#125;</div>
+            <div>&#125;</div>
+
+            <div className="preview-status">
+              <span
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <CheckCircle2 size={14} />
+                Java Runtime: All 15 Test Cases Passed
+              </span>
+              <span style={{ color: "#94a3b8", fontWeight: "normal" }}>
+                0.02s
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -495,16 +676,20 @@ export default function Home() {
       <section>
         <div className="home-section-heading">
           <div>
-            <h2>Get started</h2>
-            <p>Choose an action to continue.</p>
+            <h2>Get Started with CodeClash</h2>
+            <p>
+              Launch custom Java challenges or step into an active battle room.
+            </p>
           </div>
         </div>
 
         <div className="home-cards">
-          {cards.map(({ icon: Icon, title, text, action, to }) => (
+          {cards.map(({ icon: Icon, title, text, action, to, badge }) => (
             <article className="home-card" key={title}>
+              <span className="home-card-badge">{badge}</span>
+
               <div className="home-card-icon">
-                <Icon size={20} />
+                <Icon size={22} />
               </div>
 
               <h3>{title}</h3>
@@ -513,12 +698,12 @@ export default function Home() {
               {to.startsWith("mailto:") ? (
                 <a href={to} className="home-card-link">
                   {action}
-                  <ArrowRight size={13} />
+                  <ArrowRight size={14} />
                 </a>
               ) : (
                 <Link to={to} className="home-card-link">
                   {action}
-                  <ArrowRight size={13} />
+                  <ArrowRight size={14} />
                 </Link>
               )}
             </article>

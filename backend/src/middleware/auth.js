@@ -2,10 +2,12 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { verifyAccessToken } from "../services/tokenService.js";
 import config from "../config/env.js";
+import { beginExecutionPhase } from "../utils/executionPerformance.js";
 
 const JWT_SECRET = config.JWT_SECRET || "challenge-platform-jwt-secret-change-in-production";
 
 export async function authenticate(req, res, next) {
+  const finishAuthentication = beginExecutionPhase("AUTH");
   try {
     const authHeader = req.headers.authorization;
     if (authHeader) {
@@ -59,6 +61,8 @@ export async function authenticate(req, res, next) {
     });
   } catch (error) {
     return res.status(500).json({ error: "Authentication failed." });
+  } finally {
+    finishAuthentication();
   }
 }
 

@@ -11,6 +11,7 @@ import {
   errorHandler,
 } from "./middleware/security.js";
 import { requestIdMiddleware } from "./middleware/requestId.js";
+import { executionPerformanceMiddleware } from "./utils/executionPerformance.js";
 import authRoutes from "./routes/authRoutes.js";
 import challengeRoutes from "./routes/challengeRoutes.js";
 import executeRoutes from "./routes/executeRoutes.js";
@@ -26,6 +27,7 @@ const PORT = config.PORT || 5000;
 
 // Request ID middleware - must be first
 app.use(requestIdMiddleware);
+app.use(executionPerformanceMiddleware);
 
 // Request logging
 app.use(morgan(config.LOG_LEVEL || "dev"));

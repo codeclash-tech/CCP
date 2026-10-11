@@ -6,23 +6,30 @@ import RoomKeyModal from "../components/battleRoom/RoomKeyModal";
 import { Swords, PlusCircle, LogIn, Trophy, KeyRound, Loader2, Share2, Copy, Check } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
-function CopyableCode({ code }) {
+function CopyableCode({ code, onCopyError }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async (e) => {
     e.stopPropagation();
+    onCopyError("");
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // ignore
+      onCopyError("Couldn't copy the room key. Please select and copy it manually.");
     }
   };
   return (
-    <span
+    <button
+      type="button"
       onClick={handleCopy}
-      title="Click to copy key"
+      aria-label={`Copy room key ${code}`}
+      title="Copy room key"
       style={{
+        border: 0,
+        padding: 0,
+        background: "transparent",
+        font: "inherit",
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
@@ -35,7 +42,7 @@ function CopyableCode({ code }) {
     >
       {code}
       {copied ? <Check size={12} color="var(--color-success)" /> : <Copy size={11} style={{ opacity: 0.5 }} />}
-    </span>
+    </button>
   );
 }
 
@@ -52,6 +59,8 @@ export default function BattleRoom() {
   const [myRooms, setMyRooms] = useState([]);
   const [joinedRooms, setJoinedRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [roomsError, setRoomsError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [shareRoom, setShareRoom] = useState(null);
   const [shareRoomCode, setShareRoomCode] = useState("");
@@ -89,11 +98,12 @@ export default function BattleRoom() {
   const loadMyRooms = async () => {
     setActiveTab("my-rooms");
     setLoadingRooms(true);
+    setRoomsError("");
     try {
       const data = await getMyRooms();
       setMyRooms(data.rooms || []);
     } catch (err) {
-      console.error("Failed to load rooms:", err);
+      setRoomsError(err.message || "Failed to load your rooms.");
     } finally {
       setLoadingRooms(false);
     }
@@ -102,11 +112,12 @@ export default function BattleRoom() {
   const loadJoinedRooms = async () => {
     setActiveTab("joined-rooms");
     setLoadingRooms(true);
+    setRoomsError("");
     try {
       const data = await getJoinedRooms();
       setJoinedRooms(data.rooms || []);
     } catch (err) {
-      console.error("Failed to load joined rooms:", err);
+      setRoomsError(err.message || "Failed to load joined rooms.");
     } finally {
       setLoadingRooms(false);
     }
@@ -114,13 +125,14 @@ export default function BattleRoom() {
 
   const handleShareKey = useCallback(async (e, room) => {
     e.stopPropagation();
+    setActionError("");
     try {
       const data = await shareKey(room.roomCode);
       setShareRoom(room);
       setShareRoomCode(data.roomKey || room.roomCode);
       setShowKeyModal(true);
     } catch (err) {
-      alert(err.message || "Failed to get room key.");
+      setActionError(err.message || "Failed to get the room key.");
     }
   }, []);
 
@@ -153,6 +165,23 @@ export default function BattleRoom() {
           </button>
         ))}
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            color: "var(--color-danger)",
+            background: "rgba(218, 54, 51, 0.1)",
+            border: "1px solid rgba(218, 54, 51, 0.3)",
+            borderRadius: 8,
+            padding: "10px 12px",
+            marginBottom: 16,
+            fontSize: 13,
+          }}
+        >
+          {actionError}
+        </div>
+      )}
 
       {activeTab === "create-join" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
@@ -227,7 +256,7 @@ export default function BattleRoom() {
                 onKeyDown={(e) => e.key === "Enter" && handleJoin()}
               />
               {joinError && (
-                <div style={{ color: "var(--color-danger)", fontSize: 12, fontFamily: "var(--font-ui)" }}>
+                <div role="alert" style={{ color: "var(--color-danger)", fontSize: 12, fontFamily: "var(--font-ui)" }}>
                   {joinError}
                 </div>
               )}
@@ -264,6 +293,13 @@ export default function BattleRoom() {
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
             </div>
+          ) : roomsError ? (
+            <div role="alert" style={{ padding: 24, textAlign: "center", color: "var(--color-danger)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
+              <p style={{ marginBottom: 12 }}>{roomsError}</p>
+              <button type="button" className="btn-secondary" onClick={loadMyRooms}>
+                Try again
+              </button>
+            </div>
           ) : myRooms.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
               You haven't created any rooms yet.
@@ -288,7 +324,10 @@ export default function BattleRoom() {
                   }}
                   style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 90px", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-color)", fontSize: 12, fontFamily: "var(--font-ui)", alignItems: "center", cursor: "pointer" }}
                 >
-                  <CopyableCode code={room.roomCode} />
+                  <CopyableCode
+                    code={room.roomCode}
+                    onCopyError={setActionError}
+                  />
                   <div style={{ color: "var(--text-primary)" }}>{room.title}</div>
                   <div style={{ color: room.status === "ACTIVE" ? "var(--color-success)" : room.status === "CLOSED" ? "var(--color-danger)" : "var(--color-warning)", fontWeight: 600 }}>
                     {room.status}
@@ -322,6 +361,13 @@ export default function BattleRoom() {
           {loadingRooms ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
+            </div>
+          ) : roomsError ? (
+            <div role="alert" style={{ padding: 24, textAlign: "center", color: "var(--color-danger)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
+              <p style={{ marginBottom: 12 }}>{roomsError}</p>
+              <button type="button" className="btn-secondary" onClick={loadJoinedRooms}>
+                Try again
+              </button>
             </div>
           ) : joinedRooms.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13 }}>

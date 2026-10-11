@@ -50,7 +50,7 @@ export default function AuthPage({ mode }) {
         ? target
         : target?.pathname
           ? `${target.pathname}${target.search || ""}`
-          : "/battle-room",
+          : "/",
       { replace: true },
     );
   };

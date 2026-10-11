@@ -95,6 +95,7 @@ export default function BattleRoomLeaderboard() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isCreator, setIsCreator] = useState(false);
   const [closing, setClosing] = useState(false);
   const [showShare, setShowShare] = useState(false);
@@ -167,9 +168,11 @@ export default function BattleRoomLeaderboard() {
     )
       return;
     setClosing(true);
+    setError("");
+    setSuccessMessage("");
     try {
       const data = await closeRoom(roomCode);
-      alert(data.message || "Room closed! Results sent via email.");
+      setSuccessMessage(data.message || "Room closed and results were sent.");
       setRefreshVersion((version) => version + 1);
     } catch (err) {
       setError(err.message || "Failed to close room.");
@@ -181,9 +184,10 @@ export default function BattleRoomLeaderboard() {
   const handleRetryDelivery = async () => {
     setRetryingDelivery(true);
     setError("");
+    setSuccessMessage("");
     try {
       const data = await retryRoomResultDelivery(roomCode);
-      alert(data.message || "Result delivery retry finished.");
+      setSuccessMessage(data.message || "Result delivery retry finished.");
       setRefreshVersion((version) => version + 1);
     } catch (err) {
       setError(err.message || "Failed to retry result delivery.");
@@ -437,6 +441,23 @@ export default function BattleRoomLeaderboard() {
           </button>
         </div>
       </div>
+
+      {successMessage && (
+        <div
+          role="status"
+          style={{
+            color: "var(--color-success)",
+            background: "rgba(46, 160, 67, 0.1)",
+            border: "1px solid rgba(46, 160, 67, 0.3)",
+            borderRadius: 8,
+            padding: "10px 12px",
+            marginBottom: 16,
+            fontSize: 13,
+          }}
+        >
+          {successMessage}
+        </div>
+      )}
 
       {/* Leaderboard table */}
       {loading ? (

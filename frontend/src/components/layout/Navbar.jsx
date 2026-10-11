@@ -186,25 +186,6 @@ export default function Navbar() {
                 </div>
               </div>
 
-              {/* Profile */}
-              <Link
-                role="menuitem"
-                to="/profile"
-                onClick={() => setMenuOpen(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "9px 10px",
-                  color: "var(--text-primary)",
-                  textDecoration: "none",
-                  fontSize: 12,
-                }}
-              >
-                <UserRound size={14} />
-                My profile
-              </Link>
-
               {/* Sign out */}
               <button
                 role="menuitem"

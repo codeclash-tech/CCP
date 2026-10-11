@@ -11,9 +11,13 @@ function saveSession(result) {
   localStorage.setItem(ACCESS_TOKEN_KEY, result.token);
   if (result.refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, result.refreshToken);
+  } else {
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }
   if (result.sessionId) {
     localStorage.setItem(SESSION_ID_KEY, result.sessionId);
+  } else {
+    localStorage.removeItem(SESSION_ID_KEY);
   }
   return result.user;
 }

@@ -17,6 +17,10 @@ import Profile from "../pages/Profile";
 
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
+import {
+  LoadingScreen,
+  SessionErrorScreen,
+} from "../components/layout/SessionState";
 import { useAuth } from "../context/AuthContext";
 
 function AppLayout({ children }) {
@@ -37,9 +41,14 @@ function AppLayout({ children }) {
 }
 
 function ProtectedLayout({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, sessionError, refreshProfile } = useAuth();
   const location = useLocation();
-  if (loading) return <div role="status" style={{ padding: 32 }}>Checking your session...</div>;
+  if (loading) return <LoadingScreen message="Checking your session..." />;
+  if (sessionError) {
+    return (
+      <SessionErrorScreen message={sessionError} onRetry={refreshProfile} />
+    );
+  }
   if (!isAuthenticated) {
     return (
       <Navigate
@@ -54,9 +63,14 @@ function ProtectedLayout({ children }) {
 
 // Full-screen layout for the challenge assessment: no navbar, no footer.
 function FullScreenProtectedLayout({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, sessionError, refreshProfile } = useAuth();
   const location = useLocation();
-  if (loading) return <div role="status" style={{ padding: 32 }}>Checking your session...</div>;
+  if (loading) return <LoadingScreen message="Checking your session..." />;
+  if (sessionError) {
+    return (
+      <SessionErrorScreen message={sessionError} onRetry={refreshProfile} />
+    );
+  }
   if (!isAuthenticated) {
     return (
       <Navigate
@@ -74,11 +88,16 @@ function FullScreenProtectedLayout({ children }) {
 }
 
 function UnauthenticatedOnlyPage({ mode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, sessionError, refreshProfile } = useAuth();
   if (loading) {
-    return <div role="status" style={{ padding: 32 }}>Checking your session...</div>;
+    return <LoadingScreen message="Checking your session..." />;
   }
-  if (isAuthenticated) return <Navigate to="/battle-room" replace />;
+  if (sessionError) {
+    return (
+      <SessionErrorScreen message={sessionError} onRetry={refreshProfile} />
+    );
+  }
+  if (isAuthenticated) return <Navigate to="/" replace />;
   return <AuthPage mode={mode} />;
 }
 
@@ -152,7 +171,7 @@ export default function AppRouter() {
             }
           />
 
-          <Route path="*" element={<Navigate to="/battle-room" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

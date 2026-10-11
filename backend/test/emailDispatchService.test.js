@@ -150,9 +150,25 @@ test("sends battle-result email through Resend", async () => {
       totalScore: 90,
       totalPassed: 9,
       totalTestCases: 10,
+      questionResults: [
+        {
+          questionTitle: "Two Sum",
+          status: "ACCEPTED",
+          score: 90,
+          passed: 9,
+          total: 10,
+          results: [
+            { status: "PASSED", executionTime: 12, isHidden: false },
+            { status: "FAILED", executionTime: 18, isHidden: true, input: "secret input" },
+          ],
+        },
+      ],
       rank: 1,
       totalParticipants: 5,
       roomCode: "ROOM1",
+      startTime: "2026-01-01T10:00:00.000Z",
+      endTime: "2026-01-01T12:00:00.000Z",
+      submissionStatus: "COMPLETED",
       completedAt: "2026-01-01T12:00:00.000Z",
     });
 
@@ -161,10 +177,18 @@ test("sends battle-result email through Resend", async () => {
     assert.deepEqual(requestBody.to, ["person@example.com"]);
     assert.equal(
       requestBody.subject,
-      "Assessment Complete: Algorithms - Performance Summary",
+      "Battle complete: Algorithms - Your results",
     );
-    assert.match(requestBody.text, /PERFORMANCE SUMMARY: Algorithms/);
-    assert.match(requestBody.html, /CERTIFICATE OF EXCELLENCE/);
+    assert.match(requestBody.text, /CONGRATULATIONS, Developer!/);
+    assert.match(requestBody.text, /Two Sum — ACCEPTED, score 90, tests passed 9 \/ 10/);
+    assert.match(requestBody.text, /Battle start: Jan 1, 2026/);
+    assert.match(requestBody.html, /Question results/);
+    assert.match(requestBody.html, /Download your certificate/);
+    assert.match(requestBody.html, /Joined Rooms/);
+    assert.doesNotMatch(requestBody.html, /CERTIFICATE OF EXCELLENCE|Download PDF Certificate/);
+    assert.doesNotMatch(requestBody.text, /secret input/);
+    assert.doesNotMatch(requestBody.html, /secret input/);
+    assert.doesNotMatch(requestBody.html, /\/battle-rooms\/certificate\//);
   } finally {
     globalThis.fetch = originalFetch;
     process.env.RESEND_API_KEY = originalApiKey;
