@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Code2, Home, LogOut, Swords, UserRound } from "lucide-react";
+import { Code2, Home, Info, LogOut, Swords } from "lucide-react";
 
 import UserAvatar from "../user/UserAvatar";
 import { useAuth } from "../../context/AuthContext";
@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 const NAV_LINKS = [
   { path: "/", label: "Home", icon: Home },
   { path: "/battle-room", label: "Battle Room", icon: Swords },
+  { path: "/about", label: "About", icon: Info },
 ];
 
 export default function Navbar() {
@@ -76,9 +77,8 @@ export default function Navbar() {
           <span>CodeClash</span>
         </Link>
 
-        {user && (
-          <div style={{ display: "flex", gap: 2 }}>
-            {NAV_LINKS.map((link) => {
+        <div style={{ display: "flex", gap: 2 }}>
+            {NAV_LINKS.filter((link) => user || link.path === "/about").map((link) => {
               const isActive =
                 location.pathname === link.path ||
                 (link.path !== "/" && location.pathname.startsWith(link.path));
@@ -112,8 +112,7 @@ export default function Navbar() {
                 </Link>
               );
             })}
-          </div>
-        )}
+        </div>
       </div>
 
       {/* User menu */}

@@ -20,6 +20,7 @@ import leaderboardRoutes from "./routes/leaderboardRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import battleRoomRoutes from "./routes/battleRoomRoutes.js";
 import creatorVerificationRoutes from "./routes/creatorVerificationRoutes.js";
+import platformRoutes from "./routes/platformRoutes.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -65,6 +66,7 @@ app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/battle-rooms", battleRoomRoutes);
 app.use("/api/creator-verification", creatorVerificationRoutes);
+app.use("/api/platform", platformRoutes);
 
 // 404 handler
 app.use((req, res) => {

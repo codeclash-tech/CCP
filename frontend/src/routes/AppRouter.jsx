@@ -14,6 +14,7 @@ import BattleRoomChallenge from "../pages/BattleRoomChallenge";
 import BattleRoomLeaderboard from "../pages/BattleRoomLeaderboard";
 import AuthPage from "../pages/AuthPage";
 import Profile from "../pages/Profile";
+import About from "../pages/About";
 
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
@@ -113,6 +114,14 @@ export default function AppRouter() {
           <Route
             path="/register"
             element={<UnauthenticatedOnlyPage mode="register" />}
+          />
+          <Route
+            path="/about"
+            element={
+              <AppLayout>
+                <About />
+              </AppLayout>
+            }
           />
           <Route
             path="/"
