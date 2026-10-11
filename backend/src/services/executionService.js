@@ -1,14 +1,11 @@
 import { compareOutput } from "./outputComparator.js";
-import { performance } from "node:perf_hooks";
-import { beginExecutionPhase } from "../utils/executionPerformance.js";
 
 const DEFAULT_ENGINE_URL =
   "https://secure-code-engine.onrender.com/api/v1/execute";
 const DEFAULT_TIMEOUT_MS = 120000;
 const SUPPORTED_EXECUTION_LANGUAGES = ["java"];
 const WARM_UP_COOLDOWN_MS = 5 * 60 * 1000;
-const MAX_RATE_LIMIT_RETRIES = 2;
-const DEFAULT_RATE_LIMIT_RETRY_DELAY_MS = 1000;
+const MAX_CONCURRENT_TEST_CASES = 3;
 const FATAL_TEST_CASE_STATUSES = [
   "COMPILATION_ERROR",
   "RUNTIME_ERROR",
@@ -31,7 +28,8 @@ function normalizeLanguage(language) {
 
 /**
  * Normalize the Secure Code Engine's top-level output or per-test result
- * format. Per-test outputs are mapped to submitted cases in request order.
+ * format. Top-level output is case-specific only because execute() sends one
+ * test case per request.
  */
 function normalizeStatus(value, error = "") {
   const status = String(value || "").trim().toUpperCase().replaceAll(" ", "_");
@@ -89,44 +87,6 @@ function outputString(value) {
 
 function outputsMatch(actual, expected) {
   return compareOutput(actual, expected).passed;
-}
-
-function getRateLimitRetryDelay(response, retryCount) {
-  const retryAfter = response.headers?.get?.("retry-after");
-  if (retryAfter === null || retryAfter === undefined || retryAfter === "") {
-    return DEFAULT_RATE_LIMIT_RETRY_DELAY_MS * (2 ** retryCount);
-  }
-
-  const seconds = Number(retryAfter);
-  const delay = Number.isFinite(seconds)
-    ? Math.max(0, seconds * 1000)
-    : Math.max(0, Date.parse(retryAfter) - Date.now());
-  return Number.isFinite(delay)
-    ? delay
-    : DEFAULT_RATE_LIMIT_RETRY_DELAY_MS * (2 ** retryCount);
-}
-
-function waitForRetry(delayMs, signal) {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) {
-      const error = new Error("Execution request timed out.");
-      error.name = "AbortError";
-      reject(error);
-      return;
-    }
-
-    const timeoutId = setTimeout(() => {
-      signal?.removeEventListener("abort", abort);
-      resolve();
-    }, delayMs);
-    const abort = () => {
-      clearTimeout(timeoutId);
-      const error = new Error("Execution request timed out.");
-      error.name = "AbortError";
-      reject(error);
-    };
-    signal?.addEventListener("abort", abort, { once: true });
-  });
 }
 
 function failedCase(testCase, index, error, status = "SYSTEM_ERROR") {
@@ -230,8 +190,7 @@ export function normalizeEngineResponse(raw, submittedTestCases = []) {
     : "";
   const engineResults = Array.isArray(response.results) ? response.results : null;
   const malformedResults =
-    (Object.hasOwn(response, "results") && !Array.isArray(response.results)) ||
-    (!topLevelFatalStatus && engineResults === null && cases.length > 1);
+    Object.hasOwn(response, "results") && !Array.isArray(response.results);
   const resultCountMismatch =
     !topLevelFatalStatus &&
     (malformedResults ||
@@ -351,87 +310,67 @@ export class ExecutionService {
       });
     }
 
-    const payload = {
-      language: normalizedLanguage,
-      code: code || "",
-      timeLimit: Number(options.timeLimit || 2000),
-      memoryLimit: Number(options.memoryLimit || 65536),
-      testCases: cases.map((testCase) => ({
-        input: outputString(testCase?.input),
-        expectedOutput: outputString(testCase?.expectedOutput),
-      })),
+    const results = new Array(cases.length);
+    let nextIndex = 0;
+    const runNextCase = async () => {
+      while (nextIndex < cases.length) {
+        const index = nextIndex++;
+        const testCase = cases[index];
+        const payload = {
+          language: normalizedLanguage,
+          code: code || "",
+          timeLimit: Number(options.timeLimit || 2000),
+          memoryLimit: Number(options.memoryLimit || 65536),
+          testCases: [
+            {
+              input: outputString(testCase?.input),
+              expectedOutput: outputString(testCase?.expectedOutput),
+            },
+          ],
+        };
+        results[index] = await this.executeSingleCase(
+          payload,
+          testCase,
+          index,
+        );
+      }
     };
-
-    return this.executeBatch(payload, cases);
+    await Promise.all(
+      Array.from(
+        { length: Math.min(MAX_CONCURRENT_TEST_CASES, cases.length) },
+        runNextCase,
+      ),
+    );
+    return summarizeResults(results, cases.length);
   }
 
   async executeSingleCase(payload, testCase, index) {
-    const result = await this.executeBatch(payload, [testCase]);
-    return { ...result.results[0], testCase: index + 1 };
-  }
-
-  async executeBatch(payload, testCases) {
     const controller =
       typeof AbortController !== "undefined" ? new AbortController() : null;
     const timeoutId = controller
       ? setTimeout(() => controller.abort(), this.timeoutMs)
       : null;
-    const requestStartedAt = performance.now();
 
     try {
-      const finishEngineWait = beginExecutionPhase("ENGINE_WAIT");
-      let response;
-      try {
-        let retries = 0;
-        while (true) {
-          response = await fetch(this.engineUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-api-key": this.apiKey,
-            },
-            body: JSON.stringify(payload),
-            signal: controller?.signal,
-          });
-          if (response.status !== 429 || retries >= MAX_RATE_LIMIT_RETRIES) {
-            break;
-          }
-
-          const retryDelay = getRateLimitRetryDelay(response, retries);
-          const remainingMs =
-            this.timeoutMs - (performance.now() - requestStartedAt);
-          if (retryDelay >= remainingMs) break;
-
-          retries += 1;
-          await waitForRetry(retryDelay, controller?.signal);
-        }
-      } finally {
-        finishEngineWait();
-      }
-      const headersReceivedAt = performance.now();
+      const response = await fetch(this.engineUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        body: JSON.stringify(payload),
+        signal: controller?.signal,
+      });
       let body;
       if (typeof response.text === "function") {
-        const finishEngineBodyRead = beginExecutionPhase("ENGINE_BODY_READ");
-        try {
-          body = await response.text();
-        } finally {
-          finishEngineBodyRead();
-        }
+        body = await response.text();
       } else if (typeof response.json === "function") {
-        const finishEngineBodyRead = beginExecutionPhase("ENGINE_BODY_READ");
-        try {
-          body = await response.json();
-        } finally {
-          finishEngineBodyRead();
-        }
+        body = await response.json();
       } else {
-        const error = "Unrecognized response interface from execution engine.";
-        return summarizeResults(
-          testCases.map((testCase, index) =>
-            failedCase(testCase, index, error),
-          ),
-          testCases.length,
-          error,
+        return failedCase(
+          testCase,
+          index,
+          "Unrecognized response interface from execution engine.",
         );
       }
 
@@ -444,54 +383,34 @@ export class ExecutionService {
           engineError = "";
         }
         const message = engineError
-          ? `Secure Code Engine returned HTTP ${response.status}: ${engineError}`
+          ? `Secure Code Engine error: ${engineError}`
           : `Secure Code Engine returned HTTP ${response.status}`;
-        return summarizeResults(
-          testCases.map((testCase, index) =>
-            failedCase(testCase, index, message),
-          ),
-          testCases.length,
-          message,
-        );
+        return failedCase(testCase, index, message);
       }
 
-      const bodyReadAt = performance.now();
-      const finishNormalization = beginExecutionPhase("NORMALIZATION");
-      let result;
-      try {
-        result = normalizeEngineResponse(body, testCases);
-      } finally {
-        finishNormalization();
+      const normalized = normalizeEngineResponse(body, [testCase]);
+      if (normalized.results.length !== 1) {
+        return failedCase(
+          testCase,
+          index,
+          "Execution engine did not return exactly one test result.",
+        );
       }
-      if (process.env.BATTLE_ROOM_PERF_LOGS === "true") {
-        console.info("[ExecutionTiming] Batched engine response", {
-          testCaseCount: testCases.length,
-          statusCode: response.status,
-          headersMs: Math.round((headersReceivedAt - requestStartedAt) * 100) / 100,
-          bodyReadMs: Math.round((bodyReadAt - headersReceivedAt) * 100) / 100,
-          normalizeMs: Math.round((performance.now() - bodyReadAt) * 100) / 100,
-          totalMs: Math.round((performance.now() - requestStartedAt) * 100) / 100,
-        });
-      }
-      return result;
+      return { ...normalized.results[0], testCase: index + 1 };
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error("[ExecutionService] Error:", {
           name: error.name,
           message: error.message,
-          testCaseCount: testCases.length,
+          testCase: index + 1,
         });
       }
-      const message =
+      return failedCase(
+        testCase,
+        index,
         error.name === "AbortError"
           ? "Secure Code Engine request timed out."
-          : `Secure Code Engine request failed: ${error.message}`;
-      return summarizeResults(
-        testCases.map((testCase, index) =>
-          failedCase(testCase, index, message),
-        ),
-        testCases.length,
-        message,
+          : `Secure Code Engine request failed: ${error.message}`,
       );
     } finally {
       if (timeoutId) clearTimeout(timeoutId);

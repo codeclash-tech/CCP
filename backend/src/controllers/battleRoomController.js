@@ -1,7 +1,5 @@
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
-import { performance } from "node:perf_hooks";
-import { beginExecutionPhase } from "../utils/executionPerformance.js";
 import { executionService } from "../services/executionService.js";
 import {
   closeBattleRoomAndNotify,
@@ -991,42 +989,27 @@ export async function runQuestionSolution(req, res) {
         .json({ error: "Question ID and code are required." });
     }
 
-    const finishRoomLookup = beginExecutionPhase("ROOM_LOOKUP");
-    let room;
-    try {
-      room = await BattleRoom.findOne(
-        { roomCode: roomCode.toUpperCase(), isActive: true, isDeleted: false },
-        {
-          roomCode: 1,
-          createdBy: 1,
-          status: 1,
-          isDeleted: 1,
-          startTime: 1,
-          endTime: 1,
-          questions: 1,
-        },
-      ).lean();
-    } finally {
-      finishRoomLookup();
-    }
+    const room = await BattleRoom.findOne(
+      { roomCode: roomCode.toUpperCase(), isActive: true, isDeleted: false },
+      {
+        roomCode: 1,
+        createdBy: 1,
+        status: 1,
+        isDeleted: 1,
+        startTime: 1,
+        endTime: 1,
+        questions: 1,
+      },
+    ).lean();
     if (!room) {
       return res.status(404).json({ error: "Battle room not found." });
     }
 
     const isCreator = room.createdBy?.toString() === userId?.toString();
-    let participantExists = true;
-    if (!isCreator) {
-      const finishParticipantLookup =
-        beginExecutionPhase("SUBMISSION_LOOKUP");
-      try {
-        participantExists = Boolean(
-          await BattleRoomSubmission.exists({ roomId: room._id, userId }),
-        );
-      } finally {
-        finishParticipantLookup();
-      }
-    }
-    if (!isCreator && !participantExists) {
+    if (
+      !isCreator &&
+      !(await BattleRoomSubmission.exists({ roomId: room._id, userId }))
+    ) {
       return res.status(403).json({
         error:
           "Join from the Battle Room page and enter your organization before running code.",
@@ -1056,18 +1039,15 @@ export async function runQuestionSolution(req, res) {
       });
     }
 
-    const finishQuestionLookup = beginExecutionPhase("QUESTION_LOOKUP");
     const question = room.questions.find(
       (q) => q._id.toString() === questionId,
     );
-    finishQuestionLookup();
     if (!question) {
       return res
         .status(404)
         .json({ error: "Question not found in this room." });
     }
 
-    const finishTestPreparation = beginExecutionPhase("TEST_PREPARATION");
     const visibleTestCases = (question.visibleTestCases || [])
       .filter((tc) => tc.input !== undefined && tc.input !== null)
       .map((tc) => ({
@@ -1076,7 +1056,6 @@ export async function runQuestionSolution(req, res) {
         expectedOutput: tc.expectedOutput ?? "",
         description: tc.description || "",
       }));
-    finishTestPreparation();
 
     if (visibleTestCases.length === 0) {
       return res
@@ -1104,11 +1083,8 @@ export async function runQuestionSolution(req, res) {
       );
     }
 
-    const finishScoring = beginExecutionPhase("SCORING");
-    const resultProcessingStartedAt = performance.now();
     if (!isCodeExecutionAllowed(room)) {
       const win = getRoomWindowState(room);
-      finishScoring();
       return res.status(403).json({
         error: "The scheduled battle window ended while your code was running.",
         windowState: win.state,
@@ -1139,7 +1115,6 @@ export async function runQuestionSolution(req, res) {
         ).length
       : Math.min(visibleTestCases.length - visiblePassed, executionResult.failed || 0);
 
-    finishScoring();
     return res.status(200).json({
       status: executionResult.status,
       passed: executionResult.passed || 0,
@@ -1182,23 +1157,17 @@ export async function submitQuestionSolution(req, res) {
         .json({ error: "Question ID and code are required." });
     }
 
-    const finishRoomLookup = beginExecutionPhase("ROOM_LOOKUP");
-    let room;
-    try {
-      room = await BattleRoom.findOne(
-        { roomCode: roomCode.toUpperCase(), isActive: true, isDeleted: false },
-        {
-          roomCode: 1,
-          status: 1,
-          isDeleted: 1,
-          startTime: 1,
-          endTime: 1,
-          questions: 1,
-        },
-      ).lean();
-    } finally {
-      finishRoomLookup();
-    }
+    const room = await BattleRoom.findOne(
+      { roomCode: roomCode.toUpperCase(), isActive: true, isDeleted: false },
+      {
+        roomCode: 1,
+        status: 1,
+        isDeleted: 1,
+        startTime: 1,
+        endTime: 1,
+        questions: 1,
+      },
+    ).lean();
     if (!room) {
       return res.status(404).json({ error: "Battle room not found." });
     }
@@ -1226,25 +1195,19 @@ export async function submitQuestionSolution(req, res) {
     }
 
     // Read-only snapshot of the submission for validation + position lookup.
-    const finishSubmissionLookup = beginExecutionPhase("SUBMISSION_LOOKUP");
-    let submission;
-    try {
-      submission = await BattleRoomSubmission.findOne(
-        { roomId: room._id, userId },
-        {
-          status: 1,
-          totalScore: 1,
-          totalPassed: 1,
-          totalFailed: 1,
-          totalQuestions: 1,
-          startTime: 1,
-          questionResults: 1,
-          codingBehavior: 1,
-        },
-      ).lean();
-    } finally {
-      finishSubmissionLookup();
-    }
+    const submission = await BattleRoomSubmission.findOne(
+      { roomId: room._id, userId },
+      {
+        status: 1,
+        totalScore: 1,
+        totalPassed: 1,
+        totalFailed: 1,
+        totalQuestions: 1,
+        startTime: 1,
+        questionResults: 1,
+        codingBehavior: 1,
+      },
+    ).lean();
     if (!submission) {
       return res
         .status(400)
@@ -1262,11 +1225,9 @@ export async function submitQuestionSolution(req, res) {
         .json({ error: "You have been disqualified. Your score is 0." });
     }
 
-    const finishQuestionLookup = beginExecutionPhase("QUESTION_LOOKUP");
     const question = room.questions.find(
       (q) => q._id.toString() === questionId,
     );
-    finishQuestionLookup();
     if (!question) {
       return res
         .status(404)
@@ -1284,7 +1245,6 @@ export async function submitQuestionSolution(req, res) {
 
     const timeToSolve = Math.floor((new Date() - submission.startTime) / 1000);
 
-    const finishTestPreparation = beginExecutionPhase("TEST_PREPARATION");
     const allTestCases = [
       ...question.visibleTestCases.map((tc) => ({
         ...(tc._id ? { _id: tc._id } : {}),
@@ -1297,7 +1257,6 @@ export async function submitQuestionSolution(req, res) {
         expectedOutput: tc.expectedOutput,
       })),
     ];
-    finishTestPreparation();
 
     // Stateless execution (no DB writes during the engine call).
     let executionResult;
@@ -1329,7 +1288,6 @@ export async function submitQuestionSolution(req, res) {
       });
     }
 
-    const finishScoring = beginExecutionPhase("SCORING");
     const visibleCount = question.visibleTestCases.length;
     const hiddenCount = question.hiddenTestCases.length;
     const totalCount = visibleCount + hiddenCount;
@@ -1400,7 +1358,9 @@ export async function submitQuestionSolution(req, res) {
 
     // Compute deltas from the question snapshot; $inc preserves updates from
     // concurrent submissions to other questions in the same room.
-    const previousQuestionResult = submission.questionResults[qrIndex];
+    const qrResults = [...submission.questionResults];
+    const previousQuestionResult = qrResults[qrIndex];
+    qrResults[qrIndex] = qr;
 
     const lines = code.split("\n").length;
 
@@ -1418,60 +1378,28 @@ export async function submitQuestionSolution(req, res) {
       },
     };
 
-    finishScoring();
-    if (process.env.BATTLE_ROOM_PERF_LOGS === "true") {
-      console.info("[BattleRoomTiming] Result processing before MongoDB write", {
-        testCaseCount: allTestCases.length,
-        resultCount: executionResult.results.length,
-        durationMs:
-          Math.round((performance.now() - resultProcessingStartedAt) * 100) / 100,
-      });
-    }
-
     // Atomic merge.
     // If a proctoring event already set DISQUALIFIED (or the user completed),
     // this filter matches nothing and we return a clean conflict instead of
     // crashing with a VersionError.
-    const finishFirstWrite = beginExecutionPhase("FIRST_DB_WRITE");
-    let currentSubmission;
-    try {
-      currentSubmission = await BattleRoomSubmission.findOneAndUpdate(
-        {
-          _id: submission._id,
-          status: { $in: ["PENDING", "PROCESSING"] },
-          [`questionResults.${qrIndex}.status`]: previousQuestionResult.status,
-          [`questionResults.${qrIndex}.score`]: previousQuestionResult.score || 0,
-          [`questionResults.${qrIndex}.passed`]: previousQuestionResult.passed || 0,
-          [`questionResults.${qrIndex}.failed`]: previousQuestionResult.failed || 0,
-          [`questionResults.${qrIndex}.code`]: previousQuestionResult.code || "",
-        },
-        update,
-        {
-          new: true,
-          projection: {
-            status: 1,
-            totalScore: 1,
-            totalPassed: 1,
-            totalFailed: 1,
-            questionResults: 1,
-          },
-        },
-      ).lean();
-    } finally {
-      finishFirstWrite();
-    }
+    const result = await BattleRoomSubmission.updateOne(
+      {
+        _id: submission._id,
+        status: { $in: ["PENDING", "PROCESSING"] },
+        [`questionResults.${qrIndex}.status`]: previousQuestionResult.status,
+        [`questionResults.${qrIndex}.score`]: previousQuestionResult.score || 0,
+        [`questionResults.${qrIndex}.passed`]: previousQuestionResult.passed || 0,
+        [`questionResults.${qrIndex}.failed`]: previousQuestionResult.failed || 0,
+        [`questionResults.${qrIndex}.code`]: previousQuestionResult.code || "",
+      },
+      update,
+    );
 
-    if (!currentSubmission) {
-      const finishOtherDb = beginExecutionPhase("OTHER_DB");
-      let current;
-      try {
-        current = await BattleRoomSubmission.findOne(
-          { _id: submission._id },
-          { status: 1, totalScore: 1 },
-        ).lean();
-      } finally {
-        finishOtherDb();
-      }
+    if (result.matchedCount === 0) {
+      const current = await BattleRoomSubmission.findOne(
+        { _id: submission._id },
+        { status: 1, totalScore: 1 },
+      ).lean();
       return res.status(409).json({
         error:
           current && current.status === "DISQUALIFIED"
@@ -1482,61 +1410,49 @@ export async function submitQuestionSolution(req, res) {
       });
     }
 
+    let currentSubmission = await BattleRoomSubmission.findById(
+      submission._id,
+      {
+        status: 1,
+        totalScore: 1,
+        totalPassed: 1,
+        totalFailed: 1,
+        questionResults: 1,
+      },
+    ).lean();
+    if (!currentSubmission) {
+      return res.status(404).json({ error: "Submission no longer exists." });
+    }
     const allCompleted = currentSubmission.questionResults.every(
       (questionResult) =>
         !["PENDING", "PROCESSING"].includes(questionResult.status),
     );
     if (allCompleted) {
-      const finishCompletionWrite = beginExecutionPhase("OTHER_DB");
-      let completedSubmission;
-      try {
-        completedSubmission = await BattleRoomSubmission.findOneAndUpdate(
-          {
-            _id: submission._id,
-            status: { $in: ["PENDING", "PROCESSING"] },
-            questionResults: {
-              $not: {
-                $elemMatch: { status: { $in: ["PENDING", "PROCESSING"] } },
-              },
+      await BattleRoomSubmission.updateOne(
+        {
+          _id: submission._id,
+          status: { $in: ["PENDING", "PROCESSING"] },
+          questionResults: {
+            $not: {
+              $elemMatch: { status: { $in: ["PENDING", "PROCESSING"] } },
             },
           },
-          { $set: { status: "COMPLETED", submittedAt: new Date() } },
-          {
-            new: true,
-            projection: {
-              status: 1,
-              totalScore: 1,
-              totalPassed: 1,
-              totalFailed: 1,
-              questionResults: 1,
-            },
-          },
-        ).lean();
-      } finally {
-        finishCompletionWrite();
-      }
-      if (completedSubmission) {
-        currentSubmission = completedSubmission;
-      } else {
-        const finishOtherDb = beginExecutionPhase("OTHER_DB");
-        try {
-          currentSubmission = await BattleRoomSubmission.findById(
-            submission._id,
-            {
-              status: 1,
-              totalScore: 1,
-              totalPassed: 1,
-              totalFailed: 1,
-              questionResults: 1,
-            },
-          ).lean();
-        } finally {
-          finishOtherDb();
-        }
-      }
-      if (!currentSubmission) {
-        return res.status(404).json({ error: "Submission no longer exists." });
-      }
+        },
+        { $set: { status: "COMPLETED", submittedAt: new Date() } },
+      );
+      currentSubmission = await BattleRoomSubmission.findById(
+        submission._id,
+        {
+          status: 1,
+          totalScore: 1,
+          totalPassed: 1,
+          totalFailed: 1,
+          questionResults: 1,
+        },
+      ).lean();
+    }
+    if (!currentSubmission) {
+      return res.status(404).json({ error: "Submission no longer exists." });
     }
 
     // SECURITY: never expose hidden test case inputs, expected outputs, or
