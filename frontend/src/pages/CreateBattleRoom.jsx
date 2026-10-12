@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { createRoom } from "../services/battleRoomService";
 import { saveCreatorProfile } from "../services/platformService";
-import RoomKeyModal from "../components/battleRoom/RoomKeyModal";
 import { useAuth } from "../context/AuthContext";
 import {
   CATEGORY_VALUES,
@@ -119,9 +118,6 @@ export default function CreateBattleRoom() {
   // Submission state
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
-  const [roomKey, setRoomKey] = useState("");
-  const [createdRoom, setCreatedRoom] = useState(null);
-  const [showKeyModal, setShowKeyModal] = useState(false);
   const currentQuestion = useMemo(
     () => questions[currentQuestionIndex] || { ...emptyQuestion },
     [questions, currentQuestionIndex],
@@ -343,12 +339,14 @@ export default function CreateBattleRoom() {
       };
 
       const data = await createRoom(payload);
-      setRoomKey(data.roomKey || data.roomCode);
-      setCreatedRoom(data.room || {
-        title: title.trim(),
-        maxParticipants,
+      navigate("/battle-room", {
+        replace: true,
+        state: {
+          activeTab: "my-rooms",
+          createdRoomCode:
+            data.room?.roomCode || data.roomCode || data.roomKey,
+        },
       });
-      setShowKeyModal(true);
     } catch (err) {
       setError(err.message || "Failed to create room.");
     } finally {
@@ -959,12 +957,6 @@ export default function CreateBattleRoom() {
         </div>
       </div>
 
-      <RoomKeyModal
-        isOpen={showKeyModal}
-        onClose={() => navigate(`/battle-room/${roomKey}`)}
-        roomCode={roomKey}
-        room={createdRoom}
-      />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

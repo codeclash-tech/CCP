@@ -108,6 +108,9 @@ export function AuthProvider({ children }) {
         setSessionError("");
         setUser(profile);
       },
+      updateUser: (profile) => {
+        setUser(profile);
+      },
       signOut,
     }),
     [user, loading, sessionError, refreshProfile, signOut],

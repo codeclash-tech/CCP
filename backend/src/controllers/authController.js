@@ -366,3 +366,34 @@ export async function getProfile(req, res) {
     return res.status(500).json({ error: "Failed to get profile." });
   }
 }
+
+export async function updateProfile(req, res) {
+  try {
+    const name =
+      typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const organization =
+      typeof req.body?.organization === "string"
+        ? req.body.organization.trim()
+        : "";
+
+    if (!name || name.length > 100) {
+      return res.status(400).json({
+        error: "Enter a name between 1 and 100 characters.",
+      });
+    }
+    if (!organization || organization.length > 120) {
+      return res.status(400).json({
+        error: "Enter an organization between 1 and 120 characters.",
+      });
+    }
+
+    req.user.name = name;
+    req.user.organization = organization;
+    await req.user.save();
+
+    return res.status(200).json({ user: req.user.toPublicJSON() });
+  } catch (error) {
+    console.error("[AuthController] update-profile failed:", error.message);
+    return res.status(500).json({ error: "Failed to update your profile." });
+  }
+}

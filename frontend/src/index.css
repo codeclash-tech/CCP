@@ -554,6 +554,175 @@ body {
   overflow-x: hidden;
 }
 
+@media (max-width: 900px) {
+  .app-navbar {
+    display: flex !important;
+    height: 56px !important;
+    min-height: 56px;
+    flex-wrap: nowrap !important;
+    padding: 0 16px !important;
+    position: sticky;
+  }
+
+  .app-navbar > div.app-navbar-main {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-wrap: nowrap !important;
+    gap: 0 !important;
+  }
+
+  .app-navbar .app-navbar-links,
+  .app-navbar .app-navbar-account {
+    display: none !important;
+  }
+
+  .app-navbar-mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  .app-navbar-mobile-menu {
+    position: absolute;
+    top: calc(100% + 1px);
+    left: 0;
+    right: 0;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px 12px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.32);
+  }
+
+  .app-navbar-mobile-menu a,
+  .app-navbar-mobile-menu button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-secondary);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    text-decoration: none;
+  }
+
+  .app-navbar-mobile-menu a.active {
+    background: var(--accent-blue-soft);
+    color: var(--text-primary);
+  }
+
+  .app-navbar-mobile-menu button {
+    color: var(--color-danger);
+    cursor: pointer;
+  }
+
+  .app-navbar-mobile-user {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 12px;
+    border-top: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 12px;
+  }
+
+  .app-navbar-mobile-user span {
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .app-navbar-mobile-menu [role="alert"] {
+    padding: 4px 12px;
+    color: var(--color-danger);
+    font-size: 12px;
+  }
+
+  .battle-room-tabs-wrap {
+    margin-bottom: 24px;
+  }
+
+  .battle-room-page > .battle-room-tabs-wrap {
+    margin-right: 0;
+    padding-right: 0;
+    overflow: visible;
+  }
+
+  .battle-room-tabs-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .battle-room-tabs {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 6px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+  }
+
+  .battle-room-tabs[data-open="true"] {
+    display: flex;
+  }
+
+  .battle-room-tabs .tab-btn {
+    min-height: 42px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 6px;
+    text-align: left;
+  }
+
+  .battle-room-tabs .tab-btn.active {
+    background: var(--accent-blue-soft);
+  }
+}
+
+@media (min-width: 901px) {
+  .app-navbar-mobile-toggle,
+  .app-navbar-mobile-menu,
+  .battle-room-tabs-toggle {
+    display: none;
+  }
+
+  .battle-room-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+}
+
 img,
 svg,
 video,
@@ -594,6 +763,29 @@ canvas {
 .app-navbar-links,
 .app-navbar-account {
   min-width: 0;
+}
+
+.app-navbar-links {
+  display: flex;
+  gap: 2px;
+}
+
+.app-navbar-links a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  transition: all 0.15s;
+}
+
+.app-navbar-links a.active {
+  background: var(--accent-blue-soft);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .room-list-scroll {

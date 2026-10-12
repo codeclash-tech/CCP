@@ -65,10 +65,13 @@ export default function About() {
           </span>
           <h1>Make coding practice a shared challenge.</h1>
           <p>
-            CodeClash helps people turn programming questions into focused,
-            timed coding battles. Creators set the challenge; participants solve
-            it, see how they did, and learn through the experience.
+            CodeClash is a AMUX's product that lets you create and take part in
+            coding challenges. It provides a platform for developers to test
+            their skills, learn from others, and engage in friendly competition.
+            Whether you're a creator looking to host a challenge or a challenger
+            eager to test your abilities, CodeClash has you covered.
           </p>
+          <p></p>
           <div className="about-hero-actions">
             <Link className="btn-primary" to="/register">
               Get started <ArrowRight size={16} />
@@ -106,7 +109,7 @@ export default function About() {
             {statsError
               ? statsError
               : stats
-                ? "Creators are counted once per email."
+                ? "Join the battle now!"
                 : "Loading community totals…"}
           </p>
         </aside>

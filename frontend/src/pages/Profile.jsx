@@ -1,10 +1,64 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "../components/user/UserAvatar";
+import { updateProfile } from "../services/authService";
+import { Check, Loader2, Pencil, X } from "lucide-react";
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [name, setName] = useState(user?.name || "");
+  const [organization, setOrganization] = useState(user?.organization || "");
 
   const verified = Boolean(user?.isVerified);
+
+  useEffect(() => {
+    setName(user?.name || "");
+    setOrganization(user?.organization || "");
+  }, [user?.name, user?.organization]);
+
+  const cancelEditing = () => {
+    setName(user?.name || "");
+    setOrganization(user?.organization || "");
+    setError("");
+    setSuccess("");
+    setEditing(false);
+  };
+
+  const handleSave = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+
+    const trimmedName = name.trim();
+    const trimmedOrganization = organization.trim();
+    if (!trimmedName || trimmedName.length > 100) {
+      setError("Enter a name between 1 and 100 characters.");
+      return;
+    }
+    if (!trimmedOrganization || trimmedOrganization.length > 120) {
+      setError("Enter an organization between 1 and 120 characters.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updatedUser = await updateProfile({
+        name: trimmedName,
+        organization: trimmedOrganization,
+      });
+      updateUser(updatedUser);
+      setSuccess("Your profile has been updated.");
+      setEditing(false);
+    } catch (saveError) {
+      setError(saveError.message || "Failed to update your profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <main className="profile-page">
@@ -256,6 +310,68 @@ export default function Profile() {
           opacity: 0.7;
         }
 
+        .profile-edit-form {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 14px;
+          margin-top: 22px;
+          padding-top: 20px;
+          border-top: 1px solid var(--border-color);
+        }
+
+        .profile-edit-field {
+          display: grid;
+          gap: 7px;
+          color: var(--text-muted);
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.065em;
+        }
+
+        .profile-edit-field input {
+          width: 100%;
+          min-height: 42px;
+          padding: 9px 11px;
+          border: 1px solid var(--border-color);
+          border-radius: 7px;
+          background: var(--bg-main);
+          color: var(--text-primary);
+          font: 14px var(--font-ui);
+          text-transform: none;
+          letter-spacing: normal;
+        }
+
+        .profile-edit-actions {
+          display: flex;
+          grid-column: 1 / -1;
+          justify-content: flex-end;
+          gap: 9px;
+        }
+
+        .profile-edit-feedback {
+          grid-column: 1 / -1;
+          font-size: 13px;
+        }
+
+        .profile-edit-feedback.error {
+          color: var(--color-danger);
+        }
+
+        .profile-edit-feedback.success {
+          color: var(--color-success);
+        }
+
+        .profile-saving-icon {
+          animation: profile-spin 1s linear infinite;
+        }
+
+        @keyframes profile-spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
         /* Responsive */
 
         @media (max-width: 680px) {
@@ -280,6 +396,18 @@ export default function Profile() {
 
           .profile-content {
             padding: 22px;
+          }
+
+          .profile-edit-form {
+            grid-template-columns: 1fr;
+          }
+
+          .profile-edit-actions {
+            grid-column: auto;
+          }
+
+          .profile-edit-feedback {
+            grid-column: auto;
           }
 
           .profile-details {
@@ -385,6 +513,85 @@ export default function Profile() {
                 </dd>
               </div>
             </dl>
+
+            {success && !editing && (
+              <p className="profile-edit-feedback success" role="status">
+                {success}
+              </p>
+            )}
+
+            {editing ? (
+              <form className="profile-edit-form" onSubmit={handleSave}>
+                <label className="profile-edit-field">
+                  Name
+                  <input
+                    autoComplete="name"
+                    maxLength={100}
+                    required
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </label>
+                <label className="profile-edit-field">
+                  Organization
+                  <input
+                    autoComplete="organization"
+                    maxLength={120}
+                    required
+                    value={organization}
+                    onChange={(event) => setOrganization(event.target.value)}
+                  />
+                </label>
+                {error && (
+                  <p className="profile-edit-feedback error" role="alert">
+                    {error}
+                  </p>
+                )}
+                <div className="profile-edit-actions">
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    onClick={cancelEditing}
+                    disabled={saving}
+                  >
+                    <X size={14} />
+                    Cancel
+                  </button>
+                  <button
+                    className="btn-primary"
+                    type="submit"
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <Loader2 size={14} className="profile-saving-icon" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    {saving ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="profile-edit-actions" style={{ marginTop: 20 }}>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  onClick={() => {
+                    setError("");
+                    setSuccess("");
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil size={14} />
+                  Edit profile
+                </button>
+                {error && (
+                  <p className="profile-edit-feedback error" role="alert">
+                    {error}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="profile-footer">
               <p className="profile-footer-text">

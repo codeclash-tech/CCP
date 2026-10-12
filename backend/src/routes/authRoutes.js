@@ -12,6 +12,7 @@ import {
   loginWithPasswordHandler,
   requestPasswordResetHandler,
   resetPasswordHandler,
+  updateProfile,
 } from "../controllers/authController.js";
 import { authenticate } from "../middleware/auth.js";
 import {
@@ -125,5 +126,6 @@ router.post("/logout", authenticate, logout, auditLogout);
 router.post("/logout-all", authenticate, logoutAllDevices);
 router.get("/sessions", authenticate, getSessions);
 router.get("/profile", authenticate, getProfile);
+router.put("/profile", authenticate, updateProfile);
 
 export default router;

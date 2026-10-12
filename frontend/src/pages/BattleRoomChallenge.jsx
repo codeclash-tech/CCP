@@ -37,6 +37,7 @@ import {
   AlertTriangle,
   Code2,
 } from "lucide-react";
+import { isMobileDevice } from "../utils/device";
 
 function RoomTimer({ endTime, onTimeUp }) {
   const [timeLeft, setTimeLeft] = useState(0);
@@ -138,11 +139,7 @@ function saveRoomEditorCache(roomCode, codeByQuestion, resultByQuestion) {
 export default function BattleRoomChallenge() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
-  const [hasLaptopViewport, setHasLaptopViewport] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(min-width: 1024px)").matches,
-  );
+  const [isMobile, setIsMobile] = useState(isMobileDevice);
 
   const [room, setRoom] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -175,22 +172,32 @@ export default function BattleRoomChallenge() {
   const draggingConsoleRef = useRef(false);
 
   const draftRoomCodeRef = useRef(null);
+  const fetchInFlightRef = useRef(false);
   const codeByQuestionRef = useRef({});
   const resultByQuestionRef = useRef({});
   const activeQuestionIdRef = useRef(null);
   const startTimeRef = useRef(null);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
-    const updateViewport = () => setHasLaptopViewport(mediaQuery.matches);
+    const updateViewport = () => setIsMobile(isMobileDevice());
     updateViewport();
-    mediaQuery.addEventListener("change", updateViewport);
-    return () => mediaQuery.removeEventListener("change", updateViewport);
+    window.addEventListener("resize", updateViewport);
+    const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
+    coarsePointerQuery.addEventListener("change", updateViewport);
+    return () => {
+      window.removeEventListener("resize", updateViewport);
+      coarsePointerQuery.removeEventListener("change", updateViewport);
+    };
   }, []);
 
   const fetchRoom = useCallback(async () => {
-    setLoading(true);
-    setError("");
+    if (fetchInFlightRef.current) return;
+    fetchInFlightRef.current = true;
+    const showInitialLoading = !draftRoomCodeRef.current;
+    if (showInitialLoading) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const data = await getRoomByCode(roomCode);
       setRoom(data.room);
@@ -198,12 +205,6 @@ export default function BattleRoomChallenge() {
       setQuestionsVisible(!!data.questionsVisible);
       setWindowState(data.room?.windowState || null);
       setRoomKey(data.roomKey || "");
-      setQuestionResults(
-        (data.room.questions || []).map((q) => ({
-          questionId: q._id,
-          status: "PENDING",
-        })),
-      );
 
       const isNewRoom = draftRoomCodeRef.current !== roomCode;
       if (isNewRoom) {
@@ -213,24 +214,27 @@ export default function BattleRoomChallenge() {
         resultByQuestionRef.current = savedCache.resultByQuestion;
         activeQuestionIdRef.current = null;
         setCurrentResult(null);
-      }
-
-      const questions = data.room.questions || [];
-      const nextQuestionIndex = isNewRoom
-        ? 0
-        : Math.min(currentQuestionIndex, Math.max(questions.length - 1, 0));
-      const q = questions[nextQuestionIndex];
-      if (q) {
-        const starter = getQuestionStarter(q);
-        const restoredCode = codeByQuestionRef.current[q._id] ?? starter;
-        codeByQuestionRef.current[q._id] = restoredCode;
-        activeQuestionIdRef.current = q._id;
-        setCode(restoredCode);
-        setCurrentQuestionIndex(nextQuestionIndex);
-        const cachedResult = resultByQuestionRef.current[q._id];
-        setCurrentResult(
-          cachedResult?.code === restoredCode ? cachedResult.result : null,
+        setQuestionResults(
+          (data.room.questions || []).map((q) => ({
+            questionId: q._id,
+            status: "PENDING",
+          })),
         );
+        const firstQuestion = data.room.questions?.[0];
+        if (firstQuestion) {
+          const starter = getQuestionStarter(firstQuestion);
+          const restoredCode =
+            codeByQuestionRef.current[firstQuestion._id] ?? starter;
+          codeByQuestionRef.current[firstQuestion._id] = restoredCode;
+          activeQuestionIdRef.current = firstQuestion._id;
+          setCode(restoredCode);
+          setCurrentQuestionIndex(0);
+          const cachedResult =
+            resultByQuestionRef.current[firstQuestion._id];
+          setCurrentResult(
+            cachedResult?.code === restoredCode ? cachedResult.result : null,
+          );
+        }
       }
 
       const hasScheduledWindow = Boolean(
@@ -257,7 +261,7 @@ export default function BattleRoomChallenge() {
         data.userSubmission &&
         (data.userSubmission.status === "COMPLETED" ||
           data.userSubmission.status === "DISQUALIFIED");
-      if (data.room.status === "ACTIVE" && !userFinished) {
+      if (data.room.status === "ACTIVE" && !userFinished && !isMobileDevice()) {
         setProctorEnabled(true);
       }
 
@@ -271,13 +275,22 @@ export default function BattleRoomChallenge() {
         setError(msg);
       }
     } finally {
-      setLoading(false);
+      fetchInFlightRef.current = false;
+      if (showInitialLoading) {
+        setLoading(false);
+      }
     }
-  }, [roomCode, currentQuestionIndex]);
+  }, [roomCode]);
 
   useEffect(() => {
     fetchRoom();
   }, [fetchRoom]);
+
+  useEffect(() => {
+    if (!isMobile && room?.status === "ACTIVE" && !submitted) {
+      setProctorEnabled(true);
+    }
+  }, [isMobile, room?.status, submitted]);
 
   // Auto-refresh while the participant is waiting for the scheduled window to
   // open (or is on the not-started screen) so they unlock without a manual
@@ -292,6 +305,11 @@ export default function BattleRoomChallenge() {
   }, [windowState, room, isCreator, fetchRoom]);
 
   const handleStartRoom = async () => {
+    if (isMobileDevice()) {
+      setIsMobile(true);
+      setError("Tests can only be attended using a desktop or PC.");
+      return;
+    }
     if (
       creatorOrganization.trim().length < 2 ||
       creatorOrganization.trim().length > 120
@@ -529,9 +547,11 @@ export default function BattleRoomChallenge() {
   const handleRun = async () => {
     if (running || submitted) return;
 
-    const question = room.questions[currentQuestionIndex];
+    const questionIndex = currentQuestionIndex;
+    const question = room.questions[questionIndex];
     if (!question) return;
 
+    const codeSnapshot = code;
     const performanceTraceId = beginExecutionTrace("run");
     setRunning(true);
     setError("");
@@ -540,7 +560,7 @@ export default function BattleRoomChallenge() {
       const result = await runQuestionSolution({
         roomCode,
         questionId: question._id,
-        code,
+        code: codeSnapshot,
         language: selectedLanguage,
       });
 
@@ -585,9 +605,8 @@ export default function BattleRoomChallenge() {
         })),
       };
 
-      codeByQuestionRef.current[question._id] = code;
       resultByQuestionRef.current[question._id] = {
-        code,
+        code: codeSnapshot,
         result: runResult,
       };
       saveRoomEditorCache(
@@ -595,7 +614,10 @@ export default function BattleRoomChallenge() {
         codeByQuestionRef.current,
         resultByQuestionRef.current,
       );
-      if (activeQuestionIdRef.current === question._id) {
+      if (
+        activeQuestionIdRef.current === question._id &&
+        codeByQuestionRef.current[question._id] === codeSnapshot
+      ) {
         setCurrentResult(runResult);
       }
       setConsoleHeight((prev) => prev);
@@ -612,17 +634,21 @@ export default function BattleRoomChallenge() {
         memoryUsed: 0,
         results: [],
       };
-      codeByQuestionRef.current[question._id] = code;
-      resultByQuestionRef.current[question._id] = { code, result: failedResult };
+      resultByQuestionRef.current[question._id] = {
+        code: codeSnapshot,
+        result: failedResult,
+      };
       saveRoomEditorCache(
         roomCode,
         codeByQuestionRef.current,
         resultByQuestionRef.current,
       );
-      if (activeQuestionIdRef.current === question._id) {
+      if (
+        activeQuestionIdRef.current === question._id &&
+        codeByQuestionRef.current[question._id] === codeSnapshot
+      ) {
         setCurrentResult(failedResult);
       }
-      setError(err.message || "Failed to run code.");
     } finally {
       setRunning(false);
       finishExecutionTrace(performanceTraceId);
@@ -756,6 +782,27 @@ export default function BattleRoomChallenge() {
           Retry
         </button>
       </div>
+    );
+  }
+
+  if (room && isMobile) {
+    return (
+      <main className="challenge-device-notice" role="status">
+        <Monitor size={40} />
+        <h1>Attend only using a desktop or PC</h1>
+        <p>
+          This test is designed for a desktop or PC. Opening this page on a
+          mobile device will not disqualify you. Switch to a desktop or PC to
+          attend or continue the test.
+        </p>
+        <button
+          className="btn-primary"
+          type="button"
+          onClick={() => navigate("/battle-room", { replace: true })}
+        >
+          Back to Battle Room
+        </button>
+      </main>
     );
   }
 
@@ -968,27 +1015,6 @@ export default function BattleRoomChallenge() {
   }
 
   if (!room) return null;
-
-  if (!isCreator && !hasLaptopViewport) {
-    return (
-      <main className="challenge-device-notice">
-        <Monitor size={40} />
-        <h1>Continue this challenge on a laptop</h1>
-        <p>
-          The coding editor and challenge workspace are designed for a laptop
-          screen. Your room access is saved; open this challenge again on a
-          laptop to continue.
-        </p>
-        <button
-          className="btn-primary"
-          type="button"
-          onClick={() => navigate("/battle-room", { replace: true })}
-        >
-          Back to Battle Room
-        </button>
-      </main>
-    );
-  }
 
   // Participant blocked by the schedule (before start or after end).
   const isBlockedBySchedule =

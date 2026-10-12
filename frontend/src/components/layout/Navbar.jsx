@@ -1,6 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Code2, Home, Info, LogOut, Swords } from "lucide-react";
+import {
+  Code2,
+  Home,
+  Info,
+  LogOut,
+  Menu,
+  Swords,
+  UserRound,
+  X,
+} from "lucide-react";
 
 import UserAvatar from "../user/UserAvatar";
 import { useAuth } from "../../context/AuthContext";
@@ -18,6 +27,10 @@ export default function Navbar() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
 
   // Display the entire username in uppercase.
   const displayName = user?.name?.toUpperCase() || "ACCOUNT";
@@ -79,43 +92,38 @@ export default function Navbar() {
           <span>CodeClash</span>
         </Link>
 
-        <div className="app-navbar-links" style={{ display: "flex", gap: 2 }}>
-            {NAV_LINKS.filter((link) => user || link.path === "/about").map((link) => {
-              const isActive =
-                location.pathname === link.path ||
-                (link.path !== "/" && location.pathname.startsWith(link.path));
+        <div className="app-navbar-links">
+          {NAV_LINKS.filter((link) => user || link.path === "/about").map((link) => {
+            const isActive =
+              location.pathname === link.path ||
+              (link.path !== "/" && location.pathname.startsWith(link.path));
 
-              const Icon = link.icon;
+            const Icon = link.icon;
 
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  style={{
-                    padding: "7px 14px",
-                    borderRadius: 6,
-                    fontSize: 13,
-                    textDecoration: "none",
-                    color: isActive
-                      ? "var(--text-primary)"
-                      : "var(--text-muted)",
-                    background: isActive
-                      ? "var(--accent-blue-soft)"
-                      : "transparent",
-                    transition: "all 0.15s",
-                    fontWeight: isActive ? 600 : 400,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <Icon size={16} />
-                  {link.label}
-                </Link>
-              );
-            })}
+            return (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={isActive ? "active" : ""}
+              >
+                <Icon size={16} />
+                {link.label}
+              </Link>
+            );
+          })}
         </div>
       </div>
+
+      <button
+        className="app-navbar-mobile-toggle"
+        type="button"
+        aria-label={menuOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={menuOpen}
+        aria-controls="mobile-navigation-menu"
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        {menuOpen ? <X size={22} /> : <Menu size={22} />}
+      </button>
 
       {/* User menu */}
       {user ? (
@@ -188,6 +196,24 @@ export default function Navbar() {
               </div>
 
               {/* Sign out */}
+              <Link
+                role="menuitem"
+                to="/profile"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  width: "100%",
+                  padding: "9px 10px",
+                  color: "var(--text-primary)",
+                  textDecoration: "none",
+                  fontSize: 12,
+                }}
+              >
+                <UserRound size={14} />
+                Profile
+              </Link>
               <button
                 role="menuitem"
                 type="button"
@@ -236,6 +262,52 @@ export default function Navbar() {
           >
             Sign in
           </Link>
+        </div>
+      )}
+
+      {menuOpen && (
+        <div
+          id="mobile-navigation-menu"
+          className="app-navbar-mobile-menu"
+        >
+          {[
+            ...NAV_LINKS.filter((link) => user || link.path === "/about"),
+            ...(user ? [{ path: "/profile", label: "Profile", icon: UserRound }] : []),
+          ].map((link) => {
+            const Icon = link.icon;
+            const isActive =
+              location.pathname === link.path ||
+              (link.path !== "/" && location.pathname.startsWith(link.path));
+
+            return (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={isActive ? "active" : ""}
+                onClick={() => setMenuOpen(false)}
+              >
+                <Icon size={17} />
+                {link.label}
+              </Link>
+            );
+          })}
+          {user ? (
+            <>
+              <div className="app-navbar-mobile-user">
+                <strong>{displayName}</strong>
+                <span>{user.email}</span>
+              </div>
+              <button type="button" onClick={handleSignOut}>
+                <LogOut size={16} />
+                Sign out
+              </button>
+              {signOutError && <div role="alert">{signOutError}</div>}
+            </>
+          ) : (
+            <Link to="/login" onClick={() => setMenuOpen(false)}>
+              Sign in
+            </Link>
+          )}
         </div>
       )}
     </nav>

@@ -1,10 +1,57 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { joinRoom, getMyRooms, getJoinedRooms, shareKey } from "../services/battleRoomService";
 import { formatDate } from "../utils/helpers";
 import RoomKeyModal from "../components/battleRoom/RoomKeyModal";
-import { Swords, PlusCircle, LogIn, Trophy, KeyRound, Loader2, Share2, Copy, Check } from "lucide-react";
+import {
+  Swords,
+  PlusCircle,
+  LogIn,
+  Trophy,
+  KeyRound,
+  Loader2,
+  Share2,
+  Copy,
+  Check,
+  Menu,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { isMobileDevice } from "../utils/device";
+
+function getRoomStatusLabel(room, now = Date.now()) {
+  if (room.submissionStatus === "COMPLETED") return "Completed";
+  if (room.submissionStatus === "DISQUALIFIED") return "Disqualified";
+
+  const startTime = room.startDate || room.startTime;
+  const endTime = room.endDate || room.endTime;
+  const start = startTime ? new Date(startTime).getTime() : NaN;
+  const end = endTime ? new Date(endTime).getTime() : NaN;
+
+  if (
+    room.status === "ACTIVE" ||
+    room.status === "LIVE" ||
+    (Number.isFinite(start) &&
+      Number.isFinite(end) &&
+      start <= now &&
+      now < end)
+  ) {
+    return "Live";
+  }
+  if (room.status === "CLOSED" || (Number.isFinite(end) && end <= now)) {
+    return "Completed";
+  }
+  return "Upcoming";
+}
+
+function getStatusColor(status) {
+  if (status === "Live") return "var(--color-success)";
+  if (status === "Completed" || status === "Disqualified") {
+    return status === "Disqualified"
+      ? "var(--color-danger)"
+      : "var(--text-muted)";
+  }
+  return "var(--color-warning)";
+}
 
 function CopyableCode({ code, onCopyError }) {
   const [copied, setCopied] = useState(false);
@@ -55,7 +102,10 @@ export default function BattleRoom() {
   const [joinOrganization, setJoinOrganization] = useState("");
   const [joinError, setJoinError] = useState("");
   const [joining, setJoining] = useState(false);
-  const [activeTab, setActiveTab] = useState("create-join");
+  const [activeTab, setActiveTab] = useState(
+    location.state?.activeTab || "create-join",
+  );
+  const [roomTabsOpen, setRoomTabsOpen] = useState(false);
   const [myRooms, setMyRooms] = useState([]);
   const [joinedRooms, setJoinedRooms] = useState([]);
   const [loadingRooms, setLoadingRooms] = useState(false);
@@ -66,6 +116,12 @@ export default function BattleRoom() {
   const [shareRoomCode, setShareRoomCode] = useState("");
 
   const handleJoin = async () => {
+    if (isMobileDevice()) {
+      setJoinError(
+        "Tests can only be attended using a desktop or PC. You have not joined the battle and will not be disqualified.",
+      );
+      return;
+    }
     if (joinOrganization.trim().length < 2 || joinOrganization.trim().length > 120) {
       setJoinError("Enter your organization (2-120 characters) before joining.");
       return;
@@ -95,8 +151,7 @@ export default function BattleRoom() {
     navigate(`/battle-room/${joinCode.trim().toUpperCase()}/leaderboard`);
   };
 
-  const loadMyRooms = async () => {
-    setActiveTab("my-rooms");
+  const loadMyRooms = useCallback(async () => {
     setLoadingRooms(true);
     setRoomsError("");
     try {
@@ -107,10 +162,9 @@ export default function BattleRoom() {
     } finally {
       setLoadingRooms(false);
     }
-  };
+  }, []);
 
-  const loadJoinedRooms = async () => {
-    setActiveTab("joined-rooms");
+  const loadJoinedRooms = useCallback(async () => {
     setLoadingRooms(true);
     setRoomsError("");
     try {
@@ -121,7 +175,15 @@ export default function BattleRoom() {
     } finally {
       setLoadingRooms(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "my-rooms") {
+      loadMyRooms();
+    } else if (activeTab === "joined-rooms") {
+      loadJoinedRooms();
+    }
+  }, [activeTab, loadJoinedRooms, loadMyRooms]);
 
   const handleShareKey = useCallback(async (e, room) => {
     e.stopPropagation();
@@ -149,21 +211,45 @@ export default function BattleRoom() {
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, borderBottom: "1px solid var(--border-color)", paddingBottom: 12 }}>
-        {[
-          { key: "create-join", label: "Create / Join", icon: <PlusCircle size={14} /> },
-          { key: "my-rooms", label: "My Rooms", icon: <KeyRound size={14} /> },
-          { key: "joined-rooms", label: "Joined Rooms", icon: <LogIn size={14} /> },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={tab.key === "my-rooms" ? loadMyRooms : tab.key === "joined-rooms" ? loadJoinedRooms : () => setActiveTab(tab.key)}
-            className={`tab-btn ${activeTab === tab.key ? "active" : ""}`}
-          >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
+      <div className="battle-room-tabs-wrap">
+        <button
+          className="battle-room-tabs-toggle"
+          type="button"
+          aria-expanded={roomTabsOpen}
+          aria-controls="battle-room-tabs"
+          onClick={() => setRoomTabsOpen((open) => !open)}
+        >
+          <Menu size={17} />
+          {activeTab === "create-join"
+            ? "Create / Join"
+            : activeTab === "my-rooms"
+              ? "My Rooms"
+              : "Joined Rooms"}
+        </button>
+        <div
+          id="battle-room-tabs"
+          className="battle-room-tabs"
+          data-open={roomTabsOpen}
+        >
+          {[
+            { key: "create-join", label: "Create / Join", icon: <PlusCircle size={14} /> },
+            { key: "my-rooms", label: "My Rooms", icon: <KeyRound size={14} /> },
+            { key: "joined-rooms", label: "Joined Rooms", icon: <LogIn size={14} /> },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => {
+                setActiveTab(tab.key);
+                setRoomTabsOpen(false);
+              }}
+              className={`tab-btn ${activeTab === tab.key ? "active" : ""}`}
+              aria-pressed={activeTab === tab.key}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {actionError && (
@@ -323,15 +409,29 @@ export default function BattleRoom() {
                     else navigate(`/battle-room/${room.roomCode}/leaderboard`);
                   }}
                   className="room-list-row"
-                  style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 90px", gap: 12, padding: "10px 16px", borderBottom: "1px solid var(--border-color)", fontSize: 12, fontFamily: "var(--font-ui)", alignItems: "center", cursor: "pointer" }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "100px 1fr 90px 70px 90px 90px",
+                    gap: 12,
+                    padding: "10px 16px",
+                    borderBottom: "1px solid var(--border-color)",
+                    fontSize: 12,
+                    fontFamily: "var(--font-ui)",
+                    alignItems: "center",
+                    cursor: "pointer",
+                    background:
+                      room.roomCode === location.state?.createdRoomCode
+                        ? "var(--accent-blue-soft)"
+                        : undefined,
+                  }}
                 >
                   <CopyableCode
                     code={room.roomCode}
                     onCopyError={setActionError}
                   />
                   <div style={{ color: "var(--text-primary)" }}>{room.title}</div>
-                  <div style={{ color: room.status === "ACTIVE" ? "var(--color-success)" : room.status === "CLOSED" ? "var(--color-danger)" : "var(--color-warning)", fontWeight: 600 }}>
-                    {room.status}
+                  <div style={{ color: getStatusColor(getRoomStatusLabel(room)), fontWeight: 600 }}>
+                    {getRoomStatusLabel(room)}
                   </div>
                   <div style={{ color: "var(--text-muted)", textAlign: "center" }}>{room.participantCount || 0}</div>
                   <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
@@ -403,8 +503,8 @@ export default function BattleRoom() {
                   <div style={{ color: "var(--accent-blue-bright)", textAlign: "center", fontWeight: 600 }}>
                     {Math.round(room.totalScore || 0)}
                   </div>
-                  <div style={{ color: room.submissionStatus === "DISQUALIFIED" ? "var(--color-danger)" : room.status === "ACTIVE" ? "var(--color-success)" : room.status === "CLOSED" ? "var(--color-danger)" : "var(--color-warning)", fontWeight: 600 }}>
-                    {room.submissionStatus || room.status}
+                  <div style={{ color: getStatusColor(getRoomStatusLabel(room)), fontWeight: 600 }}>
+                    {getRoomStatusLabel(room)}
                   </div>
                   <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
                     {room.submittedAt ? formatDate(room.submittedAt) : "-"}

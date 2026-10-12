@@ -52,6 +52,9 @@ export const resetPassword = (details) =>
 export const getProfile = () =>
   api.get("/auth/profile").then((response) => response.data.user);
 
+export const updateProfile = (profile) =>
+  api.put("/auth/profile", profile).then((response) => response.data.user);
+
 export const signOut = async () => {
   try {
     await api.post("/auth/logout", {
