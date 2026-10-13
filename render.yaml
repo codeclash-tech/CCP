@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ccp-frontend
+    name: ccp-ce2f
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build
