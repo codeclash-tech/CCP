@@ -115,7 +115,7 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled }) {
         </div>
       )}
 
-      {isDisqualified && (
+      {enabled && isDisqualified && (
         <div className="pg-overlay">
           <div className="pg-modal pg-disqualified">
             <ShieldAlert size={40} color="var(--color-danger)" style={{ marginBottom: 16 }} />
@@ -141,4 +141,3 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled }) {
     </>
   );
 }
-

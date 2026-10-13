@@ -6,10 +6,20 @@ export default function useProctorGuard({ onDisqualified, enabled = true }) {
   const [warning, setWarning] = useState(null);
   const [isDisqualified, setIsDisqualified] = useState(false);
   const enabledRef = useRef(enabled);
+  const wasEnabledRef = useRef(enabled);
   const disqualifiedRef = useRef(false);
 
   useEffect(() => {
     enabledRef.current = enabled;
+    if (wasEnabledRef.current && !enabled) {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch((error) => {
+          console.error("Failed to exit fullscreen after the battle ended:", error);
+        });
+      }
+      setIsFullscreen(false);
+    }
+    wasEnabledRef.current = enabled;
   }, [enabled]);
 
   const disqualify = useCallback(
