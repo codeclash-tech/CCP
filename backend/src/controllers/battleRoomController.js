@@ -30,6 +30,7 @@ import {
 } from "../services/battleRoomScoring.js";
 import {
   RANKED_SUBMISSION_STATUSES,
+  getRoomSubmissionTime,
   sortRoomSubmissions,
 } from "../services/battleRoomRanking.js";
 

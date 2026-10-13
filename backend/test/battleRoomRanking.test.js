@@ -2,8 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   RANKED_SUBMISSION_STATUSES,
+  getRoomSubmissionTime,
   sortRoomSubmissions,
 } from "../src/services/battleRoomRanking.js";
+
+test("calculates total room submission time", () => {
+  assert.equal(
+    getRoomSubmissionTime({
+      questionResults: [{ timeToSolve: 12 }, { timeToSolve: 18 }],
+    }),
+    30,
+  );
+});
 
 test("uses leaderboard tie-breakers when ranking room submissions", () => {
   const submissions = [
