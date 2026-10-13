@@ -7,12 +7,12 @@ export async function sendBattleRoomResultEmail({
   totalScore,
   totalPassed,
   totalTestCases,
-  questionResults = [],
   rank,
   totalParticipants,
   roomCode,
   startTime,
   endTime,
+  timeZone = "UTC",
   submissionStatus = "COMPLETED",
   completedAt,
   certificateUrl,
@@ -25,44 +25,12 @@ export async function sendBattleRoomResultEmail({
     const safeUserName = escapeHtml(userName || "Developer");
     const safeRoomTitle = escapeHtml(roomTitle || "Coding Challenge");
     const safeRoomCode = escapeHtml(roomCode || "");
-    const completionDate = formatBattleDate(completedAt);
-    const battleStart = formatBattleDate(startTime);
-    const battleEnd = formatBattleDate(endTime);
+    const completionDate = formatBattleDate(completedAt, timeZone);
+    const battleStart = formatBattleDate(startTime, timeZone);
+    const battleEnd = formatBattleDate(endTime, timeZone);
     const safeStatus = escapeHtml(submissionStatus || "COMPLETED");
-    const questionResultRows = questionResults.length
-      ? questionResults
-          .map((question, index) => {
-            const questionTitle = escapeHtml(
-              question.questionTitle || `Question ${index + 1}`,
-            );
-            const questionStatus = escapeHtml(question.status || "PENDING");
-            const cases = (question.results || [])
-              .map((result, resultIndex) => {
-                const caseName = result.isHidden
-                  ? `Hidden test ${resultIndex + 1}`
-                  : `Test ${resultIndex + 1}`;
-                return `<tr>
-                  <td style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0;">${caseName}</td>
-                  <td style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0;">${escapeHtml(result.status || "PENDING")}</td>
-                  <td style="padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${Math.max(0, Number(result.executionTime) || 0)} ms</td>
-                </tr>`;
-              })
-              .join("");
-
-            return `<tr>
-              <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;"><strong>${index + 1}. ${questionTitle}</strong></td>
-              <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0;">${questionStatus}</td>
-              <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${Math.round(Number(question.score) || 0)}</td>
-              <td style="padding: 12px 10px; border-bottom: 1px solid #e2e8f0; text-align: right;">${Math.max(0, Number(question.passed) || 0)} / ${Math.max(0, Number(question.total) || 0)}</td>
-            </tr>${cases ? `<tr><td colspan="4" style="padding: 0 10px 12px;"><table width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #475569;"><thead><tr><th align="left" style="padding: 7px 10px;">Test case</th><th align="left" style="padding: 7px 10px;">Result</th><th align="right" style="padding: 7px 10px;">Time</th></tr></thead><tbody>${cases}</tbody></table></td></tr>` : ""}`;
-          })
-          .join("")
-      : `<tr><td colspan="4" style="padding: 12px 10px; color: #64748b;">No question-level results were recorded.</td></tr>`;
-
     const downloadInstructions =
-      "Use the secure link below to download your certificate. You do not need to reopen the battle room.";
-    const certificateDeadline =
-      "Download within 5 minutes of receiving this email; the battle room will then be deleted.";
+      "Download your certificate directly. You do not need to reopen the battle room.";
     const certificateLink = certificateUrl
       ? `<p style="margin: 16px 0 0;"><a href="${escapeHtml(certificateUrl)}" style="display: inline-block; padding: 11px 16px; color: #ffffff; background: #1d4ed8; border-radius: 6px; font-weight: bold; text-decoration: none;">Download your certificate</a></p>`
       : "";
@@ -96,17 +64,9 @@ export async function sendBattleRoomResultEmail({
         </tbody>
       </table>
 
-      <h2 style="margin: 28px 0 12px; font-size: 19px;">Question results</h2>
-      <div style="overflow-x: auto;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
-          <thead><tr style="background: #f1f5f9; text-align: left;"><th style="padding: 10px;">Question</th><th style="padding: 10px;">Status</th><th style="padding: 10px; text-align: right;">Score</th><th style="padding: 10px; text-align: right;">Tests passed</th></tr></thead>
-          <tbody>${questionResultRows}</tbody>
-        </table>
-      </div>
       <section style="margin-top: 28px; padding: 18px; background: #eff6ff; border-radius: 8px;">
         <h2 style="margin: 0 0 8px; font-size: 17px;">Download your certificate</h2>
         <p style="margin: 0; color: #334155; line-height: 1.6;">${downloadInstructions}</p>
-        <p style="margin: 8px 0 0; color: #334155; line-height: 1.6;">${certificateDeadline}</p>
         ${certificateLink}
       </section>
     </section>
@@ -127,19 +87,8 @@ Battle start: ${battleStart}
 Battle end: ${battleEnd}
 Completed on: ${completionDate}
 
-QUESTION RESULTS
-${questionResults.map((question, index) => {
-  const cases = (question.results || [])
-    .map((result, resultIndex) =>
-      `  ${result.isHidden ? "Hidden test" : "Test"} ${resultIndex + 1}: ${result.status || "PENDING"} (${Math.max(0, Number(result.executionTime) || 0)} ms)`,
-    )
-    .join("\n");
-  return `${index + 1}. ${question.questionTitle || `Question ${index + 1}`} — ${question.status || "PENDING"}, score ${Math.round(Number(question.score) || 0)}, tests passed ${Math.max(0, Number(question.passed) || 0)} / ${Math.max(0, Number(question.total) || 0)}${cases ? `\n${cases}` : ""}`;
-}).join("\n")}
-
 DOWNLOAD YOUR CERTIFICATE
 ${downloadInstructions}
-${certificateDeadline}
 ${certificateUrl ? `Download: ${certificateUrl}` : ""}
 
 CodeClash
@@ -171,7 +120,7 @@ CodeClash
   }
 }
 
-function formatBattleDate(value) {
+function formatBattleDate(value, timeZone = "UTC") {
   if (!value) return "Not available";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Not available";
@@ -179,9 +128,10 @@ function formatBattleDate(value) {
     year: "numeric",
     month: "short",
     day: "numeric",
-    hour: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
-    timeZone: "UTC",
+    hourCycle: "h23",
+    timeZone,
     timeZoneName: "short",
   });
 }

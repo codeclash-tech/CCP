@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { joinRoom, getMyRooms, getJoinedRooms, shareKey } from "../services/battleRoomService";
 import { formatDate } from "../utils/helpers";
@@ -17,6 +17,71 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { isMobileDevice } from "../utils/device";
+
+const ROOM_LIST_CACHE_TTL = 30_000;
+
+function readRoomListCache(kind, userId) {
+  if (!userId) return null;
+  try {
+    const cached = JSON.parse(
+      sessionStorage.getItem(`ccp:${kind}-rooms:${userId}`) || "null",
+    );
+    if (!Array.isArray(cached?.rooms) || !Number.isFinite(cached.fetchedAt)) {
+      return null;
+    }
+    return cached;
+  } catch {
+    return null;
+  }
+}
+
+function writeRoomListCache(kind, userId, rooms) {
+  if (!userId) return;
+  try {
+    sessionStorage.setItem(
+      `ccp:${kind}-rooms:${userId}`,
+      JSON.stringify({ rooms, fetchedAt: Date.now() }),
+    );
+  } catch (error) {
+    console.warn("Unable to cache battle room list:", error.message);
+  }
+}
+
+function RoomListSkeleton({ joined = false }) {
+  const columns = joined
+    ? "100px 1fr 80px 80px 100px"
+    : "100px 1fr 90px 70px 90px 90px";
+  return (
+    <div aria-label="Loading rooms" aria-busy="true">
+      {Array.from({ length: 4 }, (_, index) => (
+        <div
+          key={index}
+          className="room-list-row"
+          style={{
+            display: "grid",
+            gridTemplateColumns: columns,
+            gap: 12,
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--border-color)",
+          }}
+        >
+          {Array.from({ length: joined ? 5 : 6 }, (_, cell) => (
+            <div
+              key={cell}
+              style={{
+                height: 14,
+                maxWidth: cell === 1 ? 260 : 90,
+                borderRadius: 4,
+                background: "var(--bg-card)",
+                opacity: 0.75,
+              }}
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function getRoomStatusLabel(room, now = Date.now()) {
   if (room.submissionStatus === "COMPLETED") return "Completed";
@@ -105,15 +170,43 @@ export default function BattleRoom() {
   const [activeTab, setActiveTab] = useState(
     location.state?.activeTab || "create-join",
   );
+  const userId = user?.id || user?._id;
+  const myRoomsCache = useMemo(
+    () => readRoomListCache("my", userId),
+    [userId],
+  );
+  const joinedRoomsCache = useMemo(
+    () => readRoomListCache("joined", userId),
+    [userId],
+  );
   const [roomTabsOpen, setRoomTabsOpen] = useState(false);
-  const [myRooms, setMyRooms] = useState([]);
-  const [joinedRooms, setJoinedRooms] = useState([]);
-  const [loadingRooms, setLoadingRooms] = useState(false);
-  const [roomsError, setRoomsError] = useState("");
+  const [myRooms, setMyRooms] = useState(() => myRoomsCache?.rooms || []);
+  const [joinedRooms, setJoinedRooms] = useState(
+    () => joinedRoomsCache?.rooms || [],
+  );
+  const [hasMyRooms, setHasMyRooms] = useState(Boolean(myRoomsCache));
+  const [hasJoinedRooms, setHasJoinedRooms] = useState(
+    Boolean(joinedRoomsCache),
+  );
+  const [loadingMyRooms, setLoadingMyRooms] = useState(
+    !myRoomsCache && (location.state?.activeTab || "create-join") === "my-rooms",
+  );
+  const [loadingJoinedRooms, setLoadingJoinedRooms] = useState(
+    !joinedRoomsCache &&
+      (location.state?.activeTab || "create-join") === "joined-rooms",
+  );
+  const [myRoomsError, setMyRoomsError] = useState("");
+  const [joinedRoomsError, setJoinedRoomsError] = useState("");
   const [actionError, setActionError] = useState("");
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [shareRoom, setShareRoom] = useState(null);
   const [shareRoomCode, setShareRoomCode] = useState("");
+  const createdRoomRefreshRef = useRef(null);
+  const roomListRequestsRef = useRef({ my: null, joined: null });
+  const roomListFetchedAtRef = useRef({
+    my: myRoomsCache?.fetchedAt || 0,
+    joined: joinedRoomsCache?.fetchedAt || 0,
+  });
 
   const handleJoin = async () => {
     if (isMobileDevice()) {
@@ -151,38 +244,92 @@ export default function BattleRoom() {
     navigate(`/battle-room/${joinCode.trim().toUpperCase()}/leaderboard`);
   };
 
-  const loadMyRooms = useCallback(async () => {
-    setLoadingRooms(true);
-    setRoomsError("");
-    try {
-      const data = await getMyRooms();
-      setMyRooms(data.rooms || []);
-    } catch (err) {
-      setRoomsError(err.message || "Failed to load your rooms.");
-    } finally {
-      setLoadingRooms(false);
+  const loadMyRooms = useCallback(async (force = false) => {
+    if (roomListRequestsRef.current.my) {
+      return roomListRequestsRef.current.my;
     }
-  }, []);
+    if (
+      !force &&
+      Date.now() - roomListFetchedAtRef.current.my < ROOM_LIST_CACHE_TTL
+    ) {
+      return;
+    }
 
-  const loadJoinedRooms = useCallback(async () => {
-    setLoadingRooms(true);
-    setRoomsError("");
-    try {
-      const data = await getJoinedRooms();
-      setJoinedRooms(data.rooms || []);
-    } catch (err) {
-      setRoomsError(err.message || "Failed to load joined rooms.");
-    } finally {
-      setLoadingRooms(false);
+    if (!hasMyRooms) setLoadingMyRooms(true);
+    setMyRoomsError("");
+    const request = (async () => {
+      try {
+        const data = await getMyRooms();
+        const rooms = data.rooms || [];
+        setMyRooms(rooms);
+        setHasMyRooms(true);
+        roomListFetchedAtRef.current.my = Date.now();
+        writeRoomListCache("my", userId, rooms);
+      } catch (err) {
+        setMyRoomsError(err.message || "Failed to load your rooms.");
+      } finally {
+        setLoadingMyRooms(false);
+        roomListRequestsRef.current.my = null;
+      }
+    })();
+    roomListRequestsRef.current.my = request;
+    return request;
+  }, [hasMyRooms, userId]);
+
+  const loadJoinedRooms = useCallback(async (force = false) => {
+    if (roomListRequestsRef.current.joined) {
+      return roomListRequestsRef.current.joined;
     }
-  }, []);
+    if (
+      !force &&
+      Date.now() - roomListFetchedAtRef.current.joined < ROOM_LIST_CACHE_TTL
+    ) {
+      return;
+    }
+
+    if (!hasJoinedRooms) setLoadingJoinedRooms(true);
+    setJoinedRoomsError("");
+    const request = (async () => {
+      try {
+        const data = await getJoinedRooms();
+        const rooms = data.rooms || [];
+        setJoinedRooms(rooms);
+        setHasJoinedRooms(true);
+        roomListFetchedAtRef.current.joined = Date.now();
+        writeRoomListCache("joined", userId, rooms);
+      } catch (err) {
+        setJoinedRoomsError(err.message || "Failed to load joined rooms.");
+      } finally {
+        setLoadingJoinedRooms(false);
+        roomListRequestsRef.current.joined = null;
+      }
+    })();
+    roomListRequestsRef.current.joined = request;
+    return request;
+  }, [hasJoinedRooms, userId]);
 
   useEffect(() => {
     if (activeTab === "my-rooms") {
-      loadMyRooms();
+      const createdRoomCode = location.state?.createdRoomCode;
+      const forceRefresh =
+        Boolean(createdRoomCode) &&
+        createdRoomRefreshRef.current !== createdRoomCode;
+      if (forceRefresh) createdRoomRefreshRef.current = createdRoomCode;
+      loadMyRooms(forceRefresh);
     } else if (activeTab === "joined-rooms") {
       loadJoinedRooms();
     }
+  }, [activeTab, loadJoinedRooms, loadMyRooms, location.state]);
+
+  useEffect(() => {
+    const refreshStaleRoomList = () => {
+      if (document.visibilityState !== "visible") return;
+      if (activeTab === "my-rooms") loadMyRooms();
+      if (activeTab === "joined-rooms") loadJoinedRooms();
+    };
+    document.addEventListener("visibilitychange", refreshStaleRoomList);
+    return () =>
+      document.removeEventListener("visibilitychange", refreshStaleRoomList);
   }, [activeTab, loadJoinedRooms, loadMyRooms]);
 
   const handleShareKey = useCallback(async (e, room) => {
@@ -375,14 +522,20 @@ export default function BattleRoom() {
             <KeyRound size={15} color="var(--accent-blue-bright)" />
             Rooms You Created
           </div>
-          {loadingRooms ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
+          {myRoomsError && hasMyRooms ? (
+            <div role="alert" style={{ padding: "10px 16px", color: "var(--color-danger)", fontSize: 12 }}>
+              {myRoomsError} Showing saved results.{" "}
+              <button type="button" className="btn-secondary" onClick={() => loadMyRooms(true)} style={{ padding: "4px 8px", fontSize: 11 }}>
+                Retry
+              </button>
             </div>
-          ) : roomsError ? (
+          ) : null}
+          {loadingMyRooms && !hasMyRooms ? (
+            <RoomListSkeleton />
+          ) : myRoomsError && !hasMyRooms ? (
             <div role="alert" style={{ padding: 24, textAlign: "center", color: "var(--color-danger)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
-              <p style={{ marginBottom: 12 }}>{roomsError}</p>
-              <button type="button" className="btn-secondary" onClick={loadMyRooms}>
+              <p style={{ marginBottom: 12 }}>{myRoomsError}</p>
+              <button type="button" className="btn-secondary" onClick={() => loadMyRooms(true)}>
                 Try again
               </button>
             </div>
@@ -459,14 +612,20 @@ export default function BattleRoom() {
             <LogIn size={15} color="var(--accent-blue-bright)" />
             Rooms You Joined
           </div>
-          {loadingRooms ? (
-            <div style={{ padding: 32, textAlign: "center", color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Loading...
+          {joinedRoomsError && hasJoinedRooms ? (
+            <div role="alert" style={{ padding: "10px 16px", color: "var(--color-danger)", fontSize: 12 }}>
+              {joinedRoomsError} Showing saved results.{" "}
+              <button type="button" className="btn-secondary" onClick={() => loadJoinedRooms(true)} style={{ padding: "4px 8px", fontSize: 11 }}>
+                Retry
+              </button>
             </div>
-          ) : roomsError ? (
+          ) : null}
+          {loadingJoinedRooms && !hasJoinedRooms ? (
+            <RoomListSkeleton joined />
+          ) : joinedRoomsError && !hasJoinedRooms ? (
             <div role="alert" style={{ padding: 24, textAlign: "center", color: "var(--color-danger)", fontFamily: "var(--font-ui)", fontSize: 13 }}>
-              <p style={{ marginBottom: 12 }}>{roomsError}</p>
-              <button type="button" className="btn-secondary" onClick={loadJoinedRooms}>
+              <p style={{ marginBottom: 12 }}>{joinedRoomsError}</p>
+              <button type="button" className="btn-secondary" onClick={() => loadJoinedRooms(true)}>
                 Try again
               </button>
             </div>

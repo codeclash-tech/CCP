@@ -10,45 +10,66 @@ import {
   Users,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import {
-  getPlatformPartners,
-  getPlatformStats,
-} from "../services/platformService";
+import { getPlatformStats } from "../services/platformService";
 import "./About.css";
 
 function formatCount(value) {
   return new Intl.NumberFormat().format(value);
 }
 
+const PLATFORM_STATS_CACHE_MS = 5 * 60 * 1000;
+let cachedPlatformStats = null;
+let cachedPlatformStatsAt = 0;
+let platformStatsRequest = null;
+
+function loadPlatformStats() {
+  if (!platformStatsRequest) {
+    platformStatsRequest = getPlatformStats()
+      .then((result) => {
+        cachedPlatformStats = result;
+        cachedPlatformStatsAt = Date.now();
+        return result;
+      })
+      .finally(() => {
+        platformStatsRequest = null;
+      });
+  }
+  return platformStatsRequest;
+}
+
 export default function About() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(cachedPlatformStats);
+  const [statsLoading, setStatsLoading] = useState(!cachedPlatformStats);
   const [statsError, setStatsError] = useState("");
-  const [partners, setPartners] = useState([]);
 
   useEffect(() => {
     let isCurrent = true;
 
-    getPlatformStats()
+    if (
+      cachedPlatformStats &&
+      Date.now() - cachedPlatformStatsAt < PLATFORM_STATS_CACHE_MS
+    ) {
+      setStatsLoading(false);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    if (cachedPlatformStats) setStatsLoading(false);
+    loadPlatformStats()
       .then((result) => {
-        if (isCurrent) setStats(result);
+        if (isCurrent) {
+          setStats(result);
+          setStatsLoading(false);
+        }
       })
       .catch((error) => {
         if (isCurrent) {
           setStatsError(
             error.message || "Platform statistics could not be loaded.",
           );
+          setStatsLoading(false);
         }
-      });
-
-    getPlatformPartners()
-      .then((result) => {
-        if (isCurrent) setPartners(result.partners || []);
-      })
-      .catch((error) => {
-        console.error(
-          "[About] Partner organizations could not be loaded:",
-          error.message,
-        );
       });
 
     return () => {
@@ -86,13 +107,23 @@ export default function About() {
             </a>
           </div>
         </div>
-        <aside className="about-hero-stats" aria-label="CodeClash community">
+        <aside
+          className="about-hero-stats"
+          aria-label="CodeClash community"
+          aria-busy={statsLoading}
+        >
           <div className="about-stat-card">
             <span className="about-stat-icon">
               <Users size={19} />
             </span>
             <div>
-              <strong>{stats ? formatCount(stats.memberCount) : "—"}</strong>
+              {stats ? (
+                <strong>{formatCount(stats.memberCount)}</strong>
+              ) : statsLoading ? (
+                <span className="about-stat-skeleton" aria-label="Loading" />
+              ) : (
+                <strong>—</strong>
+              )}
               <span>Verified members</span>
             </div>
           </div>
@@ -101,7 +132,13 @@ export default function About() {
               <Lightbulb size={19} />
             </span>
             <div>
-              <strong>{stats ? formatCount(stats.creatorCount) : "—"}</strong>
+              {stats ? (
+                <strong>{formatCount(stats.creatorCount)}</strong>
+              ) : statsLoading ? (
+                <span className="about-stat-skeleton" aria-label="Loading" />
+              ) : (
+                <strong>—</strong>
+              )}
               <span>Battle creators</span>
             </div>
           </div>
@@ -110,29 +147,12 @@ export default function About() {
               ? statsError
               : stats
                 ? "Join the battle now!"
-                : "Loading community totals…"}
+                : statsLoading
+                  ? "Loading community totals…"
+                  : ""}
           </p>
         </aside>
       </section>
-      {/*
-{partners.length > 0 && (
-  <section className="about-partners" aria-label="CodeClash partners">
-    <div className="about-partners-heading">
-      <span className="about-eyebrow">Growing together</span>
-      <h2>Our partners</h2>
-    </div>
-
-    <div className="about-partners-row">
-      {partners.map((partner) => (
-        <article className="about-partner" key={partner.name}>
-          <img src={partner.logo} alt={`${partner.name} logo`} />
-          <span>{partner.name}</span>
-        </article>
-      ))}
-    </div>
-  </section>
-)}
-*/}
 
       <section className="about-section">
         <div className="about-section-heading">

@@ -246,9 +246,6 @@ export async function createRoom(req, res) {
       description,
       questions,
       maxParticipants,
-      moderationAction,
-      allowLeaderboard,
-      allowReuse,
       scheduledDate,
       scheduledStartTime,
       scheduledEndTime,
@@ -502,10 +499,9 @@ export async function createRoom(req, res) {
       status: "UPCOMING",
       isScheduled: true,
       maxParticipants: maxParticipants || 100,
-      moderationAction:
-        moderationAction === "DISQUALIFY" ? "DISQUALIFY" : "FLAG",
-      allowLeaderboard: allowLeaderboard !== false,
-      allowReuse: allowReuse !== false,
+      moderationAction: "DISQUALIFY",
+      allowLeaderboard: true,
+      allowReuse: true,
       scheduledDate: scheduledDate || "",
       scheduledStartTime: scheduledStartTime || "",
       scheduledEndTime: scheduledEndTime || "",
@@ -561,14 +557,7 @@ export async function reuseRoom(req, res) {
       return res
         .status(403)
         .json({ error: "Reuse is disabled for this room." });
-    const {
-      timeLimit,
-      timeLimitUnit,
-      maxParticipants,
-      moderationAction,
-      allowLeaderboard,
-      allowReuse,
-    } = req.body;
+    const { timeLimit, timeLimitUnit, maxParticipants } = req.body;
     let roomCode = generateRoomCode();
     while (await BattleRoom.exists({ roomCode })) roomCode = generateRoomCode();
     const room = new BattleRoom({
@@ -581,10 +570,9 @@ export async function reuseRoom(req, res) {
       timeLimitUnit: timeLimitUnit || source.timeLimitUnit,
       maxParticipants: maxParticipants || source.maxParticipants,
       languages: ["java"],
-      moderationAction:
-        moderationAction === "DISQUALIFY" ? "DISQUALIFY" : "FLAG",
-      allowLeaderboard: allowLeaderboard !== false,
-      allowReuse: allowReuse !== false,
+      moderationAction: "DISQUALIFY",
+      allowLeaderboard: true,
+      allowReuse: true,
       status: "UPCOMING",
       endDate: new Date(
         Date.now() +
@@ -1532,12 +1520,12 @@ export async function submitQuestionSolution(req, res) {
 export async function disqualifyRoomSubmission(req, res) {
   try {
     const { roomCode } = req.params;
-    const { reason, code, language } = req.body;
+    const { reason } = req.body;
     const userId = req.userId;
 
     const room = await BattleRoom.findOne(
       { roomCode: roomCode.toUpperCase(), isActive: true, isDeleted: false },
-      { roomCode: 1, status: 1, questions: 1, moderationAction: 1 },
+      { roomCode: 1, status: 1, questions: 1 },
     ).lean();
     if (!room) {
       return res.status(404).json({ error: "Battle room not found." });
@@ -1585,24 +1573,6 @@ export async function disqualifyRoomSubmission(req, res) {
         message: "Submission already finalized.",
         status: submission.status,
         totalScore: submission.totalScore || 0,
-      });
-    }
-
-    if (room.moderationAction === "FLAG") {
-      const flag = {
-        reason: reason || "Owner-configured review flag",
-        code: code || "",
-        language: language || "",
-        createdAt: new Date(),
-      };
-      await BattleRoomSubmission.updateOne(
-        { _id: submission._id },
-        { $push: { moderationFlags: flag } },
-      );
-      return res.status(200).json({
-        message: "Activity flagged for owner review. Submission was preserved.",
-        status: submission.status,
-        flagged: true,
       });
     }
 

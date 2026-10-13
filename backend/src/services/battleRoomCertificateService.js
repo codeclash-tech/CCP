@@ -3,7 +3,7 @@ import PDFDocument from "pdfkit";
 import config from "../config/env.js";
 
 const CERTIFICATE_AUDIENCE = "codeclash-battle-certificate";
-const CERTIFICATE_TOKEN_LIFETIME = "5m";
+const CERTIFICATE_TOKEN_LIFETIME = "1y";
 
 function normalizedCertificateData(data) {
   const requiredText = ["participantName", "roomTitle", "roomCode"];
@@ -58,6 +58,11 @@ function verifyCertificateToken(token) {
 
 export function streamBattleRoomCertificate(token, response) {
   const certificate = verifyCertificateToken(token);
+  streamBattleRoomCertificateData(certificate, response);
+}
+
+export function streamBattleRoomCertificateData(data, response) {
+  const certificate = normalizedCertificateData(data);
   const document = new PDFDocument({
     size: "A4",
     layout: "landscape",

@@ -56,6 +56,18 @@ async function deliverRoomResults(room) {
   for (const [index, submission] of submissions.entries()) {
     const user = submission.userId;
     const recipientEmail = submission.participantEmail || user?.email || "";
+    const certificateSnapshot = {
+      roomCode: room.roomCode,
+      roomTitle: room.title,
+      rank: index + 1,
+      totalParticipants: submissions.length,
+      completedAt: submission.submittedAt || room.endDate || new Date(),
+    };
+    await BattleRoomSubmission.updateOne(
+      { _id: submission._id, roomId: room._id },
+      { $set: { certificateSnapshot } },
+    );
+
     if (!recipientEmail) {
       emailsSkipped += 1;
       await BattleRoomSubmission.updateOne(
@@ -107,7 +119,6 @@ async function deliverRoomResults(room) {
         totalScore: submission.totalScore,
         totalPassed: submission.totalPassed,
         totalTestCases,
-        questionResults: submission.questionResults,
         rank: index + 1,
         totalParticipants: submissions.length,
         certificateUrl: createBattleRoomCertificateUrl({
@@ -118,13 +129,14 @@ async function deliverRoomResults(room) {
           rank: index + 1,
           totalParticipants: submissions.length,
           totalScore: submission.totalScore,
-          completedAt: submission.submittedAt || room.endDate || new Date(),
+          completedAt: certificateSnapshot.completedAt,
         }),
         roomCode: room.roomCode,
-        startTime: room.startTime || room.startDate,
-        endTime: room.endTime || room.endDate,
+        startTime: room.startDate || room.startTime,
+        endTime: room.endDate || room.endTime,
+        timeZone: room.timezone || "UTC",
         submissionStatus: submission.status,
-        completedAt: submission.submittedAt || room.endDate || new Date(),
+        completedAt: certificateSnapshot.completedAt,
       });
     } catch (error) {
       delivery = { success: false, error: error.message };

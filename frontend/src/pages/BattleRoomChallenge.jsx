@@ -720,34 +720,64 @@ export default function BattleRoomChallenge() {
   if (loading) {
     return (
       <div
+        role="status"
+        aria-label="Loading battle room"
+        aria-busy="true"
         style={{
           height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          padding: 20,
           background: "var(--bg-main)",
+          boxSizing: "border-box",
         }}
       >
-        <div style={{ textAlign: "center" }}>
-          <Loader2
-            size={36}
-            color="var(--accent-blue-bright)"
+        <div style={{ maxWidth: 1600, height: "100%", margin: "0 auto" }}>
+          <div
             style={{
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 16px",
-              display: "block",
+              height: 48,
+              marginBottom: 16,
+              borderRadius: 8,
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border-color)",
             }}
           />
-          <p
+          <div
             style={{
-              color: "var(--text-muted)",
-              fontFamily: "var(--font-ui)",
-              fontSize: 13,
+              display: "grid",
+              gridTemplateColumns: "minmax(260px, 38%) 1fr",
+              gap: 16,
+              height: "calc(100% - 64px)",
             }}
           >
-            Loading battle room...
-          </p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div
+              style={{
+                borderRadius: 10,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-color)",
+              }}
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateRows: "1fr 220px",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  borderRadius: 10,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-color)",
+                }}
+              />
+              <div
+                style={{
+                  borderRadius: 10,
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-color)",
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -170,6 +170,7 @@ test("sends battle-result email through Resend", async () => {
         "https://api.example.com/api/battle-rooms/certificate/test-token",
       startTime: "2026-01-01T10:00:00.000Z",
       endTime: "2026-01-01T12:00:00.000Z",
+      timeZone: "UTC",
       submissionStatus: "COMPLETED",
       completedAt: "2026-01-01T12:00:00.000Z",
     });
@@ -182,18 +183,17 @@ test("sends battle-result email through Resend", async () => {
       "Battle complete: Algorithms - Your results",
     );
     assert.match(requestBody.text, /CONGRATULATIONS, Developer!/);
-    assert.match(requestBody.text, /Two Sum — ACCEPTED, score 90, tests passed 9 \/ 10/);
-    assert.match(requestBody.text, /Battle start: Jan 1, 2026/);
-    assert.match(requestBody.html, /Question results/);
+    assert.match(requestBody.text, /Final score: 90/);
+    assert.match(requestBody.text, /Battle start: Jan 1, 2026, 10:00 UTC/);
+    assert.match(requestBody.text, /Battle end: Jan 1, 2026, 12:00 UTC/);
+    assert.doesNotMatch(requestBody.text, /Two Sum|Question results|secret input/);
+    assert.doesNotMatch(requestBody.html, /Two Sum|Question results|secret input/);
     assert.match(requestBody.html, /Download your certificate/);
     assert.match(
       requestBody.html,
       /href="https:\/\/api\.example\.com\/api\/battle-rooms\/certificate\/test-token"/,
     );
-    assert.match(
-      requestBody.html,
-      /Download within 5 minutes of receiving this email; the battle room will then be deleted\./,
-    );
+    assert.doesNotMatch(requestBody.html, /5 minutes|room will then be deleted/);
     assert.match(
       requestBody.text,
       /Download: https:\/\/api\.example\.com\/api\/battle-rooms\/certificate\/test-token/,

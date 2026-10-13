@@ -97,6 +97,11 @@ export const downloadRoomResultsExcel = (roomCode) =>
 export const getUserResult = (roomCode) =>
   api.get(`/battle-rooms/${roomCode}/my-result`).then((r) => r.data);
 
+export const downloadBattleRoomCertificate = (roomCode) =>
+  api
+    .get(`/battle-rooms/${roomCode}/certificate`, { responseType: "blob" })
+    .then((r) => r.data);
+
 export const closeRoom = (roomCode) =>
   api.post(`/battle-rooms/${roomCode}/close`).then((r) => r.data);
 
@@ -113,9 +118,6 @@ export const deleteRoom = (roomCode) =>
 
 export const shareKey = (roomCode) =>
   api.post(`/battle-rooms/${roomCode}/share-key`).then((r) => r.data);
-
-export const reuseRoom = (roomCode, restrictions) =>
-  api.post(`/battle-rooms/${roomCode}/reuse`, restrictions).then((r) => r.data);
 
 export const getMyRooms = () =>
   api.get("/battle-rooms/my-rooms").then((r) => r.data);

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -7,23 +8,21 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "../context/AuthContext";
 
-import Home from "../pages/Home";
-import BattleRoom from "../pages/BattleRoom";
-import CreateBattleRoom from "../pages/CreateBattleRoom";
-import BattleRoomChallenge from "../pages/BattleRoomChallenge";
-import BattleRoomLeaderboard from "../pages/BattleRoomLeaderboard";
-import AuthPage from "../pages/AuthPage";
-import Profile from "../pages/Profile";
-import About from "../pages/About";
-import Terms from "../pages/Terms";
-
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
-import {
-  LoadingScreen,
-  SessionErrorScreen,
-} from "../components/layout/SessionState";
 import { useAuth } from "../context/AuthContext";
+
+const Home = lazy(() => import("../pages/Home"));
+const BattleRoom = lazy(() => import("../pages/BattleRoom"));
+const CreateBattleRoom = lazy(() => import("../pages/CreateBattleRoom"));
+const BattleRoomChallenge = lazy(() => import("../pages/BattleRoomChallenge"));
+const BattleRoomLeaderboard = lazy(
+  () => import("../pages/BattleRoomLeaderboard"),
+);
+const AuthPage = lazy(() => import("../pages/AuthPage"));
+const Profile = lazy(() => import("../pages/Profile"));
+const About = lazy(() => import("../pages/About"));
+const Terms = lazy(() => import("../pages/Terms"));
 
 function AppLayout({ children }) {
   return (
@@ -36,19 +35,31 @@ function AppLayout({ children }) {
       }}
     >
       <Navbar />
-      <main style={{ flex: 1, padding: "0" }}>{children}</main>
+      <main style={{ flex: 1, padding: "0" }}>
+        <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
+      </main>
       <Footer />
     </div>
   );
 }
 
 function ProtectedLayout({ children }) {
-  const { isAuthenticated, loading, sessionError, refreshProfile } = useAuth();
+  const { isAuthenticated, loading, sessionError } = useAuth();
   const location = useLocation();
-  if (loading) return <LoadingScreen message="Checking your session..." />;
-  if (sessionError) {
+  if (loading && !isAuthenticated) {
     return (
-      <SessionErrorScreen message={sessionError} onRetry={refreshProfile} />
+      <AppLayout>
+        <RouteSkeleton />
+      </AppLayout>
+    );
+  }
+  if (sessionError && !isAuthenticated) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
     );
   }
   if (!isAuthenticated) {
@@ -65,12 +76,16 @@ function ProtectedLayout({ children }) {
 
 // Full-screen layout for the challenge assessment: no navbar, no footer.
 function FullScreenProtectedLayout({ children }) {
-  const { isAuthenticated, loading, sessionError, refreshProfile } = useAuth();
+  const { isAuthenticated, loading, sessionError } = useAuth();
   const location = useLocation();
-  if (loading) return <LoadingScreen message="Checking your session..." />;
-  if (sessionError) {
+  if (loading && !isAuthenticated) return <RouteSkeleton fullScreen />;
+  if (sessionError && !isAuthenticated) {
     return (
-      <SessionErrorScreen message={sessionError} onRetry={refreshProfile} />
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
     );
   }
   if (!isAuthenticated) {
@@ -84,23 +99,130 @@ function FullScreenProtectedLayout({ children }) {
   }
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg-main)" }}>
-      {children}
+      <Suspense fallback={<RouteSkeleton fullScreen />}>{children}</Suspense>
     </div>
   );
 }
 
 function UnauthenticatedOnlyPage({ mode }) {
-  const { isAuthenticated, loading, sessionError, refreshProfile } = useAuth();
-  if (loading) {
-    return <LoadingScreen message="Checking your session..." />;
-  }
-  if (sessionError) {
+  const { isAuthenticated, sessionError, refreshProfile } = useAuth();
+  if (sessionError && !isAuthenticated) {
     return (
-      <SessionErrorScreen message={sessionError} onRetry={refreshProfile} />
+      <>
+        <div
+          role="status"
+          style={{
+            padding: "10px 16px",
+            color: "var(--text-muted)",
+            background: "var(--bg-elevated)",
+            textAlign: "center",
+            fontSize: 13,
+          }}
+        >
+          Your saved session could not be verified. You can still sign in.
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={refreshProfile}
+            style={{ marginLeft: 10, padding: "4px 8px", fontSize: 12 }}
+          >
+            Retry
+          </button>
+        </div>
+        <Suspense fallback={<AuthRouteSkeleton />}>
+          <AuthPage mode={mode} />
+        </Suspense>
+      </>
     );
   }
   if (isAuthenticated) return <Navigate to="/" replace />;
-  return <AuthPage mode={mode} />;
+  return (
+    <Suspense fallback={<AuthRouteSkeleton />}>
+      <AuthPage mode={mode} />
+    </Suspense>
+  );
+}
+
+function AuthRouteSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading sign-in form"
+      aria-busy="true"
+      style={{
+        minHeight: "calc(100vh - 112px)",
+        display: "grid",
+        placeItems: "center",
+        padding: 24,
+        background: "var(--bg-main)",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          width: "min(100%, 440px)",
+          height: 390,
+          borderRadius: 12,
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border-color)",
+        }}
+      />
+    </div>
+  );
+}
+
+function RouteSkeleton({ fullScreen = false }) {
+  return (
+    <div
+      role="status"
+      aria-label="Loading page content"
+      aria-busy="true"
+      style={{
+        minHeight: fullScreen ? "100vh" : "calc(100vh - 112px)",
+        padding: fullScreen ? 24 : "clamp(20px, 4vw, 64px)",
+        background: "var(--bg-main)",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 1280,
+          margin: "0 auto",
+          display: "grid",
+          gap: 20,
+        }}
+      >
+        <div
+          style={{
+            height: fullScreen ? 74 : 150,
+            borderRadius: 14,
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border-color)",
+          }}
+        />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 16,
+          }}
+        >
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              style={{
+                height: fullScreen ? 220 : 180,
+                borderRadius: 12,
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border-color)",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AppRouter() {

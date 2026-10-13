@@ -115,6 +115,27 @@
   line-height: 1;
 }
 
+.about-stat-skeleton {
+  display: block;
+  width: 64px;
+  height: 25px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  animation: about-stat-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes about-stat-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-stat-skeleton {
+    animation: none;
+  }
+}
+
 .about-stat-card div span {
   color: var(--text-muted);
   font-size: 12px;

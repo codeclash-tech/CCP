@@ -211,7 +211,7 @@ const battleRoomSchema = new mongoose.Schema(
     moderationAction: {
       type: String,
       enum: ["FLAG", "DISQUALIFY"],
-      default: "FLAG",
+      default: "DISQUALIFY",
     },
     allowLeaderboard: {
       type: Boolean,

@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 // REMOVED: getPublicLeaderboard
 import {
   getRoomLeaderboard,
   downloadRoomResultsExcel,
+  downloadBattleRoomCertificate,
   closeRoom,
-  getUserResult,
   getRoomResultDelivery,
   retryRoomResultDelivery,
 } from "../services/battleRoomService";
-import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import {
   Trophy,
   Medal,
@@ -17,10 +17,38 @@ import {
   ArrowLeft,
   Users,
   XCircle,
-  Share2,
   FileSpreadsheet,
   RefreshCw,
+  Download,
 } from "lucide-react";
+
+function readLeaderboardCache(roomCode, userId) {
+  if (!roomCode || !userId) return null;
+  try {
+    const cached = JSON.parse(
+      sessionStorage.getItem(`ccp:leaderboard:${userId}:${roomCode}`) || "null",
+    );
+    return cached?.room && Array.isArray(cached.leaderboard) ? cached : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLeaderboardCache(roomCode, userId, data) {
+  if (!roomCode || !userId) return;
+  try {
+    sessionStorage.setItem(
+      `ccp:leaderboard:${userId}:${roomCode}`,
+      JSON.stringify({
+        room: data.room,
+        leaderboard: data.leaderboard || [],
+        isCreator: data.isCreator,
+      }),
+    );
+  } catch (error) {
+    console.warn("Unable to cache battle room leaderboard:", error.message);
+  }
+}
 
 function LeaderboardSkeleton() {
   return (
@@ -90,17 +118,24 @@ function formatDuration(secs) {
 export default function BattleRoomLeaderboard() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = user?.id || user?._id;
+  const cachedLeaderboard = readLeaderboardCache(roomCode, userId);
 
-  const [room, setRoom] = useState(null);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [room, setRoom] = useState(cachedLeaderboard?.room || null);
+  const [leaderboard, setLeaderboard] = useState(
+    cachedLeaderboard?.leaderboard || [],
+  );
+  const [loading, setLoading] = useState(!cachedLeaderboard);
   const [error, setError] = useState("");
+  const [roomUnavailable, setRoomUnavailable] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [isCreator, setIsCreator] = useState(false);
+  const [isCreator, setIsCreator] = useState(
+    cachedLeaderboard?.isCreator || false,
+  );
   const [closing, setClosing] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const [myResult, setMyResult] = useState(null);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
   const [retryingDelivery, setRetryingDelivery] = useState(false);
   const [resultDelivery, setResultDelivery] = useState(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -115,12 +150,15 @@ export default function BattleRoomLeaderboard() {
     if (isNewRoom) {
       loadedRoomCodeRef.current = roomCode;
       loadedDeliveryRoomRef.current = null;
-      hasLoadedDataRef.current = false;
-      setRoom(null);
-      setLeaderboard([]);
+      const cached = readLeaderboardCache(roomCode, userId);
+      hasLoadedDataRef.current = Boolean(cached);
+      setRoom(cached?.room || null);
+      setLeaderboard(cached?.leaderboard || []);
+      setIsCreator(cached?.isCreator || false);
       setResultDelivery(null);
       setError("");
-      setLoading(true);
+      setRoomUnavailable(false);
+      setLoading(!cached);
     }
     let interval;
 
@@ -133,6 +171,7 @@ export default function BattleRoomLeaderboard() {
         setRoom(data.room);
         setLeaderboard(data.leaderboard || []);
         setIsCreator(data.isCreator);
+        writeLeaderboardCache(roomCode, userId, data);
         setError("");
         hasLoadedDataRef.current = true;
         if (
@@ -150,7 +189,12 @@ export default function BattleRoomLeaderboard() {
         }
       } catch (err) {
         if (active && /not found/i.test(err.message || "")) {
-          navigate("/", { replace: true });
+          setRoomUnavailable(true);
+          if (!hasLoadedDataRef.current) {
+            setError(
+              "This battle room is no longer available. You can still download your certificate if you completed the battle.",
+            );
+          }
           return;
         }
         if (active && !hasLoadedDataRef.current) {
@@ -163,12 +207,19 @@ export default function BattleRoomLeaderboard() {
     };
 
     loadLeaderboard();
-    interval = setInterval(loadLeaderboard, 5000);
+    interval = setInterval(() => {
+      if (document.visibilityState === "visible") loadLeaderboard();
+    }, 5000);
+    const refreshOnReturn = () => {
+      if (document.visibilityState === "visible") loadLeaderboard();
+    };
+    document.addEventListener("visibilitychange", refreshOnReturn);
     return () => {
       active = false;
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
     };
-  }, [navigate, roomCode, refreshVersion]);
+  }, [navigate, roomCode, refreshVersion, userId]);
 
   const handleCloseRoom = async () => {
     if (
@@ -206,13 +257,23 @@ export default function BattleRoomLeaderboard() {
     }
   };
 
-  const handleViewMyResult = async () => {
+  const handleDownloadCertificate = async () => {
+    setDownloadingCertificate(true);
+    setError("");
     try {
-      const data = await getUserResult(roomCode);
-      setMyResult(data);
-      setShowShare(true);
+      const file = await downloadBattleRoomCertificate(roomCode);
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `codeclash-certificate-${roomCode}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (err) {
-      setError(err.message || "Failed to get your result.");
+      setError(err.message || "Failed to download your certificate.");
+    } finally {
+      setDownloadingCertificate(false);
     }
   };
 
@@ -423,14 +484,25 @@ export default function BattleRoomLeaderboard() {
               ) : null}
             </>
           ) : null}
-          <button
-            onClick={handleViewMyResult}
-            className="btn-primary"
-            style={{ padding: "8px 16px", fontSize: 12 }}
-          >
-            <Share2 size={13} />
-            My Result
-          </button>
+          {room?.status === "CLOSED" &&
+          leaderboard.some(
+            (row) => row.isCurrentUser && row.status === "COMPLETED",
+          ) ? (
+            <button
+              onClick={handleDownloadCertificate}
+              disabled={downloadingCertificate}
+              className="btn-primary"
+              style={{
+                padding: "8px 16px",
+                fontSize: 12,
+                opacity: downloadingCertificate ? 0.65 : 1,
+                cursor: downloadingCertificate ? "wait" : "pointer",
+              }}
+            >
+              <Download size={13} />
+              {downloadingCertificate ? "Downloading..." : "Certificates"}
+            </button>
+          ) : null}
           <button
             onClick={() => {
               if (
@@ -474,7 +546,28 @@ export default function BattleRoomLeaderboard() {
       {loading ? (
         <LeaderboardSkeleton />
       ) : error ? (
-        <div style={{ color: "var(--color-danger)" }}>{error}</div>
+        <div style={{ color: "var(--color-danger)" }}>
+          {error}
+          {roomUnavailable ? (
+            <button
+              onClick={handleDownloadCertificate}
+              disabled={downloadingCertificate}
+              className="btn-primary"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 12,
+                padding: "8px 16px",
+                fontSize: 12,
+                opacity: downloadingCertificate ? 0.65 : 1,
+              }}
+            >
+              <Download size={13} />
+              {downloadingCertificate ? "Downloading..." : "Certificates"}
+            </button>
+          ) : null}
+        </div>
       ) : (
         <div
           style={{
@@ -661,15 +754,6 @@ export default function BattleRoomLeaderboard() {
         </div>
       )}
 
-      {showShare && (
-        <BattleRoomShareModal
-          isOpen={showShare}
-          onClose={() => setShowShare(false)}
-          result={myResult}
-          roomCode={roomCode}
-          userName={myResult?.submission?.participantName}
-        />
-      )}
     </div>
   );
 }

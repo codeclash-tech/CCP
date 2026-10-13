@@ -102,9 +102,6 @@ export default function CreateBattleRoom() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [maxParticipants, setMaxParticipants] = useState(100);
-  const [moderationAction, setModerationAction] = useState("FLAG");
-  const [allowLeaderboard, setAllowLeaderboard] = useState(true);
-  const [allowReuse, setAllowReuse] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -330,9 +327,7 @@ export default function CreateBattleRoom() {
           };
         }),
         maxParticipants,
-        moderationAction,
-        allowLeaderboard,
-        allowReuse,
+        moderationAction: "DISQUALIFY",
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -592,22 +587,6 @@ export default function CreateBattleRoom() {
               Times use your local time zone. Choose the same date for a one-day challenge or different dates for a multi-day challenge.
             </p>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Suspicious activity policy</label>
-                <select value={moderationAction} onChange={(e) => setModerationAction(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
-                  <option value="FLAG">Flag in data - owner reviews later</option>
-                  <option value="DISQUALIFY">Immediate disqualify - retain evidence</option>
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Room lifecycle</label>
-                <div style={{ display: "grid", gap: 8, color: "var(--text-secondary)", fontSize: 12 }}>
-                  <label><input type="checkbox" checked={allowLeaderboard} onChange={(e) => setAllowLeaderboard(e.target.checked)} /> Show leaderboard</label>
-                  <label><input type="checkbox" checked={allowReuse} onChange={(e) => setAllowReuse(e.target.checked)} /> Allow reuse after the battle</label>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}

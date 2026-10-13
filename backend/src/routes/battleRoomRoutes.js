@@ -30,7 +30,10 @@ import {
   generateOutputs,
   validateQuestionEndpoint,
 } from "../controllers/battleRoomAuthoringController.js";
-import { downloadBattleRoomCertificate } from "../controllers/battleRoomCertificateController.js";
+import {
+  downloadBattleRoomCertificate,
+  downloadParticipantBattleRoomCertificate,
+} from "../controllers/battleRoomCertificateController.js";
 import {
   authenticate,
   requireVerifiedCreator,
@@ -55,6 +58,11 @@ router.post("/authoring/validate", ...creatorAuth, validateQuestionEndpoint);
 
 // Room management
 router.get("/certificate/:token", reportLimiter, downloadBattleRoomCertificate);
+router.get(
+  "/:roomCode/certificate",
+  authenticate,
+  downloadParticipantBattleRoomCertificate,
+);
 router.post("/create", ...creatorAuth, createRoom);
 router.post("/:roomCode/start", ...creatorAuth, startRoom);
 router.post("/join", authenticate, joinLimiter, joinRoom);

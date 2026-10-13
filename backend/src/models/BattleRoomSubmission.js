@@ -155,6 +155,13 @@ const battleRoomSubmissionSchema = new mongoose.Schema(
       sentAt: { type: Date, default: null },
       error: { type: String, default: "" },
     },
+    certificateSnapshot: {
+      roomCode: { type: String, default: "" },
+      roomTitle: { type: String, default: "" },
+      rank: { type: Number, default: 0 },
+      totalParticipants: { type: Number, default: 0 },
+      completedAt: { type: Date, default: null },
+    },
     disqualifyReason: {
       type: String,
       default: null,
@@ -188,6 +195,7 @@ const battleRoomSubmissionSchema = new mongoose.Schema(
 battleRoomSubmissionSchema.index({ roomId: 1, userId: 1 }, { unique: true });
 battleRoomSubmissionSchema.index({ roomId: 1, totalScore: -1 });
 battleRoomSubmissionSchema.index({ userId: 1 });
+battleRoomSubmissionSchema.index({ userId: 1, "certificateSnapshot.roomCode": 1 });
 
 battleRoomSubmissionSchema.methods.toPublicJSON = function () {
   return {
