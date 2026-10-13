@@ -28,37 +28,12 @@ import {
   calculateQuestionScore,
   countRoomTestCases,
 } from "../services/battleRoomScoring.js";
+import {
+  RANKED_SUBMISSION_STATUSES,
+  sortRoomSubmissions,
+} from "../services/battleRoomRanking.js";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-const RANKED_SUBMISSION_STATUSES = [
-  "PENDING",
-  "PROCESSING",
-  "COMPLETED",
-  "DISQUALIFIED",
-];
-
-function getRoomSubmissionTime(submission) {
-  return (submission.questionResults || []).reduce(
-    (seconds, question) => seconds + (question.timeToSolve || 0),
-    0,
-  );
-}
-
-function sortRoomSubmissions(submissions) {
-  return submissions.sort((a, b) => {
-    if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-    if (b.totalPassed !== a.totalPassed) return b.totalPassed - a.totalPassed;
-    if (a.totalFailed !== b.totalFailed) return a.totalFailed - b.totalFailed;
-    const timeDifference =
-      getRoomSubmissionTime(a) - getRoomSubmissionTime(b);
-    if (timeDifference !== 0) return timeDifference;
-    return (a.participantName || a.userId?.name || "").localeCompare(
-      b.participantName || b.userId?.name || "",
-      undefined,
-      { sensitivity: "base" },
-    );
-  });
-}
 
 function warmUpJudgeEngine() {
   executionService.warmUp().catch((error) => {

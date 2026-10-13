@@ -1,8 +1,11 @@
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
 import { countRoomTestCases } from "./battleRoomScoring.js";
+import {
+  RANKED_SUBMISSION_STATUSES,
+  sortRoomSubmissions,
+} from "./battleRoomRanking.js";
 import { sendBattleRoomResultEmail } from "./emailService.js";
-import { createBattleRoomCertificateImageUrl } from "./battleRoomCertificateService.js";
 
 const STALE_DELIVERY_MS = 5 * 60 * 1000;
 
@@ -43,39 +46,47 @@ async function finalizePendingSubmissions(room) {
 async function deliverRoomResults(room) {
   const submissions = await BattleRoomSubmission.find({
     roomId: room._id,
-    status: "COMPLETED",
+    status: { $in: RANKED_SUBMISSION_STATUSES },
   })
     .populate("userId", "name email")
-    .sort({ totalScore: -1, totalPassed: -1, submittedAt: 1, _id: 1 })
     .lean();
+  sortRoomSubmissions(submissions);
   const totalTestCases = countRoomTestCases(room.questions);
   let emailsSent = 0;
   let emailFailures = 0;
   let emailsSkipped = 0;
 
   for (const [index, submission] of submissions.entries()) {
+    if (submission.status !== "COMPLETED") continue;
     const user = submission.userId;
-    const recipientEmail = submission.participantEmail || user?.email || "";
+    const recipientEmail = submission.participantEmail || user?.email;
+    const participantName =
+      submission.participantName &&
+      submission.participantName !== "Participant"
+        ? submission.participantName
+        : user?.name;
     const certificateSnapshot = {
       roomCode: room.roomCode,
       roomTitle: room.title,
       rank: index + 1,
       totalParticipants: submissions.length,
-      completedAt: submission.submittedAt || room.endDate || new Date(),
+      completedAt: submission.submittedAt,
     };
     await BattleRoomSubmission.updateOne(
       { _id: submission._id, roomId: room._id },
       { $set: { certificateSnapshot } },
     );
 
-    if (!recipientEmail) {
+    if (!recipientEmail || !participantName) {
       emailsSkipped += 1;
       await BattleRoomSubmission.updateOne(
         { _id: submission._id, roomId: room._id },
         {
           $set: {
             "resultDelivery.status": "SKIPPED",
-            "resultDelivery.error": "No participant email is available.",
+            "resultDelivery.error": !recipientEmail
+              ? "No participant email is available."
+              : "No participant name is available.",
           },
         },
       );
@@ -114,29 +125,19 @@ async function deliverRoomResults(room) {
     try {
       delivery = await sendBattleRoomResultEmail({
         email: recipientEmail,
-        userName: submission.participantName || user?.name || "Participant",
+        userName: participantName,
         roomTitle: room.title,
         totalScore: submission.totalScore,
         totalPassed: submission.totalPassed,
         totalTestCases,
         rank: index + 1,
         totalParticipants: submissions.length,
-        certificateImageUrl: createBattleRoomCertificateImageUrl({
-          participantName:
-            submission.participantName || user?.name || "Participant",
-          roomTitle: room.title,
-          roomCode: room.roomCode,
-          rank: index + 1,
-          totalParticipants: submissions.length,
-          totalScore: submission.totalScore,
-          completedAt: certificateSnapshot.completedAt,
-        }),
         roomCode: room.roomCode,
         startTime: room.startDate || room.startTime,
         endTime: room.endDate || room.endTime,
         timeZone: room.timezone || "UTC",
         submissionStatus: submission.status,
-        completedAt: certificateSnapshot.completedAt,
+        completedAt: submission.submittedAt,
       });
     } catch (error) {
       delivery = { success: false, error: error.message };

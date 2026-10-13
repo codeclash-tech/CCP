@@ -11,44 +11,6 @@ const { sendVerificationEmail } = await import(
 const { sendBattleRoomResultEmail } = await import(
   "../src/services/emailService.js"
 );
-const {
-  createBattleRoomCertificatePng,
-  createBattleRoomCertificateSvg,
-} = await import(
-  "../src/services/battleRoomCertificateService.js"
-);
-
-test("renders the previous certificate design as an escaped SVG image", () => {
-  const svg = createBattleRoomCertificateSvg({
-    participantName: "A <Developer>",
-    roomTitle: "Algorithms & Data",
-    roomCode: "ROOM1",
-    rank: 2,
-    totalParticipants: 5,
-    completedAt: "2026-01-01T12:00:00.000Z",
-  });
-
-  assert.match(svg, /CERTIFICATE OF EXCELLENCE/);
-  assert.match(svg, /A &lt;DEVELOPER&gt;/);
-  assert.match(svg, /Algorithms &amp; Data/);
-  assert.match(svg, /FINAL RANK #2 OF 5/);
-  assert.doesNotMatch(svg, /<script/i);
-});
-
-test("renders the certificate as a PNG suitable for email clients", async () => {
-  const png = await createBattleRoomCertificatePng({
-    participantName: "Developer",
-    roomTitle: "Algorithms",
-    roomCode: "ROOM1",
-    rank: 1,
-    totalParticipants: 2,
-    completedAt: "2026-01-01T12:00:00.000Z",
-  });
-
-  assert.deepEqual([...png.subarray(0, 8)], [
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-  ]);
-});
 
 test("sends the existing verification email through Resend", async () => {
   const originalFetch = globalThis.fetch;
@@ -204,8 +166,6 @@ test("sends battle-result email through Resend", async () => {
       rank: 1,
       totalParticipants: 5,
       roomCode: "ROOM1",
-      certificateImageUrl:
-        "https://api.example.com/api/battle-rooms/certificate-image/test-token",
       startTime: "2026-01-01T10:00:00.000Z",
       endTime: "2026-01-01T12:00:00.000Z",
       timeZone: "UTC",
@@ -224,24 +184,56 @@ test("sends battle-result email through Resend", async () => {
     assert.match(requestBody.text, /Final score: 90/);
     assert.match(requestBody.text, /Battle start: Jan 1, 2026, 10:00 UTC/);
     assert.match(requestBody.text, /Battle end: Jan 1, 2026, 12:00 UTC/);
+    assert.match(
+      requestBody.text,
+      /Open the CodeClash platform and go to the Battle Room page\.\s+Click the Joined Rooms tab to find your joined battles\.\s+Select the relevant battle room to view the leaderboard\.\s+From the leaderboard, you can download your certificate\.\s+Please download your certificate before the battle room is deleted\./,
+    );
     assert.doesNotMatch(requestBody.text, /Two Sum|Question results|secret input/);
     assert.doesNotMatch(requestBody.html, /Two Sum|Question results|secret input/);
-    assert.match(requestBody.html, /<img[^>]+alt="CodeClash certificate for Developer"/);
-    assert.match(
-      requestBody.html,
-      /src="https:\/\/api\.example\.com\/api\/battle-rooms\/certificate-image\/test-token"/,
-    );
-    assert.doesNotMatch(requestBody.html, /Download your certificate|<a[^>]+certificate/);
+    assert.match(requestBody.html, /href="http:\/\/localhost:5173\/battle-room"/);
+    assert.match(requestBody.html, /Joined Rooms/);
+    assert.match(requestBody.html, /Please download your certificate before the battle room is deleted\./);
+    assert.doesNotMatch(requestBody.html, /<img|certificate-image|Download your certificate<\/a>/);
+    assert.equal("attachments" in requestBody, false);
     assert.doesNotMatch(requestBody.html, /5 minutes|room will then be deleted/);
-    assert.doesNotMatch(requestBody.text, /DOWNLOAD YOUR CERTIFICATE|Download:/);
     assert.doesNotMatch(requestBody.html, /CERTIFICATE OF EXCELLENCE|Download PDF Certificate/);
-    assert.doesNotMatch(requestBody.html, /Joined Rooms/);
     assert.doesNotMatch(requestBody.text, /secret input/);
     assert.doesNotMatch(requestBody.html, /secret input/);
   } finally {
     globalThis.fetch = originalFetch;
     process.env.RESEND_API_KEY = originalApiKey;
     process.env.EMAIL_FROM = originalEmailFrom;
+  }
+});
+
+test("does not fabricate missing participant data for result emails", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalled = false;
+  globalThis.fetch = async () => {
+    fetchCalled = true;
+    throw new Error("Resend must not receive incomplete result data.");
+  };
+
+  try {
+    const result = await sendBattleRoomResultEmail({
+      email: "person@example.com",
+      userName: "",
+      roomTitle: "Algorithms",
+      totalScore: 90,
+      totalPassed: 9,
+      totalTestCases: 10,
+      rank: 1,
+      totalParticipants: 5,
+      roomCode: "ROOM1",
+      submissionStatus: "COMPLETED",
+      completedAt: "2026-01-01T12:00:00.000Z",
+    });
+
+    assert.equal(result.success, false);
+    assert.match(result.error, /userName is required/);
+    assert.equal(fetchCalled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
