@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: codeclash-frontend
+    name: ccp-frontend
     runtime: static
     rootDir: frontend
     buildCommand: npm ci && npm run build

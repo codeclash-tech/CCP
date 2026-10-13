@@ -11,6 +11,44 @@ const { sendVerificationEmail } = await import(
 const { sendBattleRoomResultEmail } = await import(
   "../src/services/emailService.js"
 );
+const {
+  createBattleRoomCertificatePng,
+  createBattleRoomCertificateSvg,
+} = await import(
+  "../src/services/battleRoomCertificateService.js"
+);
+
+test("renders the previous certificate design as an escaped SVG image", () => {
+  const svg = createBattleRoomCertificateSvg({
+    participantName: "A <Developer>",
+    roomTitle: "Algorithms & Data",
+    roomCode: "ROOM1",
+    rank: 2,
+    totalParticipants: 5,
+    completedAt: "2026-01-01T12:00:00.000Z",
+  });
+
+  assert.match(svg, /CERTIFICATE OF EXCELLENCE/);
+  assert.match(svg, /A &lt;DEVELOPER&gt;/);
+  assert.match(svg, /Algorithms &amp; Data/);
+  assert.match(svg, /FINAL RANK #2 OF 5/);
+  assert.doesNotMatch(svg, /<script/i);
+});
+
+test("renders the certificate as a PNG suitable for email clients", async () => {
+  const png = await createBattleRoomCertificatePng({
+    participantName: "Developer",
+    roomTitle: "Algorithms",
+    roomCode: "ROOM1",
+    rank: 1,
+    totalParticipants: 2,
+    completedAt: "2026-01-01T12:00:00.000Z",
+  });
+
+  assert.deepEqual([...png.subarray(0, 8)], [
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ]);
+});
 
 test("sends the existing verification email through Resend", async () => {
   const originalFetch = globalThis.fetch;
@@ -166,8 +204,8 @@ test("sends battle-result email through Resend", async () => {
       rank: 1,
       totalParticipants: 5,
       roomCode: "ROOM1",
-      certificateUrl:
-        "https://api.example.com/api/battle-rooms/certificate/test-token",
+      certificateImageUrl:
+        "https://api.example.com/api/battle-rooms/certificate-image/test-token",
       startTime: "2026-01-01T10:00:00.000Z",
       endTime: "2026-01-01T12:00:00.000Z",
       timeZone: "UTC",
@@ -188,16 +226,14 @@ test("sends battle-result email through Resend", async () => {
     assert.match(requestBody.text, /Battle end: Jan 1, 2026, 12:00 UTC/);
     assert.doesNotMatch(requestBody.text, /Two Sum|Question results|secret input/);
     assert.doesNotMatch(requestBody.html, /Two Sum|Question results|secret input/);
-    assert.match(requestBody.html, /Download your certificate/);
+    assert.match(requestBody.html, /<img[^>]+alt="CodeClash certificate for Developer"/);
     assert.match(
       requestBody.html,
-      /href="https:\/\/api\.example\.com\/api\/battle-rooms\/certificate\/test-token"/,
+      /src="https:\/\/api\.example\.com\/api\/battle-rooms\/certificate-image\/test-token"/,
     );
+    assert.doesNotMatch(requestBody.html, /Download your certificate|<a[^>]+certificate/);
     assert.doesNotMatch(requestBody.html, /5 minutes|room will then be deleted/);
-    assert.match(
-      requestBody.text,
-      /Download: https:\/\/api\.example\.com\/api\/battle-rooms\/certificate\/test-token/,
-    );
+    assert.doesNotMatch(requestBody.text, /DOWNLOAD YOUR CERTIFICATE|Download:/);
     assert.doesNotMatch(requestBody.html, /CERTIFICATE OF EXCELLENCE|Download PDF Certificate/);
     assert.doesNotMatch(requestBody.html, /Joined Rooms/);
     assert.doesNotMatch(requestBody.text, /secret input/);

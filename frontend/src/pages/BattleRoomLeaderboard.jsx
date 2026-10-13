@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 // REMOVED: getPublicLeaderboard
 import {
   getRoomLeaderboard,
@@ -136,6 +137,7 @@ export default function BattleRoomLeaderboard() {
   const [closing, setClosing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingCertificate, setDownloadingCertificate] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [retryingDelivery, setRetryingDelivery] = useState(false);
   const [resultDelivery, setResultDelivery] = useState(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -255,6 +257,19 @@ export default function BattleRoomLeaderboard() {
     } finally {
       setRetryingDelivery(false);
     }
+  };
+
+  const handleOpenCertificate = () => {
+    const participant = leaderboard.find(
+      (row) => row.isCurrentUser && row.status === "COMPLETED",
+    );
+    if (!participant || !room) return;
+    setSelectedCertificate({
+      room,
+      rank: participant.rank,
+      totalParticipants: leaderboard.length,
+      completedAt: participant.submittedAt,
+    });
   };
 
   const handleDownloadCertificate = async () => {
@@ -489,18 +504,15 @@ export default function BattleRoomLeaderboard() {
             (row) => row.isCurrentUser && row.status === "COMPLETED",
           ) ? (
             <button
-              onClick={handleDownloadCertificate}
-              disabled={downloadingCertificate}
+              onClick={handleOpenCertificate}
               className="btn-primary"
               style={{
                 padding: "8px 16px",
                 fontSize: 12,
-                opacity: downloadingCertificate ? 0.65 : 1,
-                cursor: downloadingCertificate ? "wait" : "pointer",
               }}
             >
               <Download size={13} />
-              {downloadingCertificate ? "Downloading..." : "Certificates"}
+              Certificates
             </button>
           ) : null}
           <button
@@ -754,6 +766,14 @@ export default function BattleRoomLeaderboard() {
         </div>
       )}
 
+      <BattleRoomShareModal
+        isOpen={Boolean(selectedCertificate)}
+        onClose={() => setSelectedCertificate(null)}
+        result={selectedCertificate}
+        userName={
+          leaderboard.find((row) => row.isCurrentUser)?.name || user?.name
+        }
+      />
     </div>
   );
 }

@@ -15,7 +15,7 @@ export async function sendBattleRoomResultEmail({
   timeZone = "UTC",
   submissionStatus = "COMPLETED",
   completedAt,
-  certificateUrl,
+  certificateImageUrl,
 }) {
   try {
     const { resend, from } = getResendClient();
@@ -29,10 +29,8 @@ export async function sendBattleRoomResultEmail({
     const battleStart = formatBattleDate(startTime, timeZone);
     const battleEnd = formatBattleDate(endTime, timeZone);
     const safeStatus = escapeHtml(submissionStatus || "COMPLETED");
-    const downloadInstructions =
-      "Download your certificate directly. You do not need to reopen the battle room.";
-    const certificateLink = certificateUrl
-      ? `<p style="margin: 16px 0 0;"><a href="${escapeHtml(certificateUrl)}" style="display: inline-block; padding: 11px 16px; color: #ffffff; background: #1d4ed8; border-radius: 6px; font-weight: bold; text-decoration: none;">Download your certificate</a></p>`
+    const certificateImage = certificateImageUrl
+      ? `<img src="${escapeHtml(certificateImageUrl)}" alt="CodeClash certificate for ${safeUserName}" width="100%" style="display: block; width: 100%; max-width: 680px; height: auto; border: 0; border-radius: 8px;">`
       : "";
 
     const htmlContent = `
@@ -64,11 +62,7 @@ export async function sendBattleRoomResultEmail({
         </tbody>
       </table>
 
-      <section style="margin-top: 28px; padding: 18px; background: #eff6ff; border-radius: 8px;">
-        <h2 style="margin: 0 0 8px; font-size: 17px;">Download your certificate</h2>
-        <p style="margin: 0; color: #334155; line-height: 1.6;">${downloadInstructions}</p>
-        ${certificateLink}
-      </section>
+      ${certificateImage ? `<section style="margin-top: 28px;"><h2 style="margin: 0 0 12px; font-size: 17px;">Your certificate</h2>${certificateImage}</section>` : ""}
     </section>
     <footer style="padding: 16px 32px; color: #64748b; background: #f8fafc; font-size: 12px;">CodeClash &copy; ${new Date().getFullYear()}</footer>
   </main>
@@ -86,10 +80,6 @@ Completion status: ${submissionStatus || "COMPLETED"}
 Battle start: ${battleStart}
 Battle end: ${battleEnd}
 Completed on: ${completionDate}
-
-DOWNLOAD YOUR CERTIFICATE
-${downloadInstructions}
-${certificateUrl ? `Download: ${certificateUrl}` : ""}
 
 CodeClash
     `;

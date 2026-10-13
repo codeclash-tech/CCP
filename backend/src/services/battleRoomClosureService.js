@@ -2,7 +2,7 @@ import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
 import { countRoomTestCases } from "./battleRoomScoring.js";
 import { sendBattleRoomResultEmail } from "./emailService.js";
-import { createBattleRoomCertificateUrl } from "./battleRoomCertificateService.js";
+import { createBattleRoomCertificateImageUrl } from "./battleRoomCertificateService.js";
 
 const STALE_DELIVERY_MS = 5 * 60 * 1000;
 
@@ -121,7 +121,7 @@ async function deliverRoomResults(room) {
         totalTestCases,
         rank: index + 1,
         totalParticipants: submissions.length,
-        certificateUrl: createBattleRoomCertificateUrl({
+        certificateImageUrl: createBattleRoomCertificateImageUrl({
           participantName:
             submission.participantName || user?.name || "Participant",
           roomTitle: room.title,

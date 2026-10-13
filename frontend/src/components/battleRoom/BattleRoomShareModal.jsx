@@ -295,7 +295,7 @@ export default function BattleRoomShareModal({
     ctx.font = "bold 14px Arial, Helvetica, sans-serif";
 
     ctx.fillText(
-      new Date().toLocaleDateString("en-US", {
+      new Date(result?.completedAt || Date.now()).toLocaleDateString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
@@ -349,7 +349,7 @@ export default function BattleRoomShareModal({
     ctx.fillText("CODECLASH • COMPETE • CODE • CONQUER", 600, 695);
 
     ctx.textAlign = "left";
-  }, [rank, totalParticipants, userName, room.title]);
+  }, [rank, result?.completedAt, totalParticipants, userName, room.title]);
 
   useEffect(() => {
     if (!isOpen) return;

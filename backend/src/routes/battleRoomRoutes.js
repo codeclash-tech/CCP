@@ -33,6 +33,7 @@ import {
 import {
   downloadBattleRoomCertificate,
   downloadParticipantBattleRoomCertificate,
+  viewBattleRoomCertificateImage,
 } from "../controllers/battleRoomCertificateController.js";
 import {
   authenticate,
@@ -58,6 +59,7 @@ router.post("/authoring/validate", ...creatorAuth, validateQuestionEndpoint);
 
 // Room management
 router.get("/certificate/:token", reportLimiter, downloadBattleRoomCertificate);
+router.get("/certificate-image/:token", reportLimiter, viewBattleRoomCertificateImage);
 router.get(
   "/:roomCode/certificate",
   authenticate,
