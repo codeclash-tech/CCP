@@ -44,24 +44,17 @@ function createOtpRepository(maxAttempts) {
 async function resolveVerifiedUser(email) {
   let user = await User.findOne({ email });
   if (!user) {
-    const superAdminEmail = String(config.SUPER_ADMIN_EMAIL || "").toLowerCase();
     user = new User({
       email,
       name: email.split("@")[0],
       organization: "Unspecified",
-      role: email === superAdminEmail ? "ADMIN" : "USER",
+      role: "USER",
       isVerified: true,
     });
   } else if (!user.isVerified) {
     user.isVerified = true;
   }
 
-  if (
-    email === String(config.SUPER_ADMIN_EMAIL || "").toLowerCase() &&
-    user.role !== "ADMIN"
-  ) {
-    user.role = "ADMIN";
-  }
   await user.save();
   return user;
 }

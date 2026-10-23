@@ -72,6 +72,46 @@ export function requireJudgeCallbackSecret(req, res, next) {
   next();
 }
 
+export function createCorsMiddleware(allowedOrigins) {
+  return (req, res, next) => {
+    const origin = req.headers.origin;
+
+    if (origin && allowedOrigins.includes(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else if (!origin) {
+      res.setHeader(
+        "Access-Control-Allow-Origin",
+        allowedOrigins[0] || "https://codeclash.amux.in",
+      );
+    }
+
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PUT, DELETE, PATCH, OPTIONS",
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      [
+        "Content-Type",
+        "Authorization",
+        "X-Guest-ID",
+        "X-Creator-Credential",
+        "X-Judge-Callback-Key",
+        "X-Request-Id",
+        "X-CSRF-Token",
+      ].join(", "),
+    );
+    res.setHeader("Access-Control-Expose-Headers", "X-Request-Id");
+
+    if (req.method === "OPTIONS") {
+      return res.status(204).end();
+    }
+
+    next();
+  };
+}
+
 export function securityMiddleware(app) {
   // Normalize CLIENT_URL so an accidental trailing slash does not
   // break exact CORS origin matching.
@@ -81,6 +121,7 @@ export function securityMiddleware(app) {
   // Keeping this explicit ensures the custom domain works even if
   // CLIENT_URL is temporarily missing or misconfigured.
   const productionFrontendUrl = "https://codeclash.amux.in";
+  const desktopAppOrigin = "codeclash://app";
 
   // Helmet with strict CSP
   app.use(
@@ -192,6 +233,7 @@ export function securityMiddleware(app) {
 
     // Explicit production CodeClash domain.
     productionFrontendUrl,
+    desktopAppOrigin,
 
     // Local development origins.
     ...(config.NODE_ENV === "production"
@@ -202,49 +244,7 @@ export function securityMiddleware(app) {
   // Remove duplicates.
   const uniqueAllowedOrigins = [...new Set(allowedOrigins)];
 
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-
-    if (origin && uniqueAllowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    } else if (!origin) {
-      // Non-browser/server-to-server requests generally do not send Origin.
-      // Keep the configured client URL for compatibility.
-      res.setHeader(
-        "Access-Control-Allow-Origin",
-        clientUrl || productionFrontendUrl,
-      );
-    }
-
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "GET, POST, PUT, DELETE, PATCH, OPTIONS",
-    );
-
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      [
-        "Content-Type",
-        "Authorization",
-        "X-Guest-ID",
-        "X-Creator-Credential",
-        "X-Judge-Callback-Key",
-        "X-Request-Id",
-        "X-CSRF-Token",
-      ].join(", "),
-    );
-
-    res.setHeader("Access-Control-Expose-Headers", "X-Request-Id");
-
-    // Explicitly terminate CORS preflight requests.
-    if (req.method === "OPTIONS") {
-      return res.status(204).end();
-    }
-
-    next();
-  });
+  app.use(createCorsMiddleware(uniqueAllowedOrigins));
 }
 
 // Input sanitization middleware

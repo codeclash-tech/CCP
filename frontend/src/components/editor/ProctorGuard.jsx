@@ -1,7 +1,7 @@
 import useProctorGuard from "../../hooks/useProctorGuard";
-import { ShieldAlert, Maximize2, AlertTriangle } from "lucide-react";
+import { ShieldAlert, Maximize2, AlertTriangle, X } from "lucide-react";
 
-export default function ProctorGuard({ challengeId, onDisqualified, enabled }) {
+export default function ProctorGuard({ challengeId, onDisqualified, enabled, onExit }) {
   const {
     isFullscreen,
     warning,
@@ -30,6 +30,7 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled }) {
           backdrop-filter: blur(4px);
         }
         .pg-modal {
+          position: relative;
           background: var(--bg-elevated);
           border: 1px solid var(--border-color);
           border-radius: 12px;
@@ -39,6 +40,20 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled }) {
           text-align: center;
           color: var(--text-secondary);
           font-family: var(--font-ui);
+        }
+        .pg-exit {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          display: grid;
+          place-items: center;
+          width: 34px;
+          height: 34px;
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          color: var(--text-muted);
+          background: var(--bg-card);
+          cursor: pointer;
         }
         .pg-modal h2 {
           color: var(--text-primary);
@@ -101,6 +116,9 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled }) {
       {enabled && !isFullscreen && !isDisqualified && (
         <div className="pg-overlay">
           <div className="pg-modal">
+            <button className="pg-exit" type="button" aria-label="Leave challenge" onClick={onExit}>
+              <X size={18} />
+            </button>
             <ShieldAlert size={40} color="var(--accent-blue-bright)" style={{ marginBottom: 16 }} />
             <h2>Fullscreen Required</h2>
             <p>

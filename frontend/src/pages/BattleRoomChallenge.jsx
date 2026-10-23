@@ -36,6 +36,7 @@ import {
   KeyRound,
   AlertTriangle,
   Code2,
+  X,
 } from "lucide-react";
 import { isMobileDevice } from "../utils/device";
 
@@ -158,7 +159,6 @@ export default function BattleRoomChallenge() {
   const [proctorEnabled, setProctorEnabled] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [roomKey, setRoomKey] = useState("");
-  const [creatorOrganization, setCreatorOrganization] = useState("");
   const [questionsVisible, setQuestionsVisible] = useState(false);
   const [windowState, setWindowState] = useState(null);
   const [consoleOpen, setConsoleOpen] = useState(true);
@@ -170,6 +170,7 @@ export default function BattleRoomChallenge() {
   const mainRef = useRef(null);
   const draggingLeftRef = useRef(false);
   const draggingConsoleRef = useRef(false);
+  const submitInFlightRef = useRef(false);
 
   const draftRoomCodeRef = useRef(null);
   const fetchInFlightRef = useRef(false);
@@ -310,15 +311,8 @@ export default function BattleRoomChallenge() {
       setError("Tests can only be attended using a desktop or PC.");
       return;
     }
-    if (
-      creatorOrganization.trim().length < 2 ||
-      creatorOrganization.trim().length > 120
-    ) {
-      setError("Enter your organization (2-120 characters) before starting.");
-      return;
-    }
     try {
-      await startRoom(roomCode, creatorOrganization.trim());
+      await startRoom(roomCode);
       const data = await getRoomByCode(roomCode);
       setRoom(data.room);
       setQuestionsVisible(!!data.questionsVisible);
@@ -331,6 +325,11 @@ export default function BattleRoomChallenge() {
 
   const handleTimeUp = () => {
     setSubmitted(true);
+  };
+
+  const exitChallenge = () => {
+    setProctorEnabled(false);
+    navigate("/battle-room", { replace: true });
   };
 
   const handleDisqualified = useCallback(
@@ -406,11 +405,12 @@ export default function BattleRoomChallenge() {
   };
 
   const handleSubmit = async () => {
-    if (submitting || submitted) return;
+    if (submitInFlightRef.current || submitting || running || submitted) return;
 
     const question = room.questions[currentQuestionIndex];
     if (!question) return;
 
+    submitInFlightRef.current = true;
     const performanceTraceId = beginExecutionTrace("submit");
     setSubmitting(true);
     setError("");
@@ -421,6 +421,7 @@ export default function BattleRoomChallenge() {
         questionId: question._id,
         code,
         language: selectedLanguage,
+        question,
       });
 
       const qr = result.questionResult || {};
@@ -460,7 +461,7 @@ export default function BattleRoomChallenge() {
           input: r.input ?? "",
           executionTime: r.executionTime ?? 0,
           memoryUsed: r.memoryUsed ?? 0,
-          output: r.output ?? "",
+          output: r.output ?? r.actualOutput ?? r.stdout ?? "",
           expectedOutput: r.expectedOutput ?? "",
           error: r.error ?? "",
           isHidden: !!r.isHidden,
@@ -518,6 +519,7 @@ export default function BattleRoomChallenge() {
       }
       setError(err.message || "Failed to submit solution.");
     } finally {
+      submitInFlightRef.current = false;
       setSubmitting(false);
       finishExecutionTrace(performanceTraceId);
     }
@@ -545,7 +547,7 @@ export default function BattleRoomChallenge() {
   };
 
   const handleRun = async () => {
-    if (running || submitted) return;
+    if (running || submitting || submitInFlightRef.current || submitted) return;
 
     const questionIndex = currentQuestionIndex;
     const question = room.questions[questionIndex];
@@ -562,6 +564,7 @@ export default function BattleRoomChallenge() {
         questionId: question._id,
         code: codeSnapshot,
         language: selectedLanguage,
+        question,
       });
 
       const runResult = {
@@ -598,7 +601,7 @@ export default function BattleRoomChallenge() {
           input: r.input ?? "",
           executionTime: r.executionTime ?? 0,
           memoryUsed: r.memoryUsed ?? 0,
-          output: r.output ?? "",
+          output: r.output ?? r.actualOutput ?? r.stdout ?? "",
           expectedOutput: r.expectedOutput ?? "",
           error: r.error ?? "",
           isHidden: !!r.isHidden,
@@ -798,16 +801,6 @@ export default function BattleRoomChallenge() {
         }}
       >
         <p role="alert" style={{ color: "var(--color-danger)", fontSize: 14 }}>{error}</p>
-        {error.includes("organization before accessing") && (
-          <button
-            className="btn-primary"
-            onClick={() =>
-              navigate("/battle-room", { state: { joinRoomCode: roomCode } })
-            }
-          >
-            Enter organization and join
-          </button>
-        )}
         <button onClick={fetchRoom} className="btn-secondary">
           Retry
         </button>
@@ -849,6 +842,7 @@ export default function BattleRoomChallenge() {
       >
         <div
           style={{
+            position: "relative",
             background: "var(--bg-elevated)",
             border: "1px solid var(--border-color)",
             borderRadius: 12,
@@ -857,6 +851,27 @@ export default function BattleRoomChallenge() {
             textAlign: "center",
           }}
         >
+          <button
+            type="button"
+            aria-label="Leave challenge setup"
+            onClick={exitChallenge}
+            style={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              display: "grid",
+              placeItems: "center",
+              width: 34,
+              height: 34,
+              border: "1px solid var(--border-color)",
+              borderRadius: 8,
+              color: "var(--text-muted)",
+              background: "var(--bg-card)",
+              cursor: "pointer",
+            }}
+          >
+            <X size={18} />
+          </button>
           <Swords
             size={40}
             color="var(--accent-blue-bright)"
@@ -963,36 +978,9 @@ export default function BattleRoomChallenge() {
           </p>
           {isCreator ? (
             <div style={{ display: "grid", gap: 10, justifyItems: "center" }}>
-              <label
-                style={{
-                  color: "var(--text-secondary)",
-                  fontSize: 12,
-                  textAlign: "left",
-                  width: "min(100%, 320px)",
-                }}
-              >
-                Your organization (required to participate)
-                <input
-                  value={creatorOrganization}
-                  onChange={(event) => {
-                    setCreatorOrganization(event.target.value);
-                    setError("");
-                  }}
-                  autoComplete="organization"
-                  maxLength={120}
-                  required
-                  style={{
-                    width: "100%",
-                    boxSizing: "border-box",
-                    marginTop: 6,
-                    background: "var(--bg-card)",
-                    border: "1px solid var(--border-color)",
-                    borderRadius: 6,
-                    padding: "10px 12px",
-                    color: "var(--text-primary)",
-                  }}
-                />
-              </label>
+              <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>
+                As the creator, start the room when you’re ready.
+              </div>
               <button
                 onClick={handleStartRoom}
                 className="btn-primary"
@@ -1182,7 +1170,9 @@ export default function BattleRoomChallenge() {
 
   const question = room.questions?.[currentQuestionIndex];
   const currentQResult = questionResults[currentQuestionIndex];
-  const isQuestionSubmitted = currentQResult?.status !== "PENDING";
+  const isQuestionSubmitted = Boolean(
+    currentQResult?.status && currentQResult.status !== "PENDING",
+  );
   const currentLangDef = LANGUAGE_BY_ID.java;
   return (
     <div
@@ -1792,7 +1782,9 @@ export default function BattleRoomChallenge() {
                   ) : (
                     <Play size={12} />
                   )}
-                  {running ? "Running..." : "Run (Test)"}
+                  {running
+                    ? "Running..."
+                    : "Run"}
                 </button>
                 <button
                   onClick={handleSubmit}
@@ -1860,6 +1852,7 @@ export default function BattleRoomChallenge() {
         challengeId={room._id}
         onDisqualified={handleDisqualified}
         enabled={proctorEnabled && !submitted}
+        onExit={exitChallenge}
       />
       <RoomKeyModal
         isOpen={showKeyModal}

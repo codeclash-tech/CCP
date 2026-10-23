@@ -27,6 +27,13 @@ export function buildReferenceProgram(question, referenceSolution, language) {
   return composeProgram(question, referenceSolution, language, { forReferenceSolution: true });
 }
 
+function executionServiceError(error) {
+  return new Error(
+    "Could not validate the reference solution because the Secure Code Engine is unavailable or unreachable. Check that the engine is running and that SECURE_CODE_ENGINE_URL points to its execute endpoint, then try again.\n\n" +
+      (error || "The engine could not execute the reference solution."),
+  );
+}
+
 /**
  * Generate expected outputs for ALL test cases in ONE engine call.
  * @returns {Array<{input: string, expectedOutput: string}>}
@@ -57,15 +64,20 @@ export async function generateExpectedOutputs(question, referenceSolution, langu
     );
   }
 
-  // Engine-level failures (e.g. compilation error, engine down) with no
-  // per-test-case results block publishing with the required message.
+  // A missing engine response is an infrastructure failure, not a solution error.
   if (result.error && (!result.results || result.results.length === 0)) {
-    throw new Error(
-      "Reference solution failed. Fix the solution before publishing.\n\n" + (result.error || "")
-    );
+    throw executionServiceError(result.error);
   }
 
-// Map the engine results back to expected outputs.
+  if (
+    result.error &&
+    result.results?.length > 0 &&
+    result.results.every((testCase) => testCase.status === "SYSTEM_ERROR")
+  ) {
+    throw executionServiceError(result.error);
+  }
+
+  // Map the engine results back to expected outputs.
   // The engine puts the program's stdout into `actualOutput` (aliased to `output`).
   // The original test-case fields (parameterValues, description, etc.) are
   // preserved so the edit flow can reload parameter-based test cases.

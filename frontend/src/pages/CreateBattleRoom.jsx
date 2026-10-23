@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { createRoom } from "../services/battleRoomService";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { createRoom, getRoomForEdit, updateRoom } from "../services/battleRoomService";
 import { saveCreatorProfile } from "../services/platformService";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -64,6 +64,31 @@ const emptyQuestion = {
   hiddenTestCases: [],
 };
 
+function toLocalDateTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
+function readAuthoringDraft(userId) {
+  if (!userId) return null;
+  try {
+    const draft = JSON.parse(
+      localStorage.getItem(`ccp:battle-room-draft:${userId}`) || "null",
+    );
+    if (!draft || typeof draft !== "object" || !Array.isArray(draft.questions)) {
+      return null;
+    }
+    return draft;
+  } catch (error) {
+    console.warn("Unable to restore Battle Room draft:", error.message);
+    return null;
+  }
+}
+
 // Multi-step wizard steps (new parameter-based workflow)
 const STEPS = [
   { id: "room", label: "Room Details", icon: <KeyRound size={13} /> },
@@ -87,9 +112,15 @@ function formatTestCasesForPreview(tcs, params, max = 3) {
 
 export default function CreateBattleRoom() {
   const navigate = useNavigate();
+  const { roomCode } = useParams();
+  const editing = Boolean(roomCode);
   const { user, signIn } = useAuth();
+  const draftKey = `ccp:battle-room-draft:${user?.id || user?._id || ""}`;
+  const [initialDraft] = useState(() =>
+    editing ? null : readAuthoringDraft(user?.id || user?._id),
+  );
   const [creatorProfileComplete, setCreatorProfileComplete] = useState(
-    Boolean(user?.creatorType),
+    true,
   );
   const [creatorType, setCreatorType] = useState("");
   const [organizationName, setOrganizationName] = useState("");
@@ -99,26 +130,104 @@ export default function CreateBattleRoom() {
   const [profileSaving, setProfileSaving] = useState(false);
 
   // Room-level state
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [maxParticipants, setMaxParticipants] = useState(100);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [title, setTitle] = useState(initialDraft?.title || "");
+  const [description, setDescription] = useState(initialDraft?.description || "");
+  const [maxParticipants, setMaxParticipants] = useState(initialDraft?.maxParticipants || 100);
+  const [startDate, setStartDate] = useState(initialDraft?.startDate || "");
+  const [endDate, setEndDate] = useState(initialDraft?.endDate || "");
 
   // Questions
-  const [questions, setQuestions] = useState([{ ...emptyQuestion }]);
+  const [questions, setQuestions] = useState(
+    initialDraft?.questions?.length ? initialDraft.questions : [{ ...emptyQuestion }],
+  );
 
   // Wizard state
-  const [currentStep, setCurrentStep] = useState(0);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentStep, setCurrentStep] = useState(initialDraft?.currentStep || 0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(
+    initialDraft?.currentQuestionIndex || 0,
+  );
 
   // Submission state
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [loadingEdit, setLoadingEdit] = useState(editing);
   const currentQuestion = useMemo(
     () => questions[currentQuestionIndex] || { ...emptyQuestion },
     [questions, currentQuestionIndex],
   );
+
+  useEffect(() => {
+    if (!roomCode) return undefined;
+    let cancelled = false;
+    setLoadingEdit(true);
+    getRoomForEdit(roomCode)
+      .then(({ room }) => {
+        if (cancelled) return;
+        setTitle(room.title || "");
+        setDescription(room.description || "");
+        setMaxParticipants(room.maxParticipants || 100);
+        setStartDate(toLocalDateTime(room.startDate || room.startTime));
+        setEndDate(toLocalDateTime(room.endDate || room.endTime));
+        setQuestions((room.questions || []).map((question) => {
+          const signature = question.signature || null;
+          return {
+            ...emptyQuestion,
+            ...question,
+            signature,
+            functionName: question.functionName || signature?.name || "",
+            returnType: question.returnType || signature?.returnType || "",
+            parameters: question.parameters || signature?.params || [],
+            signaturePreview: {},
+            visibleTestCases: question.visibleTestCases || [],
+            hiddenTestCases: question.hiddenTestCases || [],
+          };
+        }));
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.message || "Could not load the saved room.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingEdit(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [roomCode]);
+
+  useEffect(() => {
+    if (editing || loadingEdit || !user?.id && !user?._id) return;
+    try {
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          title,
+          description,
+          maxParticipants,
+          startDate,
+          endDate,
+          questions,
+          currentStep,
+          currentQuestionIndex,
+        }),
+      );
+    } catch (error) {
+      console.warn("Unable to save Battle Room draft:", error.message);
+    }
+  }, [
+    currentQuestionIndex,
+    currentStep,
+    description,
+    draftKey,
+    editing,
+    endDate,
+    loadingEdit,
+    maxParticipants,
+    questions,
+    startDate,
+    title,
+    user?._id,
+    user?.id,
+  ]);
 
   const handlePartnerLogoChange = async (event) => {
     setProfileError("");
@@ -327,19 +436,26 @@ export default function CreateBattleRoom() {
           };
         }),
         maxParticipants,
+        candidateAccess: "OPEN",
+        allowedEmails: [],
         moderationAction: "DISQUALIFY",
+        allowLeaderboard: true,
+        allowReuse: true,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
 
-      const data = await createRoom(payload);
+      const data = editing
+        ? await updateRoom(roomCode, payload)
+        : await createRoom(payload);
+      if (!editing) localStorage.removeItem(draftKey);
       navigate("/battle-room", {
         replace: true,
         state: {
           activeTab: "my-rooms",
           createdRoomCode:
-            data.room?.roomCode || data.roomCode || data.roomKey,
+            data.room?.roomCode || data.roomCode || data.roomKey || roomCode,
         },
       });
     } catch (err) {
@@ -350,6 +466,10 @@ export default function CreateBattleRoom() {
   };
 
   const currentStepId = STEPS[currentStep]?.id;
+
+  if (loadingEdit) {
+    return <main className="create-battle-page" aria-busy="true">Loading saved Battle Room…</main>;
+  }
 
   if (!creatorProfileComplete) {
     return (
@@ -491,12 +611,17 @@ export default function CreateBattleRoom() {
     <div className="create-battle-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ color: "var(--text-primary)", fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>
-          Create Battle Room
+          {editing ? "Edit Battle Room" : "Create Battle Room"}
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
           Define each question once — the platform generates Java starter code and judge wrappers.
           Test cases are parameter-based and expected outputs are generated automatically from your reference solution.
         </p>
+        {!editing && (
+          <p role="status" style={{ color: "var(--color-success)", fontSize: 12, margin: "8px 0 0" }}>
+            Your draft is saved automatically on this device.
+          </p>
+        )}
       </div>
 
       {/* Step indicator */}
@@ -546,7 +671,7 @@ export default function CreateBattleRoom() {
           <div style={{ display: "grid", gap: 14 }}>
             <div>
               <label style={labelStyle}>Room Title *</label>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Week 1: Arrays & Strings Battle" style={inputStyle} />
+              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Arrays & Strings Battle" style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>Description</label>
@@ -556,7 +681,6 @@ export default function CreateBattleRoom() {
               <label style={labelStyle}>Max Participants</label>
               <input type="number" value={maxParticipants} onChange={(e) => setMaxParticipants(parseInt(e.target.value) || 10)} min={1} max={500} style={inputStyle} />
             </div>
-
             <h3 style={{ color: "var(--text-muted)", fontSize: 12, fontFamily: "var(--font-ui)", margin: "4px 0 -4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
               Battle schedule *
             </h3>
@@ -830,8 +954,8 @@ export default function CreateBattleRoom() {
             />
             <div style={{ marginTop: 12, fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", border: "1px dashed var(--border-strong)", borderRadius: 6, padding: "8px 12px" }}>
               <strong style={{ color: "var(--text-secondary)" }}>Important:</strong> the reference solution is executed only during authoring to generate
-              expected outputs. It is never executed during a contest, never shown to participants, and the expected
-              outputs are not editable — they are stored internally by the backend.
+              expected outputs. It is never used during an assessment or shown to participants. Generated
+              expected outputs are not editable.
             </div>
           </div>
         </div>
@@ -930,7 +1054,9 @@ export default function CreateBattleRoom() {
               style={{ padding: "10px 32px", fontSize: 13, opacity: creating ? 0.55 : 1 }}
             >
               {creating ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />}
-              {creating ? "Creating Room..." : "Create Room & Generate Key"}
+              {creating
+                ? editing ? "Saving Room..." : "Creating Room..."
+                : editing ? "Save Room Changes" : "Create Room & Generate Key"}
             </button>
           )}
         </div>

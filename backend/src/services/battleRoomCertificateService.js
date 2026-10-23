@@ -17,6 +17,7 @@ function normalizedCertificateData(data) {
     participantName: String(data.participantName).trim().slice(0, 160),
     roomTitle: String(data.roomTitle).trim().slice(0, 200),
     roomCode: String(data.roomCode).trim().slice(0, 32),
+    certificateId: String(data.certificateId || "").trim().slice(0, 80),
     rank: Math.max(1, Number(data.rank) || 1),
     totalParticipants: Math.max(1, Number(data.totalParticipants) || 1),
     totalScore: Math.max(0, Number(data.totalScore) || 0),
@@ -151,6 +152,15 @@ export function streamBattleRoomCertificateData(data, response) {
       408,
       { align: "center", width: pageWidth - 140 },
     );
+  if (certificate.certificateId) {
+    document
+      .fillColor("#64748b")
+      .fontSize(10)
+      .text(`Certificate ID: ${certificate.certificateId}`, 70, 432, {
+        align: "center",
+        width: pageWidth - 140,
+      });
+  }
   document
     .fillColor("#64748b")
     .fontSize(10)
@@ -162,7 +172,7 @@ export function streamBattleRoomCertificateData(data, response) {
         timeZone: "UTC",
       })} (UTC)`,
       70,
-      445,
+      450,
       { align: "center", width: pageWidth - 140 },
     );
   document

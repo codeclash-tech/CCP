@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { connectDB, getConnectionStatus } from "./config/db.js";
 import config from "./config/env.js";
 import { startCleanupJobs } from "./services/cleanupJob.js";
+import { initializeSuperAdmin } from "./services/superAdminBootstrapService.js";
 import {
   securityMiddleware,
   sanitizeInput,
@@ -21,6 +22,8 @@ import analyticsRoutes from "./routes/analyticsRoutes.js";
 import battleRoomRoutes from "./routes/battleRoomRoutes.js";
 import creatorVerificationRoutes from "./routes/creatorVerificationRoutes.js";
 import platformRoutes from "./routes/platformRoutes.js";
+import weeklyAssessmentRoutes from "./routes/weeklyAssessmentRoutes.js";
+import { initializeEligibilityHistory } from "./services/weeklyAssessmentService.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -67,6 +70,7 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/battle-rooms", battleRoomRoutes);
 app.use("/api/creator-verification", creatorVerificationRoutes);
 app.use("/api/platform", platformRoutes);
+app.use("/api/weekly-assessments", weeklyAssessmentRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -87,6 +91,8 @@ export async function start() {
       "Database connection is required before the API can start.",
     );
   }
+  await initializeSuperAdmin();
+  await initializeEligibilityHistory();
   startCleanupJobs();
 
   app.listen(PORT, () => {

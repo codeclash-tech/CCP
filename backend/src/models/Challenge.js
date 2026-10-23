@@ -164,7 +164,6 @@ challengeSchema.methods.toUserJSON = function () {
     signature: this.signature,
     functionSignatures: toPlainObjectMap(this.functionSignatures),
     starterCodes: toPlainObjectMap(this.starterCodes),
-    referenceSolutions: toPlainObjectMap(this.referenceSolutions),
     visibleTestCases: (
       this.visibleTestCases?.length
         ? this.visibleTestCases

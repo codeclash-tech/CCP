@@ -1,4 +1,10 @@
-import api from "./api";
+import api, { getFreshAccessTokenForDesktopSubmission } from "./api";
+import {
+  executeVisibleCasesLocally,
+  submitQuestionLocally,
+} from "./localExecutionService";
+import { generateReferenceOutputs } from "./referenceOutputService";
+import { API_BASE_URL } from "../utils/constants";
 
 export const generateStarterCode = (
   functionSignature,
@@ -17,9 +23,16 @@ export const generateStarterCode = (
 };
 
 export const generateExpectedOutputs = (question) => {
-  return api
-    .post("/battle-rooms/authoring/generate-outputs", { question })
-    .then((res) => res.data);
+  const desktopBridge =
+    typeof window !== "undefined" ? window.codeClashDesktop : undefined;
+  return generateReferenceOutputs(
+    question,
+    desktopBridge,
+    (payload) =>
+      api
+        .post("/battle-rooms/authoring/generate-outputs", { question: payload })
+        .then((res) => res.data),
+  );
 };
 
 export const validateQuestion = (question) => {
@@ -51,40 +64,76 @@ export const generateSignature = (name, returnType, parameters) => {
 export const createRoom = (roomData) =>
   api.post("/battle-rooms/create", roomData).then((r) => r.data);
 
-export const startRoom = (roomCode, organization) =>
-  api
-    .post(`/battle-rooms/${roomCode}/start`, { organization })
-    .then((r) => r.data);
+export const getRoomForEdit = (roomCode) =>
+  api.get(`/battle-rooms/${roomCode}/edit`).then((r) => r.data);
+
+export const updateRoom = (roomCode, roomData) =>
+  api.put(`/battle-rooms/${roomCode}`, roomData).then((r) => r.data);
+
+export const getRoomParticipants = (roomCode) =>
+  api.get(`/battle-rooms/${roomCode}/participants`).then((r) => r.data);
+
+export const updateRoomAllowlist = (roomCode, accessData) =>
+  api.put(`/battle-rooms/${roomCode}/allowlist`, accessData).then((r) => r.data);
+
+export const startRoom = (roomCode) =>
+  api.post(`/battle-rooms/${roomCode}/start`).then((r) => r.data);
 
 export const getRoomByCode = (roomCode) =>
   api.get(`/battle-rooms/${roomCode}`).then((r) => r.data);
 
-export const joinRoom = (roomCode, organization) =>
-  api
-    .post("/battle-rooms/join", { roomCode, organization })
-    .then((r) => r.data);
+export const joinRoom = (roomCode) =>
+  api.post("/battle-rooms/join", { roomCode }).then((r) => r.data);
 
 // Stateless code execution paths. The engine on Render can be slow on cold starts,
 // so these use a longer per-request timeout (120s) rather than the default 30s.
 const EXECUTION_TIMEOUT = 120000;
 
-export const submitSolution = ({ roomCode, questionId, code, language }) =>
-  api
+export const submitSolution = async ({
+  roomCode,
+  questionId,
+  code,
+  language,
+  question,
+}) => {
+  if (typeof window !== "undefined" && window.codeClashDesktop) {
+    const accessToken = await getFreshAccessTokenForDesktopSubmission();
+    return submitQuestionLocally({
+      apiBaseUrl: API_BASE_URL,
+      accessToken,
+      roomCode,
+      questionId,
+      question,
+      code,
+      language,
+    });
+  }
+
+  return api
     .post(
       `/battle-rooms/${roomCode}/submit`,
       { questionId, code, language },
       { timeout: EXECUTION_TIMEOUT },
     )
     .then((r) => r.data);
+};
 
-export const runSolution = ({ roomCode, questionId, code, language }) =>
-  api
+export const runSolution = ({ roomCode, questionId, code, language, question }) => {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.codeClashDesktop?.engine?.execute === "function"
+  ) {
+    return executeVisibleCasesLocally({ question, code, language });
+  }
+
+  return api
     .post(
       `/battle-rooms/${roomCode}/run`,
       { questionId, code, language },
       { timeout: EXECUTION_TIMEOUT },
     )
     .then((r) => r.data);
+};
 
 export const getRoomLeaderboard = (roomCode) =>
   api.get(`/battle-rooms/${roomCode}/leaderboard`).then((r) => r.data);

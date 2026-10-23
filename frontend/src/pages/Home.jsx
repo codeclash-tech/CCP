@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
+  CalendarDays,
   KeyRound,
   PlusCircle,
   Swords,
@@ -11,12 +13,13 @@ import {
   GraduationCap,
   Briefcase,
 } from "lucide-react";
+import "../styles/productPages.css";
 
 const cards = [
   {
     icon: PlusCircle,
     title: "Create a Battle Room",
-    text: "Add custom Java/DS questions, set time limits, and generate a secure battle key for your candidates or students.",
+    text: "Add custom Java/DS questions, set time limits, and generate a secure battle key for participants or students.",
     action: "Create Arena",
     to: "/battle-room/create",
     badge: "For Hosts & Recruiters",
@@ -27,7 +30,15 @@ const cards = [
     text: "Received an invitation key? Enter your 6-character room code to start solving challenges in real time.",
     action: "Enter Battle",
     to: "/battle-room",
-    badge: "For Candidates & Coders",
+    badge: "For Participants & Coders",
+  },
+  {
+    icon: CalendarDays,
+    title: "Daily Global Challenge",
+    text: "Solve today’s shared challenge. Individual scores and organization rankings start fresh every day.",
+    action: "Attend today",
+    to: "/weekly-assessment",
+    badge: "New challenge every day",
   },
   {
     icon: Mail,
@@ -46,6 +57,49 @@ const targetAudiences = [
 ];
 
 export default function Home() {
+  const { user } = useAuth();
+  const isDesktop =
+    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
+  if (isDesktop) {
+    const firstName = (user?.name || "").trim().split(/\s+/)[0];
+    return (
+      <main className="product-page desktop-dashboard">
+        <header className="product-page-heading">
+          <div>
+            <p className="product-eyebrow">CODECLASH WORKSPACE</p>
+            <h1>{firstName ? `Welcome, ${firstName}` : "Welcome to CodeClash"}</h1>
+            <p>Choose where you would like to continue.</p>
+          </div>
+        </header>
+        <div className="desktop-dashboard-grid">
+          <Link className="desktop-dashboard-card" to="/weekly-assessment">
+            <span className="desktop-dashboard-icon"><CalendarDays size={20} /></span>
+            <span>
+              <strong>Daily Global Challenge</strong>
+              <small>Compete today; scores and organization ranks reset daily.</small>
+            </span>
+            <ArrowRight size={17} />
+          </Link>
+          <Link className="desktop-dashboard-card" to="/battle-room">
+            <span className="desktop-dashboard-icon"><Swords size={20} /></span>
+            <span>
+              <strong>Battle Rooms</strong>
+              <small>Join a room or continue a battle.</small>
+            </span>
+            <ArrowRight size={17} />
+          </Link>
+          <Link className="desktop-dashboard-card" to="/battle-room/create">
+            <span className="desktop-dashboard-icon"><PlusCircle size={20} /></span>
+            <span>
+              <strong>Create a Battle Room</strong>
+              <small>Build a room with your questions and test cases.</small>
+            </span>
+            <ArrowRight size={17} />
+          </Link>
+        </div>
+      </main>
+    );
+  }
   return (
     <main className="home-page">
       <style>{`

@@ -1,0 +1,65 @@
+{
+  "name": "codeclash-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Windows desktop shell for CodeClash",
+  "main": "src/main/index.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "package:win": "node scripts/package-windows.mjs",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "overrides": {
+    "roarr": "4.2.5"
+  },
+  "build": {
+    "appId": "com.codeclash.desktop",
+    "productName": "CodeClash",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "package.json",
+      "src/main/**",
+      "src/preload/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "renderer"
+      },
+      {
+        "from": "../secure-code-engine/target/secure-code-engine-1.0.0.jar",
+        "to": "engine/secure-code-engine.jar"
+      },
+      {
+        "from": "runtime-dist",
+        "to": "runtime"
+      }
+    ],
+    "win": {
+      "icon": "assets/codeclash.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "CodeClash Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

@@ -1,4 +1,9 @@
 import mongoose from "mongoose";
+import {
+  getVisibleExecutionOutput,
+  sanitizeParticipantExecutionError,
+  sanitizeParticipantTestResult,
+} from "../services/participantExecutionSerialization.js";
 
 const questionResultSchema = new mongoose.Schema(
   {
@@ -9,6 +14,16 @@ const questionResultSchema = new mongoose.Schema(
     questionTitle: {
       type: String,
       default: "",
+    },
+    revision: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    executionGrantNonce: {
+      type: String,
+      default: null,
+      select: false,
     },
     code: {
       type: String,
@@ -31,6 +46,9 @@ const questionResultSchema = new mongoose.Schema(
         "TIME_LIMIT_EXCEEDED",
         "MEMORY_LIMIT_EXCEEDED",
         "SYSTEM_ERROR",
+        "SECURITY_VIOLATION",
+        "INTERNAL_ENGINE_ERROR",
+        "OUTPUT_LIMIT_EXCEEDED",
         "REJECTED",
         "ERROR",
       ],
@@ -90,6 +108,9 @@ const questionResultSchema = new mongoose.Schema(
             "RUNTIME_ERROR",
             "TIME_LIMIT_EXCEEDED",
             "MEMORY_LIMIT_EXCEEDED",
+            "SECURITY_VIOLATION",
+            "INTERNAL_ENGINE_ERROR",
+            "OUTPUT_LIMIT_EXCEEDED",
           ],
         },
         executionTime: { type: Number, default: 0 },
@@ -197,7 +218,9 @@ battleRoomSubmissionSchema.index({ roomId: 1, totalScore: -1 });
 battleRoomSubmissionSchema.index({ userId: 1 });
 battleRoomSubmissionSchema.index({ userId: 1, "certificateSnapshot.roomCode": 1 });
 
-battleRoomSubmissionSchema.methods.toPublicJSON = function () {
+battleRoomSubmissionSchema.methods.toPublicJSON = function ({
+  visibleTestCaseCounts = {},
+} = {}) {
   return {
     id: this._id,
     roomId: this.roomId,
@@ -213,22 +236,36 @@ battleRoomSubmissionSchema.methods.toPublicJSON = function () {
     moderationFlags: this.moderationFlags || [],
     startTime: this.startTime,
     submittedAt: this.submittedAt,
-    questionResults: this.questionResults.map((qr) => ({
-      questionId: qr.questionId,
-      questionTitle: qr.questionTitle,
-      code: qr.code || "",
-      status: qr.status,
-      score: qr.score,
-      passed: qr.passed,
-      failed: qr.failed,
-      total: qr.total,
-      executionTime: qr.executionTime,
-      memoryUsed: qr.memoryUsed,
-      timeToSolve: qr.timeToSolve,
-      output: qr.output,
-      error: qr.error,
-      results: qr.results || [],
-    })),
+    questionResults: this.questionResults.map((qr) => {
+      const visibleTestCaseCount =
+        visibleTestCaseCounts[qr.questionId?.toString()];
+      const results = (qr.results || []).map((result, index) => {
+        const resultData =
+          typeof result.toObject === "function" ? result.toObject() : result;
+        return sanitizeParticipantTestResult({
+          ...resultData,
+          isHidden: Number.isInteger(visibleTestCaseCount)
+            ? index >= visibleTestCaseCount
+            : true,
+        });
+      });
+      return {
+        questionId: qr.questionId,
+        questionTitle: qr.questionTitle,
+        code: qr.code || "",
+        status: qr.status,
+        score: qr.score,
+        passed: qr.passed,
+        failed: qr.failed,
+        total: qr.total,
+        executionTime: qr.executionTime,
+        memoryUsed: qr.memoryUsed,
+        timeToSolve: qr.timeToSolve,
+        output: getVisibleExecutionOutput(results),
+        error: sanitizeParticipantExecutionError(qr.status, qr.error),
+        results,
+      };
+    }),
     codingBehavior: this.codingBehavior,
   };
 };

@@ -37,6 +37,11 @@ yarn-error.log*
 
 # Coverage
 coverage/
+desktop/release/
+desktop/release-local/
+desktop/release-hosted/
+desktop/runtime-dist/
+desktop/node_modules/
 
 # Misc
 *.tsbuildinfo

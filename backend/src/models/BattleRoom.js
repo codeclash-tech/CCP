@@ -197,6 +197,16 @@ const battleRoomSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    candidateAccess: {
+      type: String,
+      enum: ["OPEN", "ALLOWLIST"],
+      default: "OPEN",
+    },
+    allowedEmails: {
+      type: [String],
+      default: [],
+      select: false,
+    },
     timezone: {
       type: String,
       default: "UTC",
@@ -312,6 +322,13 @@ function publicQuestionJSON(q) {
     signature: q.signature,
     starterCode: q.starterCode,
     starterCodeByLanguage: q.starterCodeByLanguage || {},
+    visibleTestCases: (q.visibleTestCases || []).map((testCase) => ({
+      input: testCase.input,
+      expectedOutput: testCase.expectedOutput,
+      description: testCase.description || "",
+      parameterValues: testCase.parameterValues || null,
+    })),
+    problemType: q.problemType || "array",
     hiddenTestCases: undefined,
     points: q.points,
   };
@@ -397,8 +414,13 @@ battleRoomSchema.methods.toEditJSON = function () {
       wrapperByLanguage: q.wrapperByLanguage || {},
     })),
     languages: ["java"],
+    candidateAccess: this.candidateAccess || "OPEN",
+    allowedEmails: this.allowedEmails || [],
     timeLimit: this.timeLimit,
     timeLimitUnit: this.timeLimitUnit,
+    moderationAction: this.moderationAction,
+    allowLeaderboard: this.allowLeaderboard,
+    allowReuse: this.allowReuse,
     status: this.status,
     startDate: this.startDate || this.startTime,
     endDate: this.endDate || this.endTime,
@@ -443,6 +465,8 @@ battleRoomSchema.methods.toCreatorJSON = function () {
   return {
     ...this.toPublicJSON(),
     questions: this.questions.map(creatorQuestionJSON),
+    candidateAccess: this.candidateAccess || "OPEN",
+    allowedEmails: this.allowedEmails || [],
     expiresAt: this.expiresAt,
   };
 };

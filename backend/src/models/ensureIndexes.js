@@ -1,5 +1,13 @@
 import Otp from "./Otp.js";
 import CreatorVerificationOtp from "./CreatorVerificationOtp.js";
+import OrganizationProfile from "./OrganizationProfile.js";
+import OrganizationMembership from "./OrganizationMembership.js";
+import GlobalChallenge from "./GlobalChallenge.js";
+import WeeklyCycle from "./WeeklyCycle.js";
+import WeeklyRosterEntry from "./WeeklyRosterEntry.js";
+import WeeklySubmission from "./WeeklySubmission.js";
+import WeeklyCertificate from "./WeeklyCertificate.js";
+import User from "./User.js";
 import config from "../config/env.js";
 
 /**
@@ -44,7 +52,62 @@ export async function ensureCreatorVerificationOtpTtlIndex() {
   }
 }
 
+export async function ensureOrganizationMembershipIndexes(
+  collection = OrganizationMembership.collection,
+) {
+  let indexes = [];
+  try {
+    indexes = await collection.indexes();
+  } catch (error) {
+    if (error.code !== 26 && error.codeName !== "NamespaceNotFound") {
+      throw error;
+    }
+  }
+
+  const membershipKey = (index) =>
+    Object.keys(index.key || {}).length === 1 && index.key.userId === 1;
+  const isDesiredIndex = (index) =>
+    index.name === "active_user_membership_unique" &&
+    index.unique === true &&
+    Object.keys(index.partialFilterExpression || {}).length === 1 &&
+    index.partialFilterExpression.status === "ACTIVE";
+
+  for (const index of indexes) {
+    if (membershipKey(index) && !isDesiredIndex(index)) {
+      await collection.dropIndex(index.name);
+      console.info(
+        `[Models] Replaced stale OrganizationMembership index "${index.name}".`,
+      );
+    }
+  }
+
+  await collection.createIndex(
+    { userId: 1 },
+    {
+      name: "active_user_membership_unique",
+      unique: true,
+      partialFilterExpression: { status: "ACTIVE" },
+    },
+  );
+}
+
+export async function ensureWeeklyAssessmentIndexes() {
+  await ensureOrganizationMembershipIndexes();
+  await Promise.all([
+    User.createIndexes(),
+    OrganizationProfile.createIndexes(),
+    OrganizationMembership.createIndexes(),
+    GlobalChallenge.createIndexes(),
+    WeeklyCycle.createIndexes(),
+    WeeklyRosterEntry.createIndexes(),
+    WeeklySubmission.createIndexes(),
+    WeeklyCertificate.createIndexes(),
+  ]);
+  console.log("[Models] Weekly assessment indexes ensured.");
+}
+
 export default {
   ensureOtpTtlIndex,
   ensureCreatorVerificationOtpTtlIndex,
+  ensureWeeklyAssessmentIndexes,
 };

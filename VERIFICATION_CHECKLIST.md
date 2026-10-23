@@ -1,8 +1,11 @@
-# Production Readiness Verification Checklist
+# Historical Production Readiness Verification Checklist
 
 **Date**: September 22, 2026  
 **Platform**: Coding Challenge Platform  
-**Status**: ✅ READY FOR DEPLOYMENT
+**Status**: Historical checklist; superseded by the 2026-10-19 Desktop audit (`NOT PRODUCTION READY`)
+
+This checklist records earlier web-platform checks only. Its checked items are
+not evidence that the current Desktop product is complete or release-ready.
 
 ---
 
@@ -415,29 +418,18 @@
 
 ---
 
-## Deployment Ready Status
+## Historical Deployment Status
 
-### ✅ PRODUCTION READY
-
-**No blocking issues identified.**
-
-**Known Limitations (acceptable)**:
-- WebSocket not implemented (polling used instead)
-- Some pre-existing test issues unrelated to production code
-
-**Recommendation**: Deploy with standard production monitoring.
+The earlier checklist marked the web platform ready for deployment. That verdict
+is superseded and must not be used for the current Desktop release. See
+[`docs/desktop-feature-parity-audit.md`](docs/desktop-feature-parity-audit.md)
+for the current release blockers.
 
 ---
 
 ## Sign-Off
 
 **Audit Date**: September 22, 2026  
-**Status**: ✅ READY FOR DEPLOYMENT  
-**Confidence**: HIGH (99.5%)  
-
-All critical systems verified, tested, and working correctly. Platform is secure, scalable, and ready for production use.
-
-Minor issues identified are non-blocking and can be addressed in future sprints if needed.
+**Status**: Historical sign-off; not a current release approval.
 
 ---
-

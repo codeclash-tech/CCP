@@ -8,16 +8,17 @@ import {
   useState,
 } from "react";
 import { getProfile, signOut as signOutRequest } from "../services/authService";
+import {
+  clearAuthTokens,
+  hasStoredCredential,
+} from "../services/sessionCredentials";
 
 const AuthContext = createContext(null);
 const AUTH_EVENT_KEY = "ccp-auth-event";
-const ACCESS_TOKEN_KEY = "ccp_access_token";
-const REFRESH_TOKEN_KEY = "ccp_refresh_token";
 const CACHED_PROFILE_KEY = "ccp_cached_profile";
 
-function clearPrivateClientState() {
-  localStorage.removeItem("ccp_access_token");
-  localStorage.removeItem("ccp_refresh_token");
+async function clearPrivateClientState() {
+  await clearAuthTokens();
   localStorage.removeItem("ccp_session_id");
   localStorage.removeItem("ccp_guest_id");
   localStorage.removeItem("ccp_guest_name");
@@ -35,22 +36,6 @@ function clearPrivateClientState() {
   }
 }
 
-function readCachedProfile() {
-  if (
-    !localStorage.getItem(ACCESS_TOKEN_KEY) &&
-    !localStorage.getItem(REFRESH_TOKEN_KEY)
-  ) {
-    return null;
-  }
-  try {
-    const profile = JSON.parse(sessionStorage.getItem(CACHED_PROFILE_KEY) || "null");
-    return profile && typeof profile === "object" ? profile : null;
-  } catch {
-    sessionStorage.removeItem(CACHED_PROFILE_KEY);
-    return null;
-  }
-}
-
 function cacheProfile(profile) {
   if (profile) {
     try {
@@ -62,14 +47,8 @@ function cacheProfile(profile) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(readCachedProfile);
-  const [loading, setLoading] = useState(
-    () =>
-      Boolean(
-        localStorage.getItem(ACCESS_TOKEN_KEY) ||
-          localStorage.getItem(REFRESH_TOKEN_KEY),
-      ),
-  );
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState("");
   const userRef = useRef(user);
   userRef.current = user;
@@ -86,9 +65,7 @@ export function AuthProvider({ children }) {
         cacheProfile(profile);
         return profile;
       } catch (error) {
-        const hasSession =
-          localStorage.getItem(ACCESS_TOKEN_KEY) ||
-          localStorage.getItem(REFRESH_TOKEN_KEY);
+        const hasSession = await hasStoredCredential();
         if (!hasSession) {
           setUser(null);
         }
@@ -113,7 +90,7 @@ export function AuthProvider({ children }) {
     } finally {
       setUser(null);
       setSessionError("");
-      clearPrivateClientState();
+      await clearPrivateClientState();
       if (notifyOtherTabs) {
         localStorage.setItem(AUTH_EVENT_KEY, String(Date.now()));
       }
@@ -121,21 +98,31 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (
-      !localStorage.getItem(ACCESS_TOKEN_KEY) &&
-      !localStorage.getItem(REFRESH_TOKEN_KEY)
-    ) {
-      setLoading(false);
-      return;
-    }
-    refreshProfile();
+    let active = true;
+    hasStoredCredential()
+      .then((hasSession) => {
+        if (hasSession) return refreshProfile();
+        if (active) setLoading(false);
+        return null;
+      })
+      .catch((error) => {
+        if (active) {
+          setSessionError(error.message || "Unable to access your secure session.");
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
   }, [refreshProfile]);
 
   useEffect(() => {
     const expireCurrentAuth = () => {
       setUser(null);
       setSessionError("");
-      clearPrivateClientState();
+      clearPrivateClientState().catch((error) => {
+        console.error("Unable to clear private session data:", error.message);
+      });
     };
     const handleStorage = (event) => {
       if (event.key === AUTH_EVENT_KEY) {

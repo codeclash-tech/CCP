@@ -105,7 +105,6 @@ export async function updateCreatorProfile(req, res) {
 
     if (creatorType === "INDIVIDUAL") {
       user.creatorType = "INDIVIDUAL";
-      user.organization = "Unspecified";
       user.partnerLogo = "";
       user.partnerAcceptedAt = null;
       user.partnerTermsVersion = "";

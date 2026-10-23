@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import {
+  Code2,
+  Eye,
+  EyeOff,
+  LoaderCircle,
+  ShieldCheck,
+  Swords,
+} from "lucide-react";
 import {
   loginWithPassword,
   requestRegistrationOtp,
@@ -24,6 +31,8 @@ const fieldStyle = {
 
 export default function AuthPage({ mode }) {
   const isRegistration = mode === "register";
+  const isDesktop =
+    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn } = useAuth();
@@ -221,16 +230,40 @@ export default function AuthPage({ mode }) {
 
   return (
     <main
-      className="auth-page"
+      className={`auth-page${isDesktop ? " desktop-auth-page" : ""}`}
       style={{
-        minHeight: "calc(100vh - 112px)",
+        minHeight: isDesktop ? "100vh" : "calc(100vh - 112px)",
         display: "grid",
         placeItems: "center",
         padding: 24,
         boxSizing: "border-box",
       }}
     >
+      {isDesktop && (
+        <aside className="desktop-auth-intro">
+          <div className="desktop-auth-brand">
+            <Code2 size={23} aria-hidden="true" />
+            <span>CodeClash</span>
+          </div>
+          <div className="desktop-auth-message">
+            <span className="desktop-auth-icon">
+              <Swords size={22} aria-hidden="true" />
+            </span>
+            <p className="desktop-auth-eyebrow">CODE. COMPETE. IMPROVE.</p>
+            <h2>Bring your best solution to the battle.</h2>
+            <p>
+              Join coding challenges, take on Battle Rooms, and follow your
+              results in one focused workspace.
+            </p>
+          </div>
+          <div className="desktop-auth-assurance">
+            <ShieldCheck size={17} aria-hidden="true" />
+            <span>Your account and submissions are protected by CodeClash.</span>
+          </div>
+        </aside>
+      )}
       <section
+        className={`auth-card${isDesktop ? " desktop-auth-card" : ""}`}
         style={{
           width: "min(100%, 440px)",
           background: "var(--bg-elevated)",
@@ -240,6 +273,12 @@ export default function AuthPage({ mode }) {
           boxSizing: "border-box",
         }}
       >
+        {isDesktop && (
+          <div className="desktop-auth-card-brand">
+            <Code2 size={19} aria-hidden="true" />
+            <span>CodeClash</span>
+          </div>
+        )}
         <h1 style={{ color: "var(--text-primary)", fontSize: 21, margin: "0 0 6px" }}>
           {isRegistration
             ? "Create your CodeClash account"
@@ -416,7 +455,16 @@ export default function AuthPage({ mode }) {
             }}
           >
             {busy
-              ? "Please wait..."
+              ? (
+                <span className="auth-loading-label">
+                  <LoaderCircle size={16} aria-hidden="true" />
+                  {isRegistration
+                    ? "Please wait..."
+                    : resetMode
+                      ? "Updating..."
+                      : "Signing in..."}
+                </span>
+              )
               : isRegistration
                 ? requested
                   ? "Verify email and continue"

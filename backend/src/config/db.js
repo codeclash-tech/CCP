@@ -29,9 +29,11 @@ export async function connectDB() {
       const {
         ensureOtpTtlIndex,
         ensureCreatorVerificationOtpTtlIndex,
+        ensureWeeklyAssessmentIndexes,
       } = await import("../models/ensureIndexes.js");
       await ensureOtpTtlIndex();
       await ensureCreatorVerificationOtpTtlIndex();
+      await ensureWeeklyAssessmentIndexes();
     }
     return isConnected;
   } catch (error) {

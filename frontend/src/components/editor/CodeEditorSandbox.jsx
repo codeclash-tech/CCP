@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { getEditorPreferences } from "../../utils/editorPreferences";
 
 export default function CodeEditorSandbox({
   value = "",
@@ -8,32 +9,40 @@ export default function CodeEditorSandbox({
   height = "100%",
 }) {
   const [isMonacoLoaded, setIsMonacoLoaded] = useState(false);
+  const [editorLoadFailed, setEditorLoadFailed] = useState(false);
   const [editorInstance, setEditorInstance] = useState(null);
   const containerRef = useRef(null);
   const monacoRef = useRef(null);
   const editorInstanceRef = useRef(null);
   const onChangeRef = useRef(onChange);
   const editorOptionsRef = useRef({ value, language, readOnly });
+  const preferencesRef = useRef(getEditorPreferences());
   onChangeRef.current = onChange;
   editorOptionsRef.current = { value, language, readOnly };
 
   useEffect(() => {
     if (typeof window !== "undefined" && !window.monaco) {
       const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js";
+      script.src = `${import.meta.env.BASE_URL}monaco/vs/loader.js`;
       script.async = true;
       script.onload = () => {
+        if (typeof window.require !== "function") {
+          setEditorLoadFailed(true);
+          return;
+        }
         window.require.config({
           paths: {
-            vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs",
+            vs: `${import.meta.env.BASE_URL}monaco/vs`,
           },
         });
-        window.require(["vs/editor/editor.main"], (monaco) => {
-          monacoRef.current = monaco;
-          monaco.editor.defineTheme("oneDarkProTheme", {
-            base: "vs-dark",
-            inherit: true,
-            rules: [
+        window.require(
+          ["vs/editor/editor.main"],
+          (monaco) => {
+            monacoRef.current = monaco;
+            monaco.editor.defineTheme("oneDarkProTheme", {
+              base: "vs-dark",
+              inherit: true,
+              rules: [
               { token: "comment", foreground: "7f848e", fontStyle: "italic" },
               { token: "comment.js", foreground: "7f848e" },
               { token: "keyword", foreground: "61afef" },
@@ -59,8 +68,8 @@ export default function CodeEditorSandbox({
               { token: "support.type", foreground: "56b6c2" },
               { token: "storage", foreground: "61afef" },
               { token: "type.identifier", foreground: "56b6c2" },
-            ],
-            colors: {
+              ],
+              colors: {
               "editor.background": "#1a1a1a",
               "editor.foreground": "#abb2bf",
               "editor.lineHighlightBackground": "#242424",
@@ -83,12 +92,15 @@ export default function CodeEditorSandbox({
               "scrollbarSlider.background": "#3a3a3a80",
               "scrollbarSlider.hoverBackground": "#4a4a4a80",
               "scrollbarSlider.activeBackground": "#0a66c280",
-            },
-          });
-          monaco.editor.setTheme("oneDarkProTheme");
-          setIsMonacoLoaded(true);
-        });
+              },
+            });
+            monaco.editor.setTheme("oneDarkProTheme");
+            setIsMonacoLoaded(true);
+          },
+          () => setEditorLoadFailed(true),
+        );
       };
+      script.onerror = () => setEditorLoadFailed(true);
       document.body.appendChild(script);
 
       return () => {
@@ -119,14 +131,14 @@ export default function CodeEditorSandbox({
       theme: "oneDarkProTheme",
       readOnly: editorOptionsRef.current.readOnly,
       minimap: { enabled: false },
-      fontSize: 14,
+      fontSize: preferencesRef.current.fontSize,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace",
       lineNumbers: "on",
       renderLineHighlight: "line",
       scrollBeyondLastLine: false,
       automaticLayout: true,
-      tabSize: 2,
-      wordWrap: "on",
+      tabSize: preferencesRef.current.tabSize,
+      wordWrap: preferencesRef.current.wordWrap ? "on" : "off",
       padding: { top: 12, bottom: 12 },
       cursorBlinking: "smooth",
       cursorSmoothCaretAnimation: "on",
@@ -170,6 +182,24 @@ export default function CodeEditorSandbox({
   );
 
   useEffect(() => {
+    const updatePreferences = (event) => {
+      const preferences = event.detail || getEditorPreferences();
+      preferencesRef.current = preferences;
+      editorInstanceRef.current?.updateOptions({
+        fontSize: preferences.fontSize,
+        tabSize: preferences.tabSize,
+        wordWrap: preferences.wordWrap ? "on" : "off",
+      });
+    };
+    window.addEventListener("codeclash-editor-preferences", updatePreferences);
+    return () =>
+      window.removeEventListener(
+        "codeclash-editor-preferences",
+        updatePreferences,
+      );
+  }, []);
+
+  useEffect(() => {
     if (editorInstance && value !== undefined) {
       const currentValue = editorInstance.getValue();
       if (currentValue !== value) {
@@ -203,6 +233,19 @@ export default function CodeEditorSandbox({
         borderRadius: "4px",
         overflow: "hidden",
       }}
-    />
+      >
+        {!isMonacoLoaded && editorLoadFailed && (
+          <textarea
+            aria-label="Java code editor"
+            autoCapitalize="off"
+            autoComplete="off"
+            autoCorrect="off"
+            className="code-editor-fallback"
+            spellCheck={false}
+            value={value}
+            onChange={(event) => onChange?.(event.target.value)}
+          />
+        )}
+      </div>
   );
 }

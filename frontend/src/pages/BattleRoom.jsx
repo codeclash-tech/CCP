@@ -14,6 +14,8 @@ import {
   Copy,
   Check,
   Menu,
+  Pencil,
+  UsersRound,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { isMobileDevice } from "../utils/device";
@@ -164,7 +166,6 @@ export default function BattleRoom() {
   const { user } = useAuth();
 
   const [joinCode, setJoinCode] = useState(location.state?.joinRoomCode || "");
-  const [joinOrganization, setJoinOrganization] = useState("");
   const [joinError, setJoinError] = useState("");
   const [joining, setJoining] = useState(false);
   const [activeTab, setActiveTab] = useState(
@@ -215,19 +216,14 @@ export default function BattleRoom() {
       );
       return;
     }
-    if (joinOrganization.trim().length < 2 || joinOrganization.trim().length > 120) {
-      setJoinError("Enter your organization (2-120 characters) before joining.");
-      return;
-    }
     if (!joinCode.trim()) {
       setJoinError("Please enter a room key.");
       return;
     }
-
     setJoinError("");
     setJoining(true);
     try {
-      await joinRoom(joinCode.trim().toUpperCase(), joinOrganization.trim());
+      await joinRoom(joinCode.trim().toUpperCase());
       navigate(`/battle-room/${joinCode.trim().toUpperCase()}/challenge`);
     } catch (err) {
       setJoinError(err.message || "Failed to join room. Check the key and try again.");
@@ -440,33 +436,12 @@ export default function BattleRoom() {
               Join Battle
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 12 }}>
-              Enter the room key and your organization. Your verified account supplies your name and email; the organization you enter is recorded for this battle.
+              Enter the room key shared by the creator. Any verified CodeClash account can join.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>
                 Joining as <strong>{user?.name}</strong> · {user?.email}
               </div>
-              <input
-                type="text"
-                value={joinOrganization}
-                onChange={(e) => {
-                  setJoinOrganization(e.target.value);
-                  setJoinError("");
-                }}
-                placeholder="Enter your organization"
-                maxLength={120}
-                autoComplete="organization"
-                required
-                style={{
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: 6,
-                  padding: "10px 12px",
-                  color: "var(--text-primary)",
-                  fontSize: 14,
-                  outline: "none",
-                }}
-              />
               <input
                 type="text"
                 value={joinCode}
@@ -545,7 +520,7 @@ export default function BattleRoom() {
             </div>
           ) : (
             <div className="room-list-scroll room-list-created">
-              <div className="room-list-row room-list-header" style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 90px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <div className="room-list-row room-list-header" style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 130px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                 <div>Key</div>
                 <div>Title</div>
                 <div>Status</div>
@@ -564,7 +539,7 @@ export default function BattleRoom() {
                   className="room-list-row"
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "100px 1fr 90px 70px 90px 90px",
+                    gridTemplateColumns: "100px 1fr 90px 70px 90px 130px",
                     gap: 12,
                     padding: "10px 16px",
                     borderBottom: "1px solid var(--border-color)",
@@ -597,6 +572,35 @@ export default function BattleRoom() {
                       style={{ background: "rgba(210,153,34,0.1)", border: "1px solid rgba(210,153,34,0.3)", color: "var(--color-warning)", borderRadius: 5, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, fontSize: 11 }}
                     >
                       <Share2 size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/battle-room/${room.roomCode}/edit`);
+                      }}
+                      title="Edit saved room"
+                      aria-label={`Edit ${room.title}`}
+                      disabled={
+                        room.status !== "UPCOMING" ||
+                        new Date(room.startDate || room.startTime || 0) <= new Date() ||
+                        Number(room.participantCount || 0) > 0
+                      }
+                      style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-secondary)", borderRadius: 5, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
+                    >
+                      <Pencil size={11} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/battle-room/${room.roomCode}/participants`);
+                      }}
+                      title="View room participants"
+                      aria-label={`View participants for ${room.title}`}
+                      style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-secondary)", borderRadius: 5, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
+                    >
+                      <UsersRound size={11} />
                     </button>
                   </div>
                 </div>

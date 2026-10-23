@@ -1,6 +1,11 @@
 import axios from "axios";
 import { API_BASE_URL } from "../utils/constants";
 import {
+  clearAuthTokens,
+  getStoredCredential,
+  storeAuthTokens,
+} from "./sessionCredentials";
+import {
   currentExecutionTraceId,
   recordExecutionRequestStart,
   recordExecutionResponseBody,
@@ -84,8 +89,10 @@ if (
 let refreshRequest;
 
 function clearStoredSession() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  const clearPromise = clearAuthTokens();
+  clearPromise.catch((error) => {
+    console.error("Unable to clear secure authentication credentials:", error.message);
+  });
   localStorage.removeItem(SESSION_ID_KEY);
   window.dispatchEvent(new Event("ccp-auth-expired"));
 }
@@ -130,47 +137,44 @@ function getApiErrorMessage(error) {
 
 function refreshAccessToken() {
   if (!refreshRequest) {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!refreshToken) {
-      clearStoredSession();
-      return Promise.reject(new Error("No refresh token is available."));
-    }
-
-    refreshRequest = axios
-      .post(
-        `${API_BASE_URL}/auth/refresh-token`,
-        { refreshToken },
-        { timeout: 120000, withCredentials: true },
-      )
-      .then(({ data }) => {
+    refreshRequest = (async () => {
+      try {
+        const refreshToken = await getStoredCredential(REFRESH_TOKEN_KEY);
+        if (!refreshToken) {
+          await clearAuthTokens();
+          throw new Error("No refresh token is available.");
+        }
+        const { data } = await axios.post(
+          `${API_BASE_URL}/auth/refresh-token`,
+          { refreshToken },
+          { timeout: 120000, withCredentials: true },
+        );
         if (!data?.token || !data?.refreshToken) {
           throw new Error("The session refresh response was incomplete.");
         }
 
-        localStorage.setItem(ACCESS_TOKEN_KEY, data.token);
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+        await storeAuthTokens(data.token, data.refreshToken);
         if (data.sessionId) {
           localStorage.setItem(SESSION_ID_KEY, data.sessionId);
         }
         return data.token;
-      })
-      .catch((error) => {
+      } catch (error) {
         if ([400, 401].includes(error.response?.status)) {
           clearStoredSession();
         }
-        throw new Error(getApiErrorMessage(error));
-      })
-      .finally(() => {
+        throw new Error(getApiErrorMessage(error), { cause: error });
+      } finally {
         refreshRequest = null;
-      });
+      }
+    })();
   }
 
   return refreshRequest;
 }
 
 api.interceptors.request.use(
-  (config) => {
-    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  async (config) => {
+    const accessToken = await getStoredCredential(ACCESS_TOKEN_KEY);
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -211,10 +215,23 @@ api.interceptors.response.use(
         clearStoredSession();
       }
 
-      return Promise.reject(new Error(getApiErrorMessage(error)));
+      const normalizedError = new Error(getApiErrorMessage(error), { cause: error });
+      normalizedError.response = error.response;
+      normalizedError.code = error.code;
+      normalizedError.config = error.config;
+      return Promise.reject(normalizedError);
     }
     return Promise.reject(new Error(getApiErrorMessage(error)));
   },
 );
 
 export default api;
+
+export async function getFreshAccessTokenForDesktopSubmission() {
+  await api.get("/auth/profile");
+  const accessToken = await getStoredCredential(ACCESS_TOKEN_KEY);
+  if (!accessToken) {
+    throw new Error("Your session has expired. Please sign in again.");
+  }
+  return accessToken;
+}

@@ -1,6 +1,14 @@
 import dotenv from "dotenv";
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-dotenv.config();
+const backendEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../.env");
+dotenv.config({
+  path: existsSync(backendEnvPath)
+    ? backendEnvPath
+    : resolve(process.cwd(), ".env"),
+});
 
 const requiredVars = ["MONGODB_URI", "JWT_SECRET", "JWT_REFRESH_SECRET"];
 
@@ -12,7 +20,9 @@ const optionalVars = {
   RESEND_API_KEY: "",
   EMAIL_FROM: "",
   SECURE_CODE_ENGINE_URL:
-    "https://secure-code-engine.onrender.com/api/v1/execute",
+    process.env.NODE_ENV === "production"
+      ? "https://secure-code-engine.onrender.com/api/v1/execute"
+      : "http://localhost:8080/api/v1/execute",
   SECURE_CODE_ENGINE_TIMEOUT_MS: "120000",
   RATE_LIMIT_WINDOW_MS: "900000",
   RATE_LIMIT_MAX: "300",
@@ -25,7 +35,8 @@ const optionalVars = {
   JWT_REFRESH_EXPIRY: "7d",
   JWT_ISSUER: "amux-ccp",
   LOG_LEVEL: process.env.NODE_ENV === "production" ? "combined" : "dev",
-  SUPER_ADMIN_EMAIL: "helloamux@gmail.com",
+  SUPER_ADMIN_EMAIL: "hellocodeclash@gmail.com",
+  SUPER_ADMIN_PASSWORD: "",
 };
 
 function validateEnv() {

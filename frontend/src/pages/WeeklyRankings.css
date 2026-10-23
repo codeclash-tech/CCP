@@ -1,0 +1,139 @@
+.weekly-rankings-page {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 48px);
+  color: var(--text-primary);
+}
+
+.weekly-rankings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.weekly-rankings-header h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.weekly-rankings-header p:last-child,
+.weekly-ranking-detail > p {
+  color: var(--text-secondary);
+}
+
+.weekly-ranking-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.weekly-ranking-tabs button {
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.weekly-ranking-tabs button.selected {
+  border-bottom-color: #3b82f6;
+  color: var(--text-primary);
+}
+
+.weekly-rankings-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.35fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.weekly-history-list,
+.weekly-ranking-detail,
+.weekly-ranking-empty {
+  padding: 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+
+.weekly-history-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.weekly-history-list button {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: var(--bg-main);
+  text-align: left;
+  cursor: pointer;
+}
+
+.weekly-history-list button.selected {
+  border-color: #3b82f6;
+  color: var(--text-primary);
+}
+
+.weekly-history-list span {
+  font-size: 11px;
+}
+
+.weekly-own-rank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 18px 0 26px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-main);
+}
+
+.weekly-own-rank strong {
+  color: #93c5fd;
+}
+
+.weekly-ranking-detail h3 {
+  margin-top: 28px;
+}
+
+.weekly-ranking-table-wrap {
+  overflow-x: auto;
+}
+
+.weekly-ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.weekly-ranking-table th,
+.weekly-ranking-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.weekly-ranking-table th {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 750px) {
+  .weekly-rankings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .weekly-rankings-header {
+    align-items: flex-start;
+  }
+}

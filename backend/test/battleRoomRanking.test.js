@@ -52,8 +52,6 @@ test("uses leaderboard tie-breakers when ranking room submissions", () => {
     ["Higher score", "Higher pass count", "Fast", "Slow"],
   );
   assert.deepEqual(RANKED_SUBMISSION_STATUSES, [
-    "PENDING",
-    "PROCESSING",
     "COMPLETED",
     "DISQUALIFIED",
   ]);

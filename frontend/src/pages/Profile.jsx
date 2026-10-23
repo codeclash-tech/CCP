@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "../components/user/UserAvatar";
 import { updateProfile } from "../services/authService";
+import api from "../services/api";
 import { Check, Loader2, Pencil, X } from "lucide-react";
 
 export default function Profile() {
@@ -12,13 +13,40 @@ export default function Profile() {
   const [success, setSuccess] = useState("");
   const [name, setName] = useState(user?.name || "");
   const [organization, setOrganization] = useState(user?.organization || "");
+  const [organizationProfile, setOrganizationProfile] = useState(null);
 
   const verified = Boolean(user?.isVerified);
+  const isOrganizationUser =
+    user?.creatorType === "ORGANIZATION" && user?.role !== "ADMIN";
+  const displayOrganization =
+    organizationProfile?.name ||
+    (user?.organization && user.organization !== "Unspecified"
+      ? user.organization
+      : "");
 
   useEffect(() => {
     setName(user?.name || "");
     setOrganization(user?.organization || "");
   }, [user?.name, user?.organization]);
+
+  useEffect(() => {
+    if (!isOrganizationUser) {
+      setOrganizationProfile(null);
+      return;
+    }
+    api.get("/weekly-assessments/organization/profile")
+      .then(({ data }) => {
+        setOrganizationProfile(data.organization || null);
+        if (data.organization?.name) setOrganization(data.organization.name);
+      })
+      .catch((loadError) => {
+        if (loadError.response?.status === 404) {
+          setOrganizationProfile(null);
+          return;
+        }
+        setError(loadError.message || "Could not load your profile.");
+      });
+  }, [isOrganizationUser]);
 
   const cancelEditing = () => {
     setName(user?.name || "");
@@ -39,13 +67,25 @@ export default function Profile() {
       setError("Enter a name between 1 and 100 characters.");
       return;
     }
-    if (!trimmedOrganization || trimmedOrganization.length > 120) {
-      setError("Enter an organization between 1 and 120 characters.");
+    if (isOrganizationUser && !trimmedOrganization) {
+      setError("Enter your organization name.");
+      return;
+    }
+    if (trimmedOrganization.length > 120) {
+      setError("Organization must be 120 characters or fewer.");
       return;
     }
 
     setSaving(true);
     try {
+      if (isOrganizationUser) {
+        const { data } = await api.request({
+          method: organizationProfile ? "put" : "post",
+          url: "/weekly-assessments/organization/profile",
+          data: { name: trimmedOrganization },
+        });
+        setOrganizationProfile(data.organization);
+      }
       const updatedUser = await updateProfile({
         name: trimmedName,
         organization: trimmedOrganization,
@@ -486,22 +526,7 @@ export default function Profile() {
 
               <div className="profile-detail">
                 <dt>Organization</dt>
-                <dd>{user?.organization || "—"}</dd>
-              </div>
-
-              <div className="profile-detail">
-                <dt>Account status</dt>
-                <dd className={verified ? "success" : ""}>
-                  {verified && <span className="success-check">✓</span>}
-                  {verified ? "Verified" : "Unverified"}
-                </dd>
-              </div>
-
-              <div className="profile-detail">
-                <dt>Role</dt>
-                <dd>
-                  <span className="profile-role">{user?.role || "USER"}</span>
-                </dd>
+                <dd>{displayOrganization || "Not set"}</dd>
               </div>
 
               <div className="profile-detail">
@@ -533,11 +558,10 @@ export default function Profile() {
                   />
                 </label>
                 <label className="profile-edit-field">
-                  Organization
+                  Organization (optional)
                   <input
                     autoComplete="organization"
                     maxLength={120}
-                    required
                     value={organization}
                     onChange={(event) => setOrganization(event.target.value)}
                   />

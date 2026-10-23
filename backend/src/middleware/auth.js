@@ -42,6 +42,12 @@ export async function authenticate(req, res, next) {
           code: "USER_NOT_FOUND",
         });
       }
+      if (user.isActive === false) {
+        return res.status(403).json({
+          error: "Account is inactive.",
+          code: "ACCOUNT_INACTIVE",
+        });
+      }
       if (!user.isVerified) {
         return res.status(403).json({
           error: "Account not verified.",

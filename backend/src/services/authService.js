@@ -14,13 +14,8 @@ import { sendOtpEmail, sanitizeEmail } from "./emailDispatchService.js";
  * Login flow:
  *   User provides email + password. On success a login token + session is issued.
  *
- * Super admin: helloamux@gmail.com registers as a normal person but is
- * automatically promoted to the ADMIN role.
+ * Super-admin privileges are assigned only by the server-side bootstrap.
  */
-const SUPER_ADMIN_EMAIL = (
-  config.SUPER_ADMIN_EMAIL || "helloamux@gmail.com"
-).toLowerCase();
-
 const OTP_TTL_SECONDS = parseInt(config.OTP_TTL_SECONDS || "300", 10);
 const OTP_MAX_ATTEMPTS = parseInt(config.OTP_MAX_ATTEMPTS || "3", 10);
 const OTP_RESEND_COOLDOWN_SECONDS = parseInt(
@@ -100,13 +95,12 @@ export async function requestOtp({
   let user = await User.findOne({ email: cleanEmail });
 
   if (!user) {
-    const isSuperAdmin = cleanEmail === SUPER_ADMIN_EMAIL;
     user = new User({
       email: cleanEmail,
       name: displayName,
       organization: "Unspecified",
       password, // hashed via pre-save hook
-      role: isSuperAdmin ? "ADMIN" : "USER",
+      role: "USER",
       isVerified: false,
       termsAcceptedAt: new Date(),
       termsVersion: "2026-10-11",
@@ -284,12 +278,6 @@ export async function verifyOtp({ userId, otp }) {
 
   user.isVerified = true;
 
-  // Promote super admin if the email matches.
-  const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL;
-  if (isSuperAdmin) {
-    user.role = "ADMIN";
-  }
-
   await user.save();
   return user;
 }
@@ -318,10 +306,6 @@ export async function loginWithPassword({ email, password }) {
     throw new Error("Invalid credentials.");
   }
 
-  // Promote super admin.
-  if (cleanEmail === SUPER_ADMIN_EMAIL && user.role !== "ADMIN") {
-    user.role = "ADMIN";
-  }
   user.isVerified = true;
   await user.save();
 

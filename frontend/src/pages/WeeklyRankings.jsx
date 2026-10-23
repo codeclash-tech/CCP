@@ -1,0 +1,340 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
+import api from "../services/api";
+import {
+  getJoinedRooms,
+  getMyRooms,
+  getRoomLeaderboard,
+} from "../services/battleRoomService";
+import { useAuth } from "../context/AuthContext";
+import "./WeeklyRankings.css";
+
+function labelDate(value) {
+  return new Date(value).toLocaleDateString("en-IN", {
+    dateStyle: "medium",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
+function roomIsActive(room, now = Date.now()) {
+  const status = String(room.status || "").toUpperCase();
+  if (["CLOSED", "ENDED", "CANCELLED"].includes(status)) return false;
+  const startAt = room.startTime || room.startDate;
+  const endAt = room.endTime || room.endDate;
+  const start = startAt ? new Date(startAt).getTime() : null;
+  const end = endAt ? new Date(endAt).getTime() : null;
+  if (Number.isFinite(end) && now >= end) return false;
+  if (Number.isFinite(start) && now < start) return false;
+  return status === "ACTIVE" || status === "LIVE" ||
+    (Number.isFinite(start) && Number.isFinite(end));
+}
+
+export default function WeeklyRankings() {
+  const { user } = useAuth();
+  const userId = String(user?.id || user?._id || "");
+  const [activeTab, setActiveTab] = useState("rooms");
+  const [rooms, setRooms] = useState([]);
+  const [selectedRoomCode, setSelectedRoomCode] = useState("");
+  const [roomRanking, setRoomRanking] = useState(null);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [roomError, setRoomError] = useState("");
+  const [history, setHistory] = useState([]);
+  const [selectedCycleId, setSelectedCycleId] = useState("");
+  const [rankings, setRankings] = useState(null);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadRooms = useCallback(async () => {
+    const [created, joined] = await Promise.allSettled([
+      getMyRooms(),
+      getJoinedRooms(),
+    ]);
+    const failures = [created, joined].filter((result) => result.status === "rejected");
+    const roomLists = [created, joined]
+      .filter((result) => result.status === "fulfilled")
+      .map((result) => result.value.rooms || []);
+    if (!roomLists.length) {
+      setRoomError(failures[0]?.reason?.message || "Could not load Battle Rooms.");
+      return;
+    }
+    const uniqueRooms = new Map();
+    for (const room of roomLists.flat()) {
+      const code = room.roomCode || room.code;
+      if (code && roomIsActive(room)) uniqueRooms.set(String(code).toUpperCase(), room);
+    }
+    const activeRooms = [...uniqueRooms.values()];
+    setRooms(activeRooms);
+    setSelectedRoomCode((current) =>
+      activeRooms.some((room) =>
+        String(room.roomCode || room.code).toUpperCase() === current,
+      )
+        ? current
+        : String(activeRooms[0]?.roomCode || activeRooms[0]?.code || "").toUpperCase(),
+    );
+    setRoomError(
+      failures.length === 2
+        ? failures[0].reason?.message || "Could not load Battle Rooms."
+        : "",
+    );
+  }, []);
+
+  const loadHistory = useCallback(async (silent = false) => {
+    if (!silent) setLoadingHistory(true);
+    setError("");
+    try {
+      const { data } = await api.get("/weekly-assessments/history");
+      const records = [...(data.history || [])].sort(
+        (left, right) =>
+          new Date(right.cycle?.startAt || 0) -
+          new Date(left.cycle?.startAt || 0),
+      );
+      setHistory(records);
+      setSelectedCycleId((current) =>
+        records.some((item) => String(item.cycle?.id) === current)
+          ? current
+          : String(records[0]?.cycle?.id || ""),
+      );
+    } catch (requestError) {
+      setError(requestError.message || "Could not load daily challenge history.");
+    } finally {
+      if (!silent) setLoadingHistory(false);
+    }
+  }, []);
+
+  const loadRankings = useCallback(async () => {
+    if (!selectedCycleId) {
+      setRankings(null);
+      return;
+    }
+    try {
+      const { data } = await api.get(
+        `/weekly-assessments/cycles/${selectedCycleId}/rankings`,
+      );
+      setRankings(data);
+    } catch (requestError) {
+      setError(requestError.message || "Could not load daily rankings.");
+    }
+  }, [selectedCycleId]);
+
+  const loadRoomRanking = useCallback(async () => {
+    if (!selectedRoomCode) {
+      setRoomRanking(null);
+      return;
+    }
+    setRoomLoading(true);
+    try {
+      const data = await getRoomLeaderboard(selectedRoomCode);
+      setRoomRanking(data);
+      setRoomError("");
+    } catch (requestError) {
+      setRoomError(requestError.message || "Could not load this room leaderboard.");
+    } finally {
+      setRoomLoading(false);
+    }
+  }, [selectedRoomCode]);
+
+  useEffect(() => {
+    loadRooms();
+    loadHistory();
+    const roomsInterval = window.setInterval(loadRooms, 30_000);
+    const historyInterval = window.setInterval(() => loadHistory(true), 30_000);
+    return () => {
+      window.clearInterval(roomsInterval);
+      window.clearInterval(historyInterval);
+    };
+  }, [loadHistory, loadRooms]);
+
+  useEffect(() => {
+    loadRankings();
+    const interval = window.setInterval(loadRankings, 5_000);
+    return () => window.clearInterval(interval);
+  }, [loadRankings]);
+
+  useEffect(() => {
+    loadRoomRanking();
+    if (!selectedRoomCode) return undefined;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") loadRoomRanking();
+    }, 5_000);
+    return () => window.clearInterval(interval);
+  }, [loadRoomRanking, selectedRoomCode]);
+
+  const currentRanking = rankings?.individualRankings?.find(
+    (candidate) => String(candidate.candidateId) === userId,
+  );
+
+  return (
+    <section className="weekly-rankings-page">
+      <header className="weekly-rankings-header">
+        <div>
+          <p className="weekly-eyebrow">LEADERBOARDS</p>
+          <h1>Rankings</h1>
+          <p>Follow live Battle Room standings and daily Global Challenge rankings.</p>
+        </div>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => {
+            if (activeTab === "rooms") loadRoomRanking();
+            else {
+              loadHistory();
+              loadRankings();
+            }
+          }}
+          disabled={roomLoading || loadingHistory}
+        >
+          <RefreshCw size={15} /> Refresh
+        </button>
+      </header>
+
+      <div className="weekly-ranking-tabs" role="tablist" aria-label="Ranking types">
+        <button
+          id="rooms-tab"
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "rooms"}
+          aria-controls="rooms-panel"
+          className={activeTab === "rooms" ? "selected" : ""}
+          onClick={() => setActiveTab("rooms")}
+        >
+          Battle Rooms
+        </button>
+        <button
+          id="global-tab"
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "global"}
+          aria-controls="global-panel"
+          className={activeTab === "global" ? "selected" : ""}
+          onClick={() => setActiveTab("global")}
+        >
+          Daily Global Challenge
+        </button>
+      </div>
+
+      {activeTab === "rooms" ? (
+        <section id="rooms-panel" role="tabpanel" aria-labelledby="rooms-tab">
+          {roomError && <p className="weekly-error" role="alert">{roomError}</p>}
+          {rooms.length === 0 ? (
+            <div className="weekly-ranking-empty">
+              <h2>No active Battle Rooms</h2>
+              <p>Battle Room leaderboards are available while their rooms are running.</p>
+              <Link to="/battle-room">Browse Battle Rooms</Link>
+            </div>
+          ) : (
+            <div className="weekly-rankings-layout">
+              <nav className="weekly-history-list" aria-label="Active Battle Rooms">
+                {rooms.map((room) => {
+                  const roomCode = String(room.roomCode || room.code).toUpperCase();
+                  return (
+                    <button
+                      type="button"
+                      key={roomCode}
+                      className={roomCode === selectedRoomCode ? "selected" : ""}
+                      onClick={() => setSelectedRoomCode(roomCode)}
+                    >
+                      <strong>{room.title || `Battle Room ${roomCode}`}</strong>
+                      <span>{roomCode} · Live</span>
+                    </button>
+                  );
+                })}
+              </nav>
+              <article className="weekly-ranking-detail">
+                {roomRanking ? (
+                  <>
+                    <h2>{roomRanking.room?.title || `Battle Room ${selectedRoomCode}`}</h2>
+                    <p>Leaderboard updates automatically while the room is active.</p>
+                    {roomRanking.leaderboard?.length ? (
+                      <div className="weekly-ranking-table-wrap">
+                        <table className="weekly-ranking-table">
+                          <thead>
+                            <tr><th>Rank</th><th>Participant</th><th>Organization</th><th>Score</th><th>Passed</th></tr>
+                          </thead>
+                          <tbody>
+                            {roomRanking.leaderboard.map((entry) => (
+                              <tr key={entry.userId}>
+                                <td>{entry.rank}</td>
+                                <td>{entry.name}{entry.isCurrentUser ? " (you)" : ""}</td>
+                                <td>{entry.organization || "—"}</td>
+                                <td>{Number(entry.totalScore || 0).toFixed(2)}</td>
+                                <td>{entry.totalPassed}/{entry.totalTestCases}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p>No completed submissions have been ranked yet.</p>}
+                  </>
+                ) : roomLoading ? <p role="status">Loading live leaderboard…</p> : null}
+              </article>
+            </div>
+          )}
+        </section>
+      ) : (
+        <section id="global-panel" role="tabpanel" aria-labelledby="global-tab">
+          {error && <p className="weekly-error" role="alert">{error}</p>}
+          {loadingHistory ? <p role="status">Loading daily rankings…</p> : history.length === 0 ? (
+            <div className="weekly-ranking-empty">
+              <h2>No daily rankings yet</h2>
+              <p>Daily Global Challenge standings appear when a challenge cycle opens.</p>
+            </div>
+          ) : (
+            <div className="weekly-rankings-layout">
+              <nav className="weekly-history-list" aria-label="Daily challenge cycles">
+                {history.map((item) => (
+                  <button
+                    type="button"
+                    key={item.cycle?.id}
+                    className={String(item.cycle?.id) === selectedCycleId ? "selected" : ""}
+                    onClick={() => setSelectedCycleId(String(item.cycle?.id))}
+                  >
+                    <strong>{item.cycle?.name || "Global Challenge"}</strong>
+                    <span>{labelDate(item.cycle?.startAt || item.cycle?.cycleKey)}</span>
+                    <span>{item.cycle?.status}</span>
+                  </button>
+                ))}
+              </nav>
+              <article className="weekly-ranking-detail">
+                {rankings && (
+                  <>
+                    <h2>{rankings.cycle.name}</h2>
+                    <p>{labelDate(rankings.cycle.startAt)} · {rankings.cycle.status} · Live updates every 5 seconds</p>
+                    {currentRanking && (
+                      <div className="weekly-own-rank">
+                        <strong>Your rank #{currentRanking.rank}</strong>
+                        <span>{Number(currentRanking.score || 0).toFixed(2)} points</span>
+                        <span>{currentRanking.completedQuestions}/1 question completed</span>
+                      </div>
+                    )}
+                    {rankings.individualRankings?.length ? (
+                      <div className="weekly-ranking-table-wrap">
+                        <table className="weekly-ranking-table">
+                          <thead>
+                            <tr><th>Rank</th><th>Participant</th><th>Organization</th><th>Score</th><th>Completed</th><th>Status</th></tr>
+                          </thead>
+                          <tbody>
+                            {rankings.individualRankings.map((candidate) => (
+                              <tr key={candidate.candidateId}>
+                                <td>{candidate.rank}</td>
+                                <td>{candidate.candidateNameSnapshot}{String(candidate.candidateId) === userId ? " (you)" : ""}</td>
+                                <td>{candidate.organizationNameSnapshot || "—"}</td>
+                                <td>{Number(candidate.score || 0).toFixed(2)}</td>
+                                <td>{candidate.completedQuestions}/1</td>
+                                <td>{candidate.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : <p>No participants are ranked in this cycle yet.</p>}
+                  </>
+                )}
+              </article>
+            </div>
+          )}
+        </section>
+      )}
+    </section>
+  );
+}

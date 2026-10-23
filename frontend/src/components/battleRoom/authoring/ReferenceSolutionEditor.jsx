@@ -29,10 +29,9 @@ const labelStyle = {
 /**
  * Reference Solution Editor.
  *
- * The admin uploads ONE correct reference solution. The backend executes it
- * against every visible and hidden test case input, auto-generates the
- * expected outputs, and stores ONLY the outputs — the reference solution is
- * never executed during a contest.
+ * The author provides one correct reference solution. Expected outputs are
+ * generated for all visible and hidden cases, while the solution stays out of
+ * contest data.
  */
 export default function ReferenceSolutionEditor({
   question,
@@ -57,7 +56,7 @@ export default function ReferenceSolutionEditor({
       setError("Paste the reference solution first.");
       return;
     }
-const hasParams = (tc) =>
+    const hasParams = (tc) =>
       tc.parameterValues &&
       Object.keys(tc.parameterValues || {}).length > 0 &&
       Object.values(tc.parameterValues || {}).some((v) => v !== undefined && v !== null && String(v).trim() !== "");
@@ -112,8 +111,7 @@ const hasParams = (tc) =>
           Reference Solution (correct answer)
         </label>
         <p style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-ui)", margin: "0 0 6px" }}>
-          Provide a correct Java solution. The backend runs it against every
-          visible + hidden input to generate expected outputs and stores only the outputs.
+          Provide a correct Java solution. CodeClash checks it against visible and hidden cases; only the generated outputs are saved.
         </p>
 
         <textarea
@@ -132,7 +130,9 @@ const hasParams = (tc) =>
             style={{ padding: "8px 20px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}
           >
             {generating ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <FlaskConical size={14} />}
-            {generating ? "Executing..." : "Generate Expected Outputs"}
+            {generating
+              ? "Running checks..."
+              : "Generate expected outputs"}
           </button>
         </div>
 

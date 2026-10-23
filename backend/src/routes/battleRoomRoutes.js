@@ -1,9 +1,14 @@
 import { Router } from "express";
 import {
   createRoom,
+  getRoomForEdit,
+  updateRoom,
+  getRoomParticipants,
+  updateRoomAllowlist,
   startRoom,
   getRoomByCode,
   joinRoom,
+  prepareDesktopSubmission,
   submitQuestionSolution,
   runQuestionSolution,
   endTest,
@@ -32,11 +37,11 @@ import {
 } from "../controllers/battleRoomAuthoringController.js";
 import {
   downloadBattleRoomCertificate,
+  listParticipantBattleRoomCertificates,
   downloadParticipantBattleRoomCertificate,
 } from "../controllers/battleRoomCertificateController.js";
 import {
   authenticate,
-  requireVerifiedCreator,
 } from "../middleware/auth.js";
 import {
   executionLimiter,
@@ -45,10 +50,7 @@ import {
 } from "../middleware/security.js";
 
 const router = Router();
-const creatorAuth = [
-  authenticate,
-  requireVerifiedCreator,
-];
+const creatorAuth = [authenticate];
 
 // Authoring wizard helpers (stateless; do not create rooms)
 router.post("/authoring/generate-signature", ...creatorAuth, generateSignature);
@@ -59,11 +61,20 @@ router.post("/authoring/validate", ...creatorAuth, validateQuestionEndpoint);
 // Room management
 router.get("/certificate/:token", reportLimiter, downloadBattleRoomCertificate);
 router.get(
+  "/certificates/mine",
+  authenticate,
+  listParticipantBattleRoomCertificates,
+);
+router.get(
   "/:roomCode/certificate",
   authenticate,
   downloadParticipantBattleRoomCertificate,
 );
 router.post("/create", ...creatorAuth, createRoom);
+router.get("/:roomCode/edit", ...creatorAuth, getRoomForEdit);
+router.put("/:roomCode", ...creatorAuth, updateRoom);
+router.get("/:roomCode/participants", ...creatorAuth, getRoomParticipants);
+router.put("/:roomCode/allowlist", ...creatorAuth, updateRoomAllowlist);
 router.post("/:roomCode/start", ...creatorAuth, startRoom);
 router.post("/join", authenticate, joinLimiter, joinRoom);
 router.get("/my-rooms", ...creatorAuth, getMyRooms);
@@ -75,6 +86,12 @@ router.delete("/:roomCode", ...creatorAuth, deleteRoom);
 router.post("/:roomCode/share-key", ...creatorAuth, shareKey);
 
 // Submission (stateless, no raw code persisted)
+router.post(
+  "/:roomCode/desktop-execution",
+  authenticate,
+  executionLimiter,
+  prepareDesktopSubmission,
+);
 router.post(
   "/:roomCode/submit",
   authenticate,

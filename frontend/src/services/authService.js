@@ -1,19 +1,13 @@
 import api from "./api";
+import { clearAuthTokens, storeAuthTokens } from "./sessionCredentials";
 
-const ACCESS_TOKEN_KEY = "ccp_access_token";
-const REFRESH_TOKEN_KEY = "ccp_refresh_token";
 const SESSION_ID_KEY = "ccp_session_id";
 
-function saveSession(result) {
+async function saveSession(result) {
   if (!result?.token || !result.user) {
     throw new Error("The sign-in response did not include a valid session.");
   }
-  localStorage.setItem(ACCESS_TOKEN_KEY, result.token);
-  if (result.refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, result.refreshToken);
-  } else {
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-  }
+  await storeAuthTokens(result.token, result.refreshToken || null);
   if (result.sessionId) {
     localStorage.setItem(SESSION_ID_KEY, result.sessionId);
   } else {
@@ -22,9 +16,8 @@ function saveSession(result) {
   return result.user;
 }
 
-function clearSession() {
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+async function clearSession() {
+  await clearAuthTokens();
   localStorage.removeItem(SESSION_ID_KEY);
 }
 
@@ -61,6 +54,6 @@ export const signOut = async () => {
       sessionId: localStorage.getItem(SESSION_ID_KEY),
     });
   } finally {
-    clearSession();
+    await clearSession();
   }
 };

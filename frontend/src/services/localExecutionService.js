@@ -1,0 +1,220 @@
+import { composeProgram } from "../../../backend/src/services/wrapperGenerator.js";
+import { convertParameterValuesToInput } from "../../../backend/src/services/parameterConverter.js";
+
+const REFERENCE_OUTPUT_SENTINEL = "__REFERENCE_OUTPUT_SENTINEL__";
+const REFERENCE_FAILURE_MESSAGES = {
+  COMPILATION_ERROR: "Compilation failed.",
+  COMPILE_ERROR: "Compilation failed.",
+  RUNTIME_ERROR: "Runtime error.",
+  TIME_LIMIT_EXCEEDED: "Execution timed out.",
+  MEMORY_LIMIT_EXCEEDED: "Memory limit exceeded.",
+  SYSTEM_ERROR: "Code execution is currently unavailable.",
+  ERROR: "Execution failed.",
+};
+
+function getExecutionInput(testCase, signature) {
+  if (
+    testCase.parameterValues &&
+    typeof testCase.parameterValues === "object" &&
+    signature?.name
+  ) {
+    return convertParameterValuesToInput(signature, testCase.parameterValues);
+  }
+  return String(testCase.input ?? "");
+}
+
+function getReferenceOutput(result) {
+  return String(
+    result.actualOutput ?? result.output ?? result.stdout ?? "",
+  ).trim();
+}
+
+function throwSafeLocalExecutionError(error) {
+  const message = error?.message;
+  if (
+    typeof message === "string" &&
+    /^(?:Source code|Only Java|At least one test case|No more than \d+ test cases|Test case \d+|The execution time limit|The execution memory limit)/.test(
+      message,
+    )
+  ) {
+    throw new Error(message);
+  }
+  throw new Error("Code execution is currently unavailable.");
+}
+
+function validateReferenceResults(results, question) {
+  const returnType = String(question.signature?.returnType || "void")
+    .trim()
+    .toLowerCase();
+
+  results.forEach((result, index) => {
+    const failureMessage = REFERENCE_FAILURE_MESSAGES[result?.status];
+    if (failureMessage) {
+      throw new Error(
+        `Reference solution failed on test case ${index + 1}. ${failureMessage}`,
+      );
+    }
+
+    const output = getReferenceOutput(result || {});
+    if (returnType !== "void" && (!output || output.toLowerCase() === "null")) {
+      throw new Error(
+        `Reference solution failed on test case ${index + 1}. It produced no output.`,
+      );
+    }
+  });
+}
+
+export async function generateExpectedOutputsLocally(
+  question,
+  desktopBridge =
+    typeof window !== "undefined" ? window.codeClashDesktop : undefined,
+) {
+  if (!question || typeof question !== "object") {
+    throw new TypeError("A question is required to generate expected outputs.");
+  }
+  if (typeof question.referenceSolution !== "string" || !question.referenceSolution.trim()) {
+    throw new TypeError("A reference solution is required to generate expected outputs.");
+  }
+  if (typeof desktopBridge?.engine?.execute !== "function") {
+    throw new Error("Code execution is currently unavailable.");
+  }
+
+  const visibleTestCases = Array.isArray(question.visibleTestCases)
+    ? question.visibleTestCases
+    : [];
+  const hiddenTestCases = Array.isArray(question.hiddenTestCases)
+    ? question.hiddenTestCases
+    : [];
+  if (visibleTestCases.length === 0 || hiddenTestCases.length === 0) {
+    throw new Error("Add at least one visible and one hidden test case.");
+  }
+
+  const testCases = [...visibleTestCases, ...hiddenTestCases].map((testCase) => ({
+    input: getExecutionInput(testCase, question.signature),
+    expectedOutput: REFERENCE_OUTPUT_SENTINEL,
+  }));
+  const program = composeProgram(
+    question,
+    question.referenceSolution,
+    question.referenceSolutionLanguage || "java",
+  );
+
+  let execution;
+  try {
+    execution = await desktopBridge.engine.execute({
+      code: program,
+      language: question.referenceSolutionLanguage || "java",
+      testCases,
+    });
+  } catch (error) {
+    throwSafeLocalExecutionError(error);
+  }
+
+  if (!Array.isArray(execution?.results) || execution.results.length !== testCases.length) {
+    throw new Error("Code execution is currently unavailable.");
+  }
+  validateReferenceResults(execution.results, question);
+
+  const generatedTestCases = [...visibleTestCases, ...hiddenTestCases].map(
+    (testCase, index) => ({
+      ...testCase,
+      input: testCases[index].input,
+      expectedOutput: getReferenceOutput(execution.results[index]),
+    }),
+  );
+  const visibleCount = visibleTestCases.length;
+
+  return {
+    visibleTestCases: generatedTestCases.slice(0, visibleCount),
+    hiddenTestCases: generatedTestCases.slice(visibleCount),
+    accepted: true,
+    message: "Expected outputs generated successfully.",
+  };
+}
+
+export async function executeVisibleCasesLocally({ question, code, language }) {
+  if (!question || typeof code !== "string") {
+    throw new TypeError("A question and source code are required for code execution.");
+  }
+  if (!window.codeClashDesktop?.engine?.execute) {
+    throw new Error("Code execution is currently unavailable.");
+  }
+
+  const sourceTestCases = (question.visibleTestCases || []).filter(
+    (testCase) =>
+      (testCase.input !== undefined && testCase.input !== null) ||
+      (testCase.parameterValues &&
+        typeof testCase.parameterValues === "object" &&
+        question.signature?.name &&
+        Object.keys(testCase.parameterValues).length > 0),
+  );
+  const visibleTestCases = sourceTestCases.map((testCase) => ({
+    input: getExecutionInput(testCase, question.signature),
+    expectedOutput: testCase.expectedOutput ?? "",
+  }));
+  if (visibleTestCases.length === 0) {
+    throw new Error("No visible test cases are available for this question.");
+  }
+
+  const program = question.signature?.name
+    ? composeProgram(question, code, language)
+    : code;
+  try {
+    const execution = await window.codeClashDesktop.engine.execute({
+      code: program,
+      language,
+      testCases: visibleTestCases,
+    });
+    return {
+      ...execution,
+      results: Array.isArray(execution?.results)
+        ? execution.results.map((result, index) => ({
+            ...result,
+            input: result.input ?? visibleTestCases[index]?.input ?? "",
+            output:
+              result.actualOutput ??
+              result.output ??
+              result.stdout ??
+              result.error ??
+              "",
+            expectedOutput:
+              result.expectedOutput ??
+              visibleTestCases[index]?.expectedOutput ??
+              "",
+          }))
+        : [],
+    };
+  } catch (error) {
+    throwSafeLocalExecutionError(error);
+  }
+}
+
+export async function submitQuestionLocally({
+  apiBaseUrl,
+  accessToken,
+  questionId,
+  roomCode,
+  question,
+  code,
+  language,
+}) {
+  if (!question || typeof code !== "string") {
+    throw new TypeError("A question and source code are required for local submission.");
+  }
+  if (typeof window.codeClashDesktop?.assessment?.submit !== "function") {
+    throw new Error("The CodeClash desktop submission service is not available.");
+  }
+
+  const executionCode = question.signature?.name
+    ? composeProgram(question, code, language)
+    : code;
+  return window.codeClashDesktop.assessment.submit({
+    apiBaseUrl,
+    accessToken,
+    roomCode,
+    questionId,
+    code,
+    executionCode,
+    language,
+  });
+}

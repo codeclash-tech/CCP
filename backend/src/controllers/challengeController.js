@@ -94,11 +94,7 @@ export async function createChallenge(req, res) {
     let activeDate = req.body.activeDate
       ? new Date(req.body.activeDate)
       : getNextWindowStart(); // default: next 6 PM window
-    const isSuperAdmin =
-      req.user &&
-      req.user.email &&
-      req.user.email.toLowerCase() ===
-        (process.env.SUPER_ADMIN_EMAIL || "helloamux@gmail.com").toLowerCase();
+    const isSuperAdmin = req.user?.role === "ADMIN";
 
     if (isSuperAdmin) {
       // Normalize the requested activeDate to its 6 PM window start.

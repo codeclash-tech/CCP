@@ -1,6 +1,12 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+export function getAssessmentRole(user) {
+  if (user?.role === "ADMIN") return "SUPER_ADMIN";
+  if (user?.creatorType === "ORGANIZATION") return "ORGANIZATION_USER";
+  return "CANDIDATE";
+}
+
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -20,6 +26,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "Unspecified",
       trim: true,
+      index: true,
+    },
+    organizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "OrganizationProfile",
+      default: null,
       index: true,
     },
     creatorType: {
@@ -70,6 +82,27 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+    eligibilityHistory: {
+      type: [
+        new mongoose.Schema(
+          {
+            effectiveAt: { type: Date, required: true },
+            name: { type: String, required: true },
+            role: { type: String, enum: ["USER", "ADMIN"], required: true },
+            creatorType: { type: String, enum: ["INDIVIDUAL", "ORGANIZATION", null], default: null },
+            isVerified: { type: Boolean, required: true },
+            isActive: { type: Boolean, required: true },
+          },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
     totalScore: {
       type: Number,
       default: 0,
@@ -94,6 +127,7 @@ userSchema.methods.toPublicJSON = function () {
     email: this.email,
     name: this.name,
     organization: this.organization,
+    assessmentRole: getAssessmentRole(this),
     creatorType: this.creatorType,
     isPartner: Boolean(this.partnerAcceptedAt),
     role: this.role,
@@ -116,10 +150,30 @@ userSchema.pre("save", async function (next) {
   }
 });
 
+userSchema.pre("save", function (next) {
+  const eligibilityFields = ["name", "role", "creatorType", "isVerified", "isActive"];
+  if (
+    this.isNew ||
+    eligibilityFields.some((field) => this.isModified(field))
+  ) {
+    this.eligibilityHistory.push({
+      effectiveAt: new Date(),
+      name: this.name,
+      role: this.role,
+      creatorType: this.creatorType,
+      isVerified: this.isVerified,
+      isActive: this.isActive,
+    });
+  }
+  next();
+});
+
 // Compare a plaintext password against the stored hash.
 userSchema.methods.comparePassword = async function (candidate) {
   if (!this.password) return false;
   return bcrypt.compare(candidate, this.password);
 };
+
+userSchema.index({ createdAt: 1, role: 1 });
 
 export default mongoose.model("User", userSchema);

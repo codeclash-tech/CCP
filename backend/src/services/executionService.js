@@ -1,11 +1,12 @@
 import { compareOutput } from "./outputComparator.js";
 
 const DEFAULT_ENGINE_URL =
-  "https://secure-code-engine.onrender.com/api/v1/execute";
-const DEFAULT_TIMEOUT_MS = 120000;
+  process.env.NODE_ENV === "production"
+    ? "https://secure-code-engine.onrender.com/api/v1/execute"
+    : "http://localhost:8080/api/v1/execute";
+const DEFAULT_TIMEOUT_MS = 300000;
 const SUPPORTED_EXECUTION_LANGUAGES = ["java"];
 const WARM_UP_COOLDOWN_MS = 5 * 60 * 1000;
-const MAX_CONCURRENT_TEST_CASES = 3;
 const FATAL_TEST_CASE_STATUSES = [
   "COMPILATION_ERROR",
   "RUNTIME_ERROR",
@@ -297,8 +298,15 @@ export class ExecutionService {
     if (cases.length === 0) {
       return summarizeResults([], 0, "No test cases were provided.");
     }
+    if (cases.length > 50) {
+      const error = "No more than 50 test cases can be executed at once.";
+      return summarizeResults(
+        cases.map((testCase, index) => failedCase(testCase, index, error)),
+        cases.length,
+        error,
+      );
+    }
 
-    // Log execution details only in development mode, redacted for security
     if (process.env.NODE_ENV === "development") {
       console.log("[ExecutionService] Request:", {
         url: this.engineUrl,
@@ -310,46 +318,21 @@ export class ExecutionService {
       });
     }
 
-    const results = new Array(cases.length);
-    let nextIndex = 0;
-    const runNextCase = async () => {
-      while (nextIndex < cases.length) {
-        const index = nextIndex++;
-        const testCase = cases[index];
-        const payload = {
-          language: normalizedLanguage,
-          code: code || "",
-          timeLimit: Number(options.timeLimit || 2000),
-          memoryLimit: Number(options.memoryLimit || 65536),
-          testCases: [
-            {
-              input: outputString(testCase?.input),
-              expectedOutput: outputString(testCase?.expectedOutput),
-            },
-          ],
-        };
-        results[index] = await this.executeSingleCase(
-          payload,
-          testCase,
-          index,
-        );
-      }
-    };
-    await Promise.all(
-      Array.from(
-        { length: Math.min(MAX_CONCURRENT_TEST_CASES, cases.length) },
-        runNextCase,
-      ),
-    );
-    return summarizeResults(results, cases.length);
-  }
-
-  async executeSingleCase(payload, testCase, index) {
     const controller =
       typeof AbortController !== "undefined" ? new AbortController() : null;
     const timeoutId = controller
       ? setTimeout(() => controller.abort(), this.timeoutMs)
       : null;
+    const payload = {
+      language: normalizedLanguage,
+      code: code || "",
+      timeLimit: Number(options.timeLimit || 2000),
+      memoryLimit: Number(options.memoryLimit || 65536),
+      testCases: cases.map((testCase) => ({
+        input: outputString(testCase?.input),
+        expectedOutput: outputString(testCase?.expectedOutput),
+      })),
+    };
 
     try {
       const response = await fetch(this.engineUrl, {
@@ -361,18 +344,12 @@ export class ExecutionService {
         body: JSON.stringify(payload),
         signal: controller?.signal,
       });
-      let body;
-      if (typeof response.text === "function") {
-        body = await response.text();
-      } else if (typeof response.json === "function") {
-        body = await response.json();
-      } else {
-        return failedCase(
-          testCase,
-          index,
-          "Unrecognized response interface from execution engine.",
-        );
-      }
+      const body =
+        typeof response.text === "function"
+          ? await response.text()
+          : typeof response.json === "function"
+            ? await response.json()
+            : null;
 
       if (!response.ok) {
         let engineError = "";
@@ -385,32 +362,25 @@ export class ExecutionService {
         const message = engineError
           ? `Secure Code Engine error: ${engineError}`
           : `Secure Code Engine returned HTTP ${response.status}`;
-        return failedCase(testCase, index, message);
+        return normalizeEngineResponse({ error: message }, cases);
       }
 
-      const normalized = normalizeEngineResponse(body, [testCase]);
-      if (normalized.results.length !== 1) {
-        return failedCase(
-          testCase,
-          index,
-          "Execution engine did not return exactly one test result.",
-        );
-      }
-      return { ...normalized.results[0], testCase: index + 1 };
+      return normalizeEngineResponse(body, cases);
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
         console.error("[ExecutionService] Error:", {
           name: error.name,
           message: error.message,
-          testCase: index + 1,
+          testCaseCount: cases.length,
         });
       }
-      return failedCase(
-        testCase,
-        index,
-        error.name === "AbortError"
+      const message =
+        error.name === "AbortError" || error.name === "TimeoutError"
           ? "Secure Code Engine request timed out."
-          : `Secure Code Engine request failed: ${error.message}`,
+          : `Secure Code Engine request failed: ${error.message}`;
+      return normalizeEngineResponse(
+        { error: message },
+        cases,
       );
     } finally {
       if (timeoutId) clearTimeout(timeoutId);

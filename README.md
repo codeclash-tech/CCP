@@ -236,7 +236,8 @@ Incoming Request
 | **Request ID** | UUID v4 middleware | Every request gets unique `X-Request-Id` header, propagated to all logs and responses |
 | **Nonce Replay Protection** | Cryptographic nonce | 32 random bytes → 64-char hex string. One-time use per action per user. Required for `SUBMIT`, `RUN`, `CONTEST_START/END`, `ANALYTICS_FLUSH`. |
 | **Nonce Validation** | Server-side consume | Validates format (`/^[a-f0-9]{64}$/`), action enum, user + resource binding. Atomic consume prevents reuse. |
-| **Nonce Expiry** | 24-hour TTL | Auto-cleaned by MongoDB TTL index |
+| **Desktop submission recovery** | Atomic grant lifecycle | Grants are source-, user-, room-, and question-bound; the initial authorization lasts 5 minutes, claims have a 10-minute lease, and a failed or interrupted synchronization can be retried for up to 24 hours. A saved authoritative result is returned on retry without re-execution or duplicate scoring. |
+| **Nonce Expiry** | 24-hour TTL | Nonces are auto-cleaned by MongoDB TTL index; desktop submission grants retain bounded recovery metadata for up to 24 hours. |
 | **IP Tracking** | All requests | IP logged in AuditLog, Session, and rate limiting key |
 
 ### 4. Input Validation & Sanitization
@@ -580,6 +581,7 @@ coding-challenge-platform/
 - **Node.js** v18+ and npm
 - **MongoDB** v6+ (local or cloud Atlas)
 - **Resend API credentials** for outbound email (`RESEND_API_KEY` and `EMAIL_FROM`)
+- **Secure Code Engine** running locally at `http://localhost:8080` for code execution
 
 ### Quick Start (5 minutes)
 
@@ -589,9 +591,9 @@ cd backend && npm install
 cd ../frontend && npm install
 
 # 2. Configure environment
-#    Copy and edit these files:
-#    backend/.env  → Set MONGODB_URI, EMAIL creds, JWT_SECRET
-#    frontend/.env → Set VITE_API_URL
+#    backend/.env  → Set MONGODB_URI, JWT secrets, and Secure Code Engine settings
+#    frontend/.env → Set VITE_API_URL=http://localhost:5000/api
+#    Start the separate Secure Code Engine at http://localhost:8080
 
 # 3. Start backend (Terminal 1)
 cd backend && npm run dev
@@ -618,7 +620,9 @@ open http://localhost:5173
 | `JWT_REFRESH_SECRET` | Secret for refresh tokens | (required) | **Must be different from JWT_SECRET** |
 | `RESEND_API_KEY` | Resend API key | (required for email delivery) | Backend email delivery |
 | `EMAIL_FROM` | Verified Resend sender address | (required for email delivery) | Backend email delivery |
-| `RENDER_EXECUTOR_URL` | Remote code executor | https://code-executor.onrender.com | Sandboxed execution |
+| `SECURE_CODE_ENGINE_URL` | Secure Code Engine execute endpoint | `http://localhost:8080/api/v1/execute` in development; hosted endpoint in production | Sandboxed execution |
+| `SECURE_CODE_ENGINE_API_KEY` | API key for the Secure Code Engine | (required by engine configuration) | Authenticates backend-to-engine requests |
+| `SECURE_CODE_ENGINE_TIMEOUT_MS` | Execution engine request timeout | 120000 | Bounds execution requests |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window | 900000 (15min) | DoS protection |
 | `RATE_LIMIT_MAX` | Max requests per window | 100 | DoS protection |
 | `OTP_EXPIRY_MINUTES` | OTP validity duration | 10 | Auth security |
@@ -640,6 +644,22 @@ When deploying the frontend, set `VITE_API_URL` to the deployed backend URL
 including `/api` in the frontend host's build environment. The backend's
 `CLIENT_URL` must be set to the frontend's HTTPS origin so its CORS policy
 allows browser requests from the deployed site.
+
+## Spring Framework Advisory Remediation
+
+As of 2026-10-19, the local Java execution engine uses Spring Boot `4.0.8`,
+Spring Framework `7.0.9`, and SpringDoc `3.1.1`. The resolved Tomcat and Jackson
+patch versions are `11.0.25`, `2.21.7`, and `3.1.7`. `mvn clean verify`
+completed with 8 tests passing, and a fresh CVE scan over resolved compile,
+runtime, and test dependencies reported no known vulnerabilities. Fresh npm
+audits for the backend, frontend, and Desktop each reported zero vulnerabilities.
+
+These dependency/build results do not establish production readiness. The
+packaged engine has not completed a confirmed startup/API smoke test, and the
+Desktop product still has unimplemented weekly assessment/roster/ranking
+workflows and no verified authenticated end-to-end submission. See
+[`docs/desktop-feature-parity-audit.md`](docs/desktop-feature-parity-audit.md)
+for the current blockers.
 
 ---
 

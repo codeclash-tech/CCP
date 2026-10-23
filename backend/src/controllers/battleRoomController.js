@@ -1,5 +1,7 @@
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import Nonce from "../models/Nonce.js";
+import { createHash } from "node:crypto";
 import { executionService } from "../services/executionService.js";
 import {
   closeBattleRoomAndNotify,
@@ -33,6 +35,14 @@ import {
   getRoomSubmissionTime,
   sortRoomSubmissions,
 } from "../services/battleRoomRanking.js";
+import { getOrganizationProfileName } from "../utils/organizationProfile.js";
+import {
+  normalizeAllowedEmails,
+} from "../utils/battleRoomAccess.js";
+import {
+  sanitizeParticipantExecutionError,
+  sanitizeParticipantTestResult,
+} from "../services/participantExecutionSerialization.js";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -53,6 +63,77 @@ function generateRoomCode() {
 
 function isValidLanguage(lang) {
   return String(lang || "").toLowerCase() === "java";
+}
+
+function buildParticipantSubmissionResponse(
+  questionResult,
+  currentSubmission,
+  visibleCount,
+  hiddenCount,
+) {
+  const results = (questionResult.results || []).map(
+    sanitizeParticipantTestResult,
+  );
+  const visibleResults = results.slice(0, visibleCount);
+  const hiddenResults = results.slice(visibleCount);
+  const isPassed = (result) =>
+    result.status === "PASSED" || result.status === "ACCEPTED";
+  const visiblePassed =
+    visibleResults.length > 0
+      ? visibleResults.filter(isPassed).length
+      : Math.min(visibleCount, questionResult.passed || 0);
+  const hiddenPassed =
+    hiddenResults.length > 0
+      ? hiddenResults.filter(isPassed).length
+      : Math.min(
+          hiddenCount,
+          Math.max(0, (questionResult.passed || 0) - visiblePassed),
+        );
+  const allCompleted = currentSubmission.questionResults.every(
+    (result) => !["PENDING", "PROCESSING"].includes(result.status),
+  );
+
+  return {
+    message: "Solution submitted!",
+    questionResult: {
+      questionId: questionResult.questionId,
+      questionTitle: questionResult.questionTitle,
+      language: questionResult.language,
+      status: questionResult.status,
+      score: questionResult.score,
+      passed: questionResult.passed,
+      failed: questionResult.failed,
+      total: questionResult.total,
+      executionTime: questionResult.executionTime,
+      memoryUsed: questionResult.memoryUsed,
+      timeToSolve: questionResult.timeToSolve,
+      output: "",
+      error: sanitizeParticipantExecutionError(
+        questionResult.status,
+        questionResult.error,
+      ),
+      visiblePassed,
+      visibleFailed: visibleCount - visiblePassed,
+      hiddenCount,
+      hiddenPassed,
+      hiddenFailed: hiddenCount - hiddenPassed,
+      results,
+    },
+    status: questionResult.status,
+    score: questionResult.score,
+    passed: questionResult.passed,
+    failed: questionResult.failed,
+    total: questionResult.total,
+    executionTime: questionResult.executionTime,
+    memoryUsed: questionResult.memoryUsed,
+    hiddenPassed,
+    hiddenFailed: hiddenCount - hiddenPassed,
+    totalScore: currentSubmission.totalScore,
+    totalPassed: currentSubmission.totalPassed,
+    totalFailed: currentSubmission.totalFailed,
+    submissionStatus: currentSubmission.status,
+    allCompleted,
+  };
 }
 
 /**
@@ -226,6 +307,11 @@ export async function createRoom(req, res) {
       scheduledStartTime,
       scheduledEndTime,
       timezone,
+      candidateAccess = "OPEN",
+      allowedEmails,
+      moderationAction = "DISQUALIFY",
+      allowLeaderboard = true,
+      allowReuse = true,
       // Legacy timestamp aliases remain accepted for existing clients.
       startDate: rawStartDate,
       endDate: rawEndDate,
@@ -233,6 +319,24 @@ export async function createRoom(req, res) {
       endTime: rawEndTime,
     } = req.body;
     const userId = req.userId;
+
+    if (!["OPEN", "ALLOWLIST"].includes(candidateAccess)) {
+      return res.status(400).json({ error: "candidateAccess must be OPEN or ALLOWLIST." });
+    }
+    if (!["FLAG", "DISQUALIFY"].includes(moderationAction) ||
+      typeof allowLeaderboard !== "boolean" ||
+      typeof allowReuse !== "boolean") {
+      return res.status(400).json({ error: "Room moderation and rules settings are invalid." });
+    }
+    let normalizedAllowedEmails;
+    try {
+      normalizedAllowedEmails = normalizeAllowedEmails(allowedEmails);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (candidateAccess === "ALLOWLIST" && normalizedAllowedEmails.length === 0) {
+      return res.status(400).json({ error: "An allowlisted room must include at least one candidate email." });
+    }
 
     if (
       typeof title !== "string" ||
@@ -470,14 +574,16 @@ export async function createRoom(req, res) {
       createdBy: userId,
       questions: processedQuestions,
       languages: roomLanguages,
+      candidateAccess,
+      allowedEmails: normalizedAllowedEmails,
       timeLimit: tValue,
       timeLimitUnit: tUnit,
       status: "UPCOMING",
       isScheduled: true,
       maxParticipants: maxParticipants || 100,
-      moderationAction: "DISQUALIFY",
-      allowLeaderboard: true,
-      allowReuse: true,
+      moderationAction,
+      allowLeaderboard,
+      allowReuse,
       scheduledDate: scheduledDate || "",
       scheduledStartTime: scheduledStartTime || "",
       scheduledEndTime: scheduledEndTime || "",
@@ -578,26 +684,13 @@ export async function startRoom(req, res) {
   try {
     const { roomCode } = req.params;
     const userId = req.userId;
-    const organization =
-      typeof req.body?.organization === "string"
-        ? req.body.organization.trim()
-        : "";
-
-    if (
-      organization.length < 2 ||
-      organization.length > 120 ||
-      /[\u0000-\u001f\u007f]/.test(organization)
-    ) {
-      return res.status(400).json({
-        error: "A valid organization (2-120 characters) is required to start.",
-      });
-    }
+    const organization = getOrganizationProfileName(req.user) || "Unspecified";
 
     const room = await BattleRoom.findOne({
       roomCode: roomCode.toUpperCase(),
       isActive: true,
       isDeleted: false,
-    });
+    }).select("+allowedEmails");
     if (!room) {
       return res.status(404).json({ error: "Battle room not found." });
     }
@@ -672,6 +765,300 @@ export async function startRoom(req, res) {
   }
 }
 
+async function findOwnedEditableRoom(roomCode, userId) {
+  const room = await BattleRoom.findOne({
+    roomCode: String(roomCode || "").toUpperCase(),
+    isActive: true,
+    isDeleted: false,
+  }).select("+allowedEmails");
+  if (!room) return { error: "Battle room not found.", status: 404 };
+  if (String(room.createdBy) !== String(userId)) {
+    return { error: "Only the room creator can manage this battle room.", status: 403 };
+  }
+  if (
+    room.status !== "UPCOMING" ||
+    new Date(room.startDate || room.startTime || 0) <= new Date()
+  ) {
+    return { error: "Saved room content can be edited only before the room starts.", status: 409 };
+  }
+  const [submissionCount, participants] = await Promise.all([
+    BattleRoomSubmission.countDocuments({ roomId: room._id }),
+    Promise.resolve(room.participants || []),
+  ]);
+  if (submissionCount > 0 || participants.length > 0) {
+    return { error: "Room content cannot be changed after a candidate has joined.", status: 409 };
+  }
+  return { room };
+}
+
+export async function getRoomForEdit(req, res) {
+  try {
+    const result = await findOwnedEditableRoom(req.params.roomCode, req.userId);
+    if (!result.room) return res.status(result.status).json({ error: result.error });
+    return res.json({ room: result.room.toEditJSON() });
+  } catch (error) {
+    console.error("Load battle room edit data error:", error.message);
+    return res.status(500).json({ error: "Could not load saved room for editing." });
+  }
+}
+
+export async function updateRoom(req, res) {
+  try {
+    const result = await findOwnedEditableRoom(req.params.roomCode, req.userId);
+    if (!result.room) return res.status(result.status).json({ error: result.error });
+    const room = result.room;
+    const {
+      title,
+      description,
+      questions,
+      maxParticipants,
+      startDate,
+      endDate,
+      timezone,
+      candidateAccess = "OPEN",
+      allowedEmails,
+      moderationAction = "DISQUALIFY",
+      allowLeaderboard = true,
+      allowReuse = true,
+    } = req.body || {};
+    if (
+      typeof title !== "string" ||
+      !title.trim() ||
+      title.trim().length > 120 ||
+      !Array.isArray(questions) ||
+      questions.length < 1 ||
+      questions.length > 20
+    ) {
+      return res.status(400).json({
+        error: "A title of at most 120 characters and between 1 and 20 questions are required.",
+      });
+    }
+    if (
+      !Number.isInteger(maxParticipants) ||
+      maxParticipants < Math.max(1, room.participantCount || 0)
+    ) {
+      return res.status(400).json({
+        error: "Maximum participants must be a whole number no lower than the current participant count.",
+      });
+    }
+    if (!["OPEN", "ALLOWLIST"].includes(candidateAccess)) {
+      return res.status(400).json({ error: "candidateAccess must be OPEN or ALLOWLIST." });
+    }
+    if (!["FLAG", "DISQUALIFY"].includes(moderationAction) ||
+      typeof allowLeaderboard !== "boolean" ||
+      typeof allowReuse !== "boolean") {
+      return res.status(400).json({ error: "Room moderation and rules settings are invalid." });
+    }
+    let normalizedAllowedEmails;
+    try {
+      normalizedAllowedEmails = normalizeAllowedEmails(allowedEmails);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (candidateAccess === "ALLOWLIST" && normalizedAllowedEmails.length === 0) {
+      return res.status(400).json({ error: "An allowlisted room must include at least one candidate email." });
+    }
+
+    const processedQuestions = [];
+    for (let index = 0; index < questions.length; index += 1) {
+      const question = questions[index];
+      if (
+        !question ||
+        typeof question.title !== "string" ||
+        !question.title.trim() ||
+        typeof question.description !== "string" ||
+        !question.description.trim() ||
+        !Array.isArray(question.visibleTestCases) ||
+        question.visibleTestCases.length < 3 ||
+        !Array.isArray(question.hiddenTestCases) ||
+        question.hiddenTestCases.length < 1
+      ) {
+        return res.status(400).json({
+          error: `Question ${index + 1} needs a title, description, at least three visible cases, and one hidden case.`,
+        });
+      }
+      for (const testCase of [...question.visibleTestCases, ...question.hiddenTestCases]) {
+        if (
+          !testCase ||
+          typeof testCase.input !== "string" ||
+          testCase.expectedOutput === undefined ||
+          testCase.expectedOutput === null
+        ) {
+          return res.status(400).json({ error: `Question ${index + 1} has an invalid test case.` });
+        }
+      }
+      let signature = question.signature || null;
+      let functionName = question.functionName || "";
+      let starterCodeByLanguage = question.starterCodeByLanguage || {};
+      if (question.functionSignature && !signature) {
+        const signatureResult = validateSignature(question.functionSignature);
+        if (!signatureResult.valid) {
+          return res.status(400).json({ error: `Question ${index + 1} has an invalid function signature.` });
+        }
+        signature = signatureResult.parsed;
+        functionName = signature.name;
+      }
+      if (signature?.name) {
+        functionName = signature.name;
+        starterCodeByLanguage = {};
+      }
+      processedQuestions.push({
+        title: question.title.trim(),
+        description: question.description.trim(),
+        explanation: question.explanation || "",
+        constraints: question.constraints || "",
+        difficulty: question.difficulty || "MEDIUM",
+        category: question.category || "Custom",
+        tags: question.tags || [],
+        examples: question.examples || [],
+        hints: question.hints || [],
+        signature,
+        starterCode: question.starterCode || starterCodeByLanguage.java || "",
+        starterCodeByLanguage,
+        visibleTestCases: question.visibleTestCases.map((testCase) => ({
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          description: testCase.description || "",
+          parameterValues: testCase.parameterValues || null,
+        })),
+        hiddenTestCases: question.hiddenTestCases.map((testCase) => ({
+          input: testCase.input,
+          expectedOutput: testCase.expectedOutput,
+          parameterValues: testCase.parameterValues || null,
+        })),
+        points: question.points || 100,
+        problemType: question.problemType || "array",
+        functionSignature: question.functionSignature || "",
+        functionName,
+        expectedOutputSource: question.expectedOutputSource || "manual",
+        referenceSolution: question.referenceSolution || "",
+        referenceSolutionLanguage: "java",
+        wrapperByLanguage: question.wrapperByLanguage || {},
+      });
+    }
+
+    let schedule;
+    try {
+      schedule = parseSchedule({
+        startDate: startDate || null,
+        endDate: endDate || null,
+        timezone: timezone || room.timezone || "UTC",
+        durationMinutes: 1,
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    const start = new Date(schedule.start);
+    const end = new Date(schedule.end);
+    const now = new Date();
+    const durationMinutes = Math.ceil((end.getTime() - start.getTime()) / 60000);
+    if (start <= now || durationMinutes < 1 || durationMinutes > 2000 * 10080) {
+      return res.status(400).json({ error: "Choose a future schedule within the supported duration." });
+    }
+    const durationUnits = [
+      { unit: "weeks", minutes: 10080 },
+      { unit: "days", minutes: 1440 },
+      { unit: "hours", minutes: 60 },
+      { unit: "minutes", minutes: 1 },
+    ];
+    const duration = durationUnits.find(({ minutes }) =>
+      durationMinutes % minutes === 0 && durationMinutes / minutes <= 2000,
+    );
+    room.title = title.trim();
+    room.description = typeof description === "string" ? description : "";
+    room.questions = processedQuestions;
+    room.maxParticipants = maxParticipants;
+    room.candidateAccess = candidateAccess;
+    room.allowedEmails = normalizedAllowedEmails;
+    room.moderationAction = moderationAction;
+    room.allowLeaderboard = allowLeaderboard;
+    room.allowReuse = allowReuse;
+    room.timezone = timezone || room.timezone || "UTC";
+    room.scheduledDate = "";
+    room.scheduledStartTime = "";
+    room.scheduledEndTime = "";
+    room.startTime = start;
+    room.endTime = end;
+    room.startDate = start;
+    room.endDate = end;
+    room.timeLimit = duration ? durationMinutes / duration.minutes : durationMinutes;
+    room.timeLimitUnit = duration?.unit || "minutes";
+    await room.save();
+    return res.json({ message: "Battle room updated.", room: room.toCreatorJSON() });
+  } catch (error) {
+    console.error("Update battle room error:", error.message);
+    return res.status(500).json({ error: "Could not update the saved battle room." });
+  }
+}
+
+export async function getRoomParticipants(req, res) {
+  try {
+    const room = await BattleRoom.findOne({
+      roomCode: String(req.params.roomCode || "").toUpperCase(),
+      isActive: true,
+      isDeleted: false,
+    }).select("+allowedEmails");
+    if (!room) return res.status(404).json({ error: "Battle room not found." });
+    if (String(room.createdBy) !== String(req.userId)) {
+      return res.status(403).json({ error: "Only the room creator can view candidate access and participants." });
+    }
+    const participants = await BattleRoomSubmission.find({ roomId: room._id })
+      .sort({ createdAt: 1 })
+      .select("userId participantEmail participantName participantOrganization status totalScore submittedAt startTime createdAt")
+      .lean();
+    return res.json({
+      room: {
+        roomCode: room.roomCode,
+        title: room.title,
+        status: room.computeCurrentStatus(),
+        candidateAccess: room.candidateAccess || "OPEN",
+        allowedEmails: room.allowedEmails || [],
+      },
+      participants,
+    });
+  } catch (error) {
+    console.error("Load room candidates error:", error.message);
+    return res.status(500).json({ error: "Could not load room candidates." });
+  }
+}
+
+export async function updateRoomAllowlist(req, res) {
+  try {
+    const room = await BattleRoom.findOne({
+      roomCode: String(req.params.roomCode || "").toUpperCase(),
+      isActive: true,
+      isDeleted: false,
+    }).select("+allowedEmails");
+    if (!room) return res.status(404).json({ error: "Battle room not found." });
+    if (String(room.createdBy) !== String(req.userId)) {
+      return res.status(403).json({ error: "Only the room creator can manage candidate access." });
+    }
+    const candidateAccess = req.body?.candidateAccess;
+    if (!["OPEN", "ALLOWLIST"].includes(candidateAccess)) {
+      return res.status(400).json({ error: "candidateAccess must be OPEN or ALLOWLIST." });
+    }
+    let allowedEmails;
+    try {
+      allowedEmails = normalizeAllowedEmails(req.body?.allowedEmails);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (candidateAccess === "ALLOWLIST" && allowedEmails.length === 0) {
+      return res.status(400).json({ error: "An allowlisted room must include at least one candidate email." });
+    }
+    room.candidateAccess = candidateAccess;
+    room.allowedEmails = allowedEmails;
+    await room.save();
+    return res.json({
+      candidateAccess: room.candidateAccess,
+      allowedEmails: room.allowedEmails,
+    });
+  } catch (error) {
+    console.error("Update room candidate access error:", error.message);
+    return res.status(500).json({ error: "Could not update candidate access." });
+  }
+}
+
 export async function getRoomByCode(req, res) {
   try {
     const { roomCode } = req.params;
@@ -681,7 +1068,7 @@ export async function getRoomByCode(req, res) {
       roomCode: roomCode.toUpperCase(),
       isActive: true,
       isDeleted: false,
-    });
+    }).select("+allowedEmails");
     if (!room) {
       return res
         .status(404)
@@ -727,8 +1114,7 @@ export async function getRoomByCode(req, res) {
     const isParticipant = !!userSubmission;
     if (!isCreator && !isParticipant) {
       return res.status(403).json({
-        error:
-          "Join from the Battle Room page and enter your organization before accessing this battle.",
+        error: "Join this Battle Room with its key before accessing the challenge.",
         code: "ROOM_JOIN_REQUIRED",
       });
     }
@@ -773,24 +1159,11 @@ export async function joinRoom(req, res) {
     const { roomCode } = req.body;
     const userId = req.userId;
     const name = req.user?.name;
-    const organization =
-      typeof req.body?.organization === "string"
-        ? req.body.organization.trim()
-        : "";
+    const organization = getOrganizationProfileName(req.user) || "Unspecified";
     const email = req.user?.email;
 
     if (!roomCode) {
       return res.status(400).json({ error: "Room key is required." });
-    }
-    if (organization.length < 2 || organization.length > 120) {
-      return res.status(400).json({
-        error: "Organization must be between 2 and 120 characters.",
-      });
-    }
-    if (/[\u0000-\u001f\u007f]/.test(organization)) {
-      return res.status(400).json({
-        error: "Organization contains invalid characters.",
-      });
     }
     if (
       !userId ||
@@ -809,7 +1182,7 @@ export async function joinRoom(req, res) {
       roomCode: roomCode.toUpperCase(),
       isActive: true,
       isDeleted: false,
-    });
+    }).select("+allowedEmails");
     if (!room) {
       return res
         .status(404)
@@ -842,7 +1215,6 @@ export async function joinRoom(req, res) {
       roomId: room._id,
       userId,
     });
-
     if (
       existingSubmission &&
       (existingSubmission.status === "COMPLETED" ||
@@ -934,6 +1306,159 @@ export async function joinRoom(req, res) {
   }
 }
 
+export async function prepareDesktopSubmission(req, res) {
+  try {
+    const { roomCode } = req.params;
+    const { questionId, codeHash } = req.body || {};
+    const userId = req.userId;
+    if (
+      typeof roomCode !== "string" ||
+      !/^[A-Z0-9]{6}$/i.test(roomCode) ||
+      typeof questionId !== "string" ||
+      !/^[a-f\d]{24}$/i.test(questionId)
+    ) {
+      return res.status(400).json({ error: "A valid room code and question ID are required." });
+    }
+    if (
+      typeof codeHash !== "string" ||
+      !/^[a-f\d]{64}$/i.test(codeHash)
+    ) {
+      return res.status(400).json({ error: "A valid source-code digest is required." });
+    }
+
+    const room = await BattleRoom.findOne({
+      roomCode: roomCode.toUpperCase(),
+      isActive: true,
+      isDeleted: false,
+    }).lean();
+    if (!room) {
+      return res.status(404).json({ error: "Battle room not found." });
+    }
+    const submission = await BattleRoomSubmission.findOne(
+      { roomId: room._id, userId },
+      { status: 1, questionResults: 1 },
+    ).lean();
+    if (!submission) {
+      return res.status(403).json({ error: "You have not joined this battle." });
+    }
+    if (submission.status === "DISQUALIFIED") {
+      return res.status(403).json({ error: "You have been disqualified." });
+    }
+
+    const question = room.questions.find(
+      (candidate) => candidate._id.toString() === String(questionId),
+    );
+    if (!question) {
+      return res.status(404).json({ error: "Question not found in this room." });
+    }
+    if (
+      !submission.questionResults.some(
+        (result) => result.questionId.toString() === String(questionId),
+      )
+    ) {
+      return res.status(403).json({ error: "Question is not assigned to your submission." });
+    }
+
+    const requestedCodeHash = codeHash.toLowerCase();
+    const hasPersistedMatchingResult = submission.questionResults.some(
+      (result) =>
+        result.questionId.toString() === String(questionId) &&
+        !["PENDING", "PROCESSING"].includes(result.status) &&
+        createHash("sha256").update(result.code || "", "utf8").digest("hex") ===
+          requestedCodeHash,
+    );
+    if (submission.status === "COMPLETED" && !hasPersistedMatchingResult) {
+      return res.status(409).json({
+        error: "This battle is complete and has no saved result for this source.",
+      });
+    }
+    if (!isCodeExecutionAllowed(room) && !hasPersistedMatchingResult) {
+      const windowState = getRoomWindowState(room);
+      return res.status(403).json({
+        error:
+          windowState.state === ROOM_WINDOW_STATE.NOT_STARTED
+            ? "Challenge has not started yet."
+            : "Time is up! The battle has ended.",
+        windowState: windowState.state,
+        serverTime: windowState.now.toISOString(),
+      });
+    }
+
+    const visibleTestCases = (question.visibleTestCases || []).map((testCase) => ({
+      input: testCase.input,
+      expectedOutput: testCase.expectedOutput ?? "",
+    }));
+    const hiddenTestCases = (question.hiddenTestCases || []).map((testCase) => ({
+      input: testCase.input,
+      expectedOutput: testCase.expectedOutput ?? "",
+    }));
+    const allTestCases = [...visibleTestCases, ...hiddenTestCases];
+    if (visibleTestCases.length === 0 || allTestCases.length > 50) {
+      return res.status(400).json({
+        error: "Desktop execution requires at least one visible case and no more than 50 total cases.",
+      });
+    }
+    let caseDataCharacters = 0;
+    for (const testCase of allTestCases) {
+      if (
+        typeof testCase.input !== "string" ||
+        testCase.input.length > 5_000 ||
+        typeof testCase.expectedOutput !== "string" ||
+        testCase.expectedOutput.length > 100_000
+      ) {
+        return res.status(422).json({
+          error: "A configured test case exceeds the supported execution limits.",
+        });
+      }
+      caseDataCharacters += testCase.input.length + testCase.expectedOutput.length;
+    }
+    if (caseDataCharacters > 1_000_000) {
+      return res.status(422).json({
+        error: "The configured test data exceeds the supported execution size.",
+      });
+    }
+
+    const nonceResource =
+      `${room._id}:${submission._id}:${questionId}:${codeHash.toLowerCase()}`;
+    const now = new Date();
+    const existingGrant = await Nonce.findOne({
+      userId,
+      action: "SUBMIT",
+      resourceId: nonceResource,
+      recoveryExpiresAt: { $gt: now },
+      $or: [
+        {
+          state: "AVAILABLE",
+          authorizationExpiresAt: { $gt: now },
+        },
+        {
+          state: {
+            $in: ["PROCESSING", "RETRYABLE", "COMPLETED"],
+          },
+        },
+      ],
+    }).lean();
+    const nonce =
+      existingGrant?.nonce ||
+      (await Nonce.generate(
+        userId,
+        "SUBMIT",
+        nonceResource,
+        5 * 60 * 1000,
+      ));
+    return res.status(200).json({
+      nonce,
+      visibleTestCaseCount: visibleTestCases.length,
+      testCases: visibleTestCases,
+      timeLimit: 5_000,
+      memoryLimit: 131_072,
+    });
+  } catch (error) {
+    console.error("Prepare desktop submission error:", error.message);
+    return res.status(500).json({ error: "Unable to authorize this submission." });
+  }
+}
+
 /**
  * STATELESS RUN
  * POST /api/battle-rooms/:roomCode/run
@@ -947,10 +1472,18 @@ export async function runQuestionSolution(req, res) {
     const { questionId, code, language } = req.body;
     const userId = req.userId;
 
-    if (!questionId || !code) {
+    if (
+      typeof roomCode !== "string" ||
+      !/^[A-Z0-9]{6}$/i.test(roomCode) ||
+      typeof questionId !== "string" ||
+      !/^[a-f\d]{24}$/i.test(questionId) ||
+      typeof code !== "string" ||
+      !code.trim() ||
+      code.length > 50_000
+    ) {
       return res
         .status(400)
-        .json({ error: "Question ID and code are required." });
+        .json({ error: "A valid room code, question ID, and Java source (up to 50000 characters) are required." });
     }
 
     const room = await BattleRoom.findOne(
@@ -976,7 +1509,7 @@ export async function runQuestionSolution(req, res) {
     ) {
       return res.status(403).json({
         error:
-          "Join from the Battle Room page and enter your organization before running code.",
+          "Join this Battle Room with its key before running code.",
         code: "ROOM_JOIN_REQUIRED",
       });
     }
@@ -1110,15 +1643,41 @@ export async function runQuestionSolution(req, res) {
  *   disqualification merges cleanly without throwing a VersionError.
  */
 export async function submitQuestionSolution(req, res) {
+  let nonceClaim = null;
   try {
     const { roomCode } = req.params;
-    const { questionId, code, language } = req.body;
+    if (
+      !req.body ||
+      typeof req.body !== "object" ||
+      Array.isArray(req.body)
+    ) {
+      return res.status(400).json({ error: "A valid submission request is required." });
+    }
+    if (Object.hasOwn(req.body, "localExecution")) {
+      return res.status(400).json({
+        error: "Client-reported execution results are not accepted.",
+      });
+    }
+    const {
+      questionId,
+      code,
+      language,
+      desktopNonce,
+    } = req.body || {};
     const userId = req.userId;
 
-    if (!questionId || !code) {
+    if (
+      typeof roomCode !== "string" ||
+      !/^[A-Z0-9]{6}$/i.test(roomCode) ||
+      typeof questionId !== "string" ||
+      !/^[a-f\d]{24}$/i.test(questionId) ||
+      typeof code !== "string" ||
+      !code.trim() ||
+      code.length > 50_000
+    ) {
       return res
         .status(400)
-        .json({ error: "Question ID and code are required." });
+        .json({ error: "A valid room code, question ID, and Java source (up to 50000 characters) are required." });
     }
 
     const room = await BattleRoom.findOne(
@@ -1134,21 +1693,6 @@ export async function submitQuestionSolution(req, res) {
     ).lean();
     if (!room) {
       return res.status(404).json({ error: "Battle room not found." });
-    }
-
-    // Server-authoritative window check. Prevents submissions before the start
-    // time and after the end time regardless of client clock or payload.
-    if (!isCodeExecutionAllowed(room)) {
-      const win = getRoomWindowState(room);
-      return res.status(403).json({
-        error:
-          win.state === ROOM_WINDOW_STATE.NOT_STARTED
-            ? "Challenge has not started yet."
-            : "Time is up! The battle has ended.",
-        windowState: win.state,
-        serverTime: win.now.toISOString(),
-        msUntilStart: Math.max(0, win.msUntilStart || 0),
-      });
     }
 
     const lang = String(language || "java").toLowerCase();
@@ -1177,12 +1721,6 @@ export async function submitQuestionSolution(req, res) {
         .status(400)
         .json({ error: "You haven't joined this battle yet." });
     }
-    if (submission.status === "COMPLETED") {
-      return res.status(400).json({
-        error:
-          "You have already completed this battle and cannot attempt again.",
-      });
-    }
     if (submission.status === "DISQUALIFIED") {
       return res
         .status(400)
@@ -1207,22 +1745,187 @@ export async function submitQuestionSolution(req, res) {
         .json({ error: "Question not found in your submission." });
     }
 
+    const existingQuestionResult = submission.questionResults[qrIndex];
+    if (
+      desktopNonce === undefined &&
+      existingQuestionResult.code === code &&
+      !["PENDING", "PROCESSING"].includes(existingQuestionResult.status)
+    ) {
+      return res.status(200).json(
+        buildParticipantSubmissionResponse(
+          existingQuestionResult,
+          submission,
+          question.visibleTestCases.length,
+          question.hiddenTestCases.length,
+        ),
+      );
+    }
+    if (submission.status === "COMPLETED" && desktopNonce === undefined) {
+      return res.status(400).json({
+        error:
+          "You have already completed this battle and cannot attempt again.",
+      });
+    }
+
     const timeToSolve = Math.floor((new Date() - submission.startTime) / 1000);
 
+    const visibleTestCases = (question.visibleTestCases || []).map((tc) => ({
+      ...(tc._id ? { _id: tc._id } : {}),
+      input: tc.input,
+      expectedOutput: tc.expectedOutput ?? "",
+    }));
+    const hiddenTestCases = (question.hiddenTestCases || []).map((tc) => ({
+      ...(tc._id ? { _id: tc._id } : {}),
+      input: tc.input,
+      expectedOutput: tc.expectedOutput ?? "",
+    }));
     const allTestCases = [
-      ...question.visibleTestCases.map((tc) => ({
-        ...(tc._id ? { _id: tc._id } : {}),
-        input: tc.input,
-        expectedOutput: tc.expectedOutput,
-      })),
-      ...question.hiddenTestCases.map((tc) => ({
-        ...(tc._id ? { _id: tc._id } : {}),
-        input: tc.input,
-        expectedOutput: tc.expectedOutput,
-      })),
+      ...visibleTestCases,
+      ...hiddenTestCases,
     ];
+    if (
+      allTestCases.length === 0 ||
+      allTestCases.length > 50 ||
+      allTestCases.some(
+        (testCase) =>
+          typeof testCase.input !== "string" ||
+          testCase.input.length > 5_000 ||
+          typeof testCase.expectedOutput !== "string" ||
+          testCase.expectedOutput.length > 100_000,
+      )
+    ) {
+      return res.status(422).json({
+        error: "The configured test cases exceed the supported execution limits.",
+      });
+    }
 
-    // Stateless execution (no DB writes during the engine call).
+    const nonceResource = desktopNonce === undefined
+      ? null
+      : `${room._id}:${submission._id}:${questionId}:${createHash("sha256")
+          .update(code, "utf8")
+          .digest("hex")}`;
+
+    if (desktopNonce !== undefined) {
+      if (typeof desktopNonce !== "string" || !/^[a-f\d]{64}$/i.test(desktopNonce)) {
+        return res.status(400).json({ error: "A valid desktop execution authorization is required." });
+      }
+      nonceClaim = await Nonce.claimDesktopSubmission(
+        userId,
+        desktopNonce,
+        nonceResource,
+      );
+      if (!nonceClaim.nonce) {
+        return res.status(409).json({
+          error: "The desktop execution authorization is invalid, expired, or already used.",
+        });
+      }
+      if (
+        !nonceClaim.claimed &&
+        nonceClaim.nonce.state === "PROCESSING"
+      ) {
+        return res.status(409).json({
+          error: "This submission is still being judged. Retry shortly to retrieve its result.",
+          code: "SUBMISSION_IN_PROGRESS",
+          retryable: true,
+        });
+      }
+      if (
+        !nonceClaim.claimed &&
+        nonceClaim.nonce.state !== "COMPLETED"
+      ) {
+        return res.status(409).json({
+          error: "The desktop execution authorization is invalid or expired.",
+        });
+      }
+
+      const currentSubmission = await BattleRoomSubmission.findOne(
+        { _id: submission._id, roomId: room._id, userId },
+        {
+          status: 1,
+          totalScore: 1,
+          totalPassed: 1,
+          totalFailed: 1,
+          questionResults: 1,
+        },
+      )
+        .select("+questionResults.executionGrantNonce")
+        .lean();
+      const existingQuestionResult = currentSubmission?.questionResults?.find(
+        (result) =>
+          result.questionId.toString() === questionId &&
+          result.code === code &&
+          !["PENDING", "PROCESSING"].includes(result.status),
+      );
+      const persistedQuestionResult =
+        existingQuestionResult &&
+        (existingQuestionResult.executionGrantNonce === desktopNonce ||
+          nonceClaim.claimed)
+          ? existingQuestionResult
+          : null;
+      if (persistedQuestionResult) {
+        if (nonceClaim.claimed) {
+          const completedNonce = await Nonce.completeDesktopSubmission(
+            nonceClaim.nonce._id,
+            nonceClaim.claimId,
+          );
+          if (!completedNonce) {
+            throw new Error(
+              "The submission result was saved but grant finalization failed.",
+            );
+          }
+          nonceClaim = null;
+        }
+        return res
+          .status(200)
+          .json(
+            buildParticipantSubmissionResponse(
+              persistedQuestionResult,
+              currentSubmission,
+              visibleTestCases.length,
+              hiddenTestCases.length,
+            ),
+          );
+      }
+      if (!nonceClaim.claimed) {
+        return res.status(409).json({
+          error: "The completed authorization has no matching saved result.",
+        });
+      }
+    }
+
+    if (submission.status === "COMPLETED") {
+      if (nonceClaim?.claimed) {
+        await Nonce.releaseDesktopSubmission(
+          nonceClaim.nonce._id,
+          nonceClaim.claimId,
+        );
+        nonceClaim = null;
+      }
+      return res.status(409).json({
+        error: "This battle is complete and has no saved result for this source.",
+      });
+    }
+
+    if (!isCodeExecutionAllowed(room)) {
+      if (nonceClaim?.claimed) {
+        await Nonce.releaseDesktopSubmission(
+          nonceClaim.nonce._id,
+          nonceClaim.claimId,
+        );
+        nonceClaim = null;
+      }
+      const win = getRoomWindowState(room);
+      return res.status(403).json({
+        error:
+          win.state === ROOM_WINDOW_STATE.NOT_STARTED
+            ? "Challenge has not started yet."
+            : "Time is up! The battle has ended.",
+        windowState: win.state,
+        serverTime: win.now.toISOString(),
+        msUntilStart: Math.max(0, win.msUntilStart || 0),
+      });
+    }
+
     let executionResult;
     if (question.signature && question.signature.name) {
       executionResult = await executeComposedQuestion(
@@ -1237,13 +1940,28 @@ export async function submitQuestionSolution(req, res) {
         allTestCases,
         lang,
         {
-          timeLimit: 5000,
-          memoryLimit: 131072,
+          timeLimit: 5_000,
+          memoryLimit: 131_072,
         },
       );
     }
 
+    if (
+      ["SYSTEM_ERROR", "INTERNAL_ENGINE_ERROR"].includes(
+        executionResult.status,
+      )
+    ) {
+      throw new Error("Authoritative judging could not complete.");
+    }
+
     if (!isCodeExecutionAllowed(room)) {
+      if (nonceClaim?.claimed) {
+        await Nonce.releaseDesktopSubmission(
+          nonceClaim.nonce._id,
+          nonceClaim.claimId,
+        );
+        nonceClaim = null;
+      }
       const win = getRoomWindowState(room);
       return res.status(403).json({
         error: "The scheduled battle window ended while your code was running.",
@@ -1270,11 +1988,16 @@ export async function submitQuestionSolution(req, res) {
       totalCount,
     );
 
+    const qrResults = [...submission.questionResults];
+    const previousQuestionResult = qrResults[qrIndex];
+
     // Keep the submitted source with the result so the room owner can audit
     // the complete battle record after the battle.
     const qr = {
       questionId: question._id,
       questionTitle: question.title,
+      revision: (previousQuestionResult.revision || 0) + 1,
+      ...(desktopNonce ? { executionGrantNonce: desktopNonce } : {}),
       code,
       language: lang,
       status: executionResult.status,
@@ -1285,45 +2008,35 @@ export async function submitQuestionSolution(req, res) {
       executionTime: executionResult.executionTime ?? 0,
       memoryUsed: executionResult.memoryUsed ?? 0,
       timeToSolve,
-      output: executionResult.output ?? "",
-      error: executionResult.error ?? "",
-      results: executionResult.results.map((r, idx) => ({
-        ...(r.testCaseId ? { testCaseId: r.testCaseId } : {}),
-        testCase: r.testCase ?? idx + 1,
-        input: r.input ?? allTestCases[idx]?.input ?? "",
-        status: r.status,
-        executionTime: r.executionTime ?? 0,
-        memoryUsed: r.memoryUsed ?? 0,
-        output: r.output ?? "",
-        expectedOutput: idx < visibleCount
-          ? (r.expectedOutput ?? allTestCases[idx]?.expectedOutput ?? "")
-          : "",
-        error: r.error ?? "",
-        isHidden: idx >= visibleCount,
-      })),
+      output: executionResult.results
+        .slice(0, visibleCount)
+        .map((result) => result.output ?? "")
+        .join("\n"),
+      error: sanitizeParticipantExecutionError(
+        executionResult.status,
+        executionResult.error,
+      ),
+      results: executionResult.results.map((r, idx) =>
+        sanitizeParticipantTestResult({
+          ...(r.testCaseId ? { testCaseId: r.testCaseId } : {}),
+          testCase: r.testCase ?? idx + 1,
+          input: r.input ?? allTestCases[idx]?.input ?? "",
+          status: r.status,
+          executionTime: r.executionTime ?? 0,
+          memoryUsed: r.memoryUsed ?? 0,
+          output: r.output ?? "",
+          expectedOutput:
+            idx < visibleCount
+              ? (r.expectedOutput ?? allTestCases[idx]?.expectedOutput ?? "")
+              : "",
+          error: r.error ?? "",
+          isHidden: idx >= visibleCount,
+        }),
+      ),
     };
-
-    const hiddenResults = executionResult.results.slice(visibleCount);
-    const visibleResults = executionResult.results.slice(0, visibleCount);
-    const visiblePassedCount = visibleResults.length
-      ? visibleResults.filter(
-          (r) => r.status === "PASSED" || r.status === "ACCEPTED",
-        ).length
-      : Math.min(visibleCount, passedCount);
-    const visibleFailedCount = visibleCount - visiblePassedCount;
-    const hiddenPassed = hiddenResults.length
-      ? hiddenResults.filter(
-          (r) => r.status === "PASSED" || r.status === "ACCEPTED",
-        ).length
-      : Math.min(hiddenCount, Math.max(0, passedCount - visiblePassedCount));
-    const hiddenFailed = hiddenResults.length
-      ? hiddenResults.length - hiddenPassed
-      : Math.min(hiddenCount, Math.max(0, failedCount - visibleFailedCount));
 
     // Compute deltas from the question snapshot; $inc preserves updates from
     // concurrent submissions to other questions in the same room.
-    const qrResults = [...submission.questionResults];
-    const previousQuestionResult = qrResults[qrIndex];
     qrResults[qrIndex] = qr;
 
     const lines = code.split("\n").length;
@@ -1351,6 +2064,7 @@ export async function submitQuestionSolution(req, res) {
         _id: submission._id,
         status: { $in: ["PENDING", "PROCESSING"] },
         [`questionResults.${qrIndex}.status`]: previousQuestionResult.status,
+        [`questionResults.${qrIndex}.revision`]: previousQuestionResult.revision || 0,
         [`questionResults.${qrIndex}.score`]: previousQuestionResult.score || 0,
         [`questionResults.${qrIndex}.passed`]: previousQuestionResult.passed || 0,
         [`questionResults.${qrIndex}.failed`]: previousQuestionResult.failed || 0,
@@ -1364,6 +2078,13 @@ export async function submitQuestionSolution(req, res) {
         { _id: submission._id },
         { status: 1, totalScore: 1 },
       ).lean();
+      if (nonceClaim?.claimed) {
+        await Nonce.releaseDesktopSubmission(
+          nonceClaim.nonce._id,
+          nonceClaim.claimId,
+        );
+        nonceClaim = null;
+      }
       return res.status(409).json({
         error:
           current && current.status === "DISQUALIFIED"
@@ -1372,6 +2093,17 @@ export async function submitQuestionSolution(req, res) {
         status: current?.status || "CONFLICT",
         totalScore: current?.totalScore || 0,
       });
+    }
+
+    if (nonceClaim?.claimed) {
+      const completedNonce = await Nonce.completeDesktopSubmission(
+        nonceClaim.nonce._id,
+        nonceClaim.claimId,
+      );
+      if (!completedNonce) {
+        throw new Error("The submission result was saved but grant finalization failed.");
+      }
+      nonceClaim = null;
     }
 
     let currentSubmission = await BattleRoomSubmission.findById(
@@ -1425,63 +2157,43 @@ export async function submitQuestionSolution(req, res) {
     // submit because it may contain output produced from hidden inputs. The
     // full record (including code and hidden results) remains persisted
     // server-side for the creator report.
-    const safeResults = qr.results.map((r) =>
-      r.isHidden
-        ? {
-            testCase: r.testCase,
-            status: r.status,
-            executionTime: r.executionTime,
-            memoryUsed: r.memoryUsed,
-            isHidden: true,
-          }
-        : r,
-    );
-    return res.status(200).json({
-      message: "Solution submitted!",
-      questionResult: {
-        questionId: qr.questionId,
-        questionTitle: qr.questionTitle,
-        language: qr.language,
-        status: qr.status,
-        score: qr.score,
-        passed: qr.passed,
-        failed: qr.failed,
-        total: qr.total,
-        executionTime: qr.executionTime,
-        memoryUsed: qr.memoryUsed,
-        timeToSolve: qr.timeToSolve,
-        // Compiler/runtime diagnostics are the participant's own code output
-        // and are safe (and necessary) to surface.
-        output: "",
-        error: qr.error || "",
-        visiblePassed: visiblePassedCount,
-        visibleFailed: visibleCount - visiblePassedCount,
-        hiddenCount,
-        hiddenPassed,
-        hiddenFailed,
-        results: safeResults,
-      },
-      status: qr.status,
-      score: qr.score,
-      passed: qr.passed,
-      failed: qr.failed,
-      total: qr.total,
-      executionTime: qr.executionTime,
-      memoryUsed: qr.memoryUsed,
-      hiddenPassed,
-      hiddenFailed,
-      totalScore: currentSubmission.totalScore,
-      totalPassed: currentSubmission.totalPassed,
-      totalFailed: currentSubmission.totalFailed,
-      submissionStatus: currentSubmission.status,
-      allCompleted,
-    });
+    return res
+      .status(200)
+      .json(
+        buildParticipantSubmissionResponse(
+          qr,
+          currentSubmission,
+          visibleCount,
+          hiddenCount,
+        ),
+      );
   } catch (error) {
-    const message =
-      error?.message ||
-      "Secure Code Engine is currently unavailable. Please try again in a few moments.";
-    console.error("Submit question solution error:", message);
-    return res.status(502).json({ error: message });
+    if (nonceClaim?.claimed && nonceClaim.nonce) {
+      try {
+        await Nonce.releaseDesktopSubmission(
+          nonceClaim.nonce._id,
+          nonceClaim.claimId,
+        );
+      } catch (releaseError) {
+        console.error(
+          "Failed to release a retryable desktop submission grant:",
+          releaseError.message,
+        );
+      }
+    }
+    console.error("Submit question solution error:", error?.message || error);
+    if (!req.body?.desktopNonce) {
+      return res.status(502).json({
+        error:
+          error?.message ||
+          "Secure Code Engine is currently unavailable. Please try again in a few moments.",
+      });
+    }
+    return res.status(503).json({
+      error: "Authoritative judging is temporarily unavailable. Please retry this submission.",
+      code: "SUBMISSION_RETRYABLE",
+      retryable: true,
+    });
   }
 }
 
@@ -1817,6 +2529,12 @@ export async function getUserResult(req, res) {
       allSubmissions.findIndex(
         (s) => s.userId.toString() === userId.toString(),
       ) + 1;
+    const visibleTestCaseCounts = Object.fromEntries(
+      room.questions.map((question) => [
+        question._id.toString(),
+        (question.visibleTestCases || []).length,
+      ]),
+    );
 
     return res.status(200).json({
       room: {
@@ -1829,7 +2547,7 @@ export async function getUserResult(req, res) {
         timeLimitUnit: room.timeLimitUnit,
         questionCount: room.questions.length,
       },
-      submission: submission.toPublicJSON(),
+      submission: submission.toPublicJSON({ visibleTestCaseCounts }),
       rank,
       totalParticipants: allSubmissions.length,
     });

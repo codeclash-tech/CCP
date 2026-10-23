@@ -11,6 +11,7 @@ import {
   createSession,
   revokeAllUserSessions,
 } from "../services/tokenService.js";
+import { normalizeOrganizationProfileName } from "../utils/organizationProfile.js";
 
 /**
  * Password-based authentication controller with email-verified registration.
@@ -371,24 +372,32 @@ export async function updateProfile(req, res) {
   try {
     const name =
       typeof req.body?.name === "string" ? req.body.name.trim() : "";
-    const organization =
-      typeof req.body?.organization === "string"
-        ? req.body.organization.trim()
-        : "";
+    const hasOrganization = Object.hasOwn(req.body || {}, "organization");
+    const organization = hasOrganization
+      ? normalizeOrganizationProfileName(req.body.organization)
+      : null;
 
     if (!name || name.length > 100) {
       return res.status(400).json({
         error: "Enter a name between 1 and 100 characters.",
       });
     }
-    if (!organization || organization.length > 120) {
+    if (
+      hasOrganization &&
+      typeof req.body.organization !== "string"
+    ) {
+      return res.status(400).json({
+        error: "Organization must be text.",
+      });
+    }
+    if (hasOrganization && req.body.organization.trim() && !organization) {
       return res.status(400).json({
         error: "Enter an organization between 1 and 120 characters.",
       });
     }
 
     req.user.name = name;
-    req.user.organization = organization;
+    if (hasOrganization) req.user.organization = organization || "Unspecified";
     await req.user.save();
 
     return res.status(200).json({ user: req.user.toPublicJSON() });

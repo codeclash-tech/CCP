@@ -3,6 +3,12 @@ import Organization from "../models/Organization.js";
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
 import User from "../models/User.js";
+import WeeklyCycle from "../models/WeeklyCycle.js";
+import {
+  finalizeWeeklyCycle,
+  freezeWeeklyRoster,
+  ensureCurrentGlobalCycle,
+} from "./weeklyAssessmentService.js";
 import { closeBattleRoomAndNotify } from "./battleRoomClosureService.js";
 
 export function startCleanupJobs() {
@@ -108,6 +114,51 @@ export function startCleanupJobs() {
       console.error("[CleanupJob] Closed room deletion failed:", error.message);
     }
   });
+
+  cron.schedule("* * * * *", async () => {
+    const now = new Date();
+    try {
+      try {
+        await ensureCurrentGlobalCycle(now);
+      } catch (error) {
+        console.error("[WeeklyAssessment] Global cycle scheduling failed:", error.message);
+      }
+      const cyclesToFreeze = await WeeklyCycle.find({
+        status: "SCHEDULED",
+        startAt: { $lte: now },
+        rosterFrozenAt: null,
+      }).select("_id");
+      for (const cycle of cyclesToFreeze) {
+        try {
+          await freezeWeeklyRoster(cycle._id);
+        } catch (error) {
+          console.error(`[WeeklyAssessment] Cycle ${cycle._id} roster freeze failed:`, error.message);
+        }
+      }
+      const cyclesToFinalize = await WeeklyCycle.find({
+        $or: [
+          {
+            status: { $in: ["ACTIVE", "FINALIZING"] },
+            endAt: { $lte: now },
+          },
+          {
+            status: "FINALIZED",
+            certificatesIssuedAt: null,
+          },
+        ],
+      }).select("_id");
+      for (const cycle of cyclesToFinalize) {
+        try {
+          await finalizeWeeklyCycle(cycle._id, now);
+        } catch (error) {
+          if (error.statusCode === 409) continue;
+          console.error(`[WeeklyAssessment] Cycle ${cycle._id} finalization failed:`, error.message);
+        }
+      }
+    } catch (error) {
+      console.error("[WeeklyAssessment] Lifecycle job failed:", error.message);
+    }
+  }, { timezone: "Asia/Kolkata" });
 
   console.log("[CleanupJob] Scheduled cleanup jobs started.");
 }
