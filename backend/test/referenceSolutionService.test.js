@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  describeExecutionServiceFailure,
   executionService,
 } from "../src/services/executionService.js";
 import { generateExpectedOutputs } from "../src/services/referenceSolutionService.js";
@@ -14,6 +15,13 @@ const question = {
 };
 const referenceSolution = "class Solution { public int value() { return 1; } }";
 const testCases = [{ input: "", expectedOutput: "" }];
+
+test("explains how to resolve a rejected Secure Code Engine API key", () => {
+  assert.match(
+    describeExecutionServiceFailure("Secure Code Engine error: Invalid API Key"),
+    /SECURE_CODE_ENGINE_API_KEY[\s\S]*ENGINE_MASTER_API_KEY/,
+  );
+});
 
 test("reports an unreachable Secure Code Engine separately from solution failures", async (t) => {
   t.mock.method(executionService, "execute", async () => ({

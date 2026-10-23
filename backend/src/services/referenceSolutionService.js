@@ -17,7 +17,10 @@
  */
 
 import { composeProgram } from "./wrapperGenerator.js";
-import { executionService } from "./executionService.js";
+import {
+  describeExecutionServiceFailure,
+  executionService,
+} from "./executionService.js";
 
 /**
  * Build the composed Java program that reads one test-case input and prints
@@ -29,7 +32,8 @@ export function buildReferenceProgram(question, referenceSolution, language) {
 
 function executionServiceError(error) {
   return new Error(
-    "Could not validate the reference solution because the Secure Code Engine is unavailable or unreachable. Check that the engine is running and that SECURE_CODE_ENGINE_URL points to its execute endpoint, then try again.\n\n" +
+    describeExecutionServiceFailure(error) +
+      "\n\n" +
       (error || "The engine could not execute the reference solution."),
   );
 }

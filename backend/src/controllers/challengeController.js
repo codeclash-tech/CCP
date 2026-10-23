@@ -1,4 +1,5 @@
 import Challenge from "../models/Challenge.js";
+import { describeExecutionServiceFailure } from "../services/executionService.js";
 import mongoose from "mongoose";
 import {
   normalizeChallengePayload,
@@ -75,6 +76,12 @@ export async function createChallenge(req, res) {
 
     const preview = await previewChallengeExecution(normalized);
     if (!preview.accepted) {
+      if (preview.status === "SYSTEM_ERROR") {
+        return res.status(502).json({
+          error: describeExecutionServiceFailure(preview.error),
+          details: preview.error ? [preview.error] : [],
+        });
+      }
       return res
         .status(400)
         .json({

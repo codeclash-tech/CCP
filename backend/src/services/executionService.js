@@ -277,6 +277,17 @@ export function normalizeEngineResponse(raw, submittedTestCases = []) {
   return summarizeResults(results, cases.length, error);
 }
 
+export function describeExecutionServiceFailure(error) {
+  const detail = String(error || "");
+  if (/invalid api key|missing api key/i.test(detail)) {
+    return "Secure Code Engine rejected its API key. Configure the backend SECURE_CODE_ENGINE_API_KEY to match the engine ENGINE_MASTER_API_KEY or an active client API key.";
+  }
+  if (/license expired/i.test(detail)) {
+    return "Secure Code Engine rejected an expired client license. Renew the client license or configure the backend to use the engine master API key.";
+  }
+  return "Could not validate the reference solution because the Secure Code Engine is unavailable or unreachable. Check that the engine is running and that SECURE_CODE_ENGINE_URL points to its execute endpoint, then try again.";
+}
+
 export class ExecutionService {
   constructor(
     engineUrl = process.env.SECURE_CODE_ENGINE_URL || DEFAULT_ENGINE_URL,
