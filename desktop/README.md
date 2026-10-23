@@ -21,6 +21,8 @@ Then run `npm run dev` from `desktop`. The command starts Vite and Electron and
 builds the engine JAR if it is missing. The backend remains a separate service.
 The development app uses the frontend `.env` API URL; packaged builds default
 to CodeClash's hosted API and do not include the frontend `.env` URL.
+Packaged renderer content is served from the secure `codeclash://app` origin;
+the backend CORS allowlist must include that origin for desktop sign-in.
 
 ## Windows installer
 

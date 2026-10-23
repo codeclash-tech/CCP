@@ -19,6 +19,8 @@ The execution endpoint defaults to `http://localhost:8080/api/v1/execute` in dev
 Set `NODE_ENV=production`, use an HTTPS `CLIENT_URL`, provide `RESEND_API_KEY` and a verified `EMAIL_FROM` sender address, and use different randomly generated JWT secrets of at least 32 characters. Do not commit `.env` or production credentials. The production dependency tree is checked with `npm audit --omit=dev`.
 
 Configure `VITE_API_URL` in the frontend to point to this API's `/api` base URL, or proxy `/api` to this service on the frontend origin.
+The packaged Electron client uses the `codeclash://app` origin, which is
+explicitly allowed for credentialed API requests.
 
 ## Super Admin account
 
