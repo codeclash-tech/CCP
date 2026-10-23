@@ -13,6 +13,7 @@ Express API for CodeClash. Requires Node.js 20.19 or newer and MongoDB.
 
 The health endpoint is `GET /api/health`. It returns HTTP 200 only when MongoDB is connected; otherwise it returns HTTP 503.
 The execution endpoint defaults to `http://localhost:8080/api/v1/execute` in development. The Secure Code Engine is a separate service and must be started independently.
+Packaged desktop Super Admin question creation validates reference solutions with the bundled local engine and sends the generated outputs to the API; web question creation retains backend-side reference execution. Participant submissions remain subject to server-side judging.
 
 ## Production configuration
 

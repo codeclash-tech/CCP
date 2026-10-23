@@ -14,6 +14,14 @@ import {
   getWindowStart,
 } from "../utils/challengeWindow.js";
 
+export function isLocallyValidatedDesktopRequest(req) {
+  return (
+    req.user?.role === "ADMIN" &&
+    req.headers?.origin === "codeclash://app" &&
+    req.body?.referenceSolutionValidatedLocally === true
+  );
+}
+
 const ALLOWED_UPDATE_FIELDS = [
   "title",
   "description",
@@ -74,20 +82,22 @@ export async function createChallenge(req, res) {
         .json({ error: "A challenge with this title already exists." });
     }
 
-    const preview = await previewChallengeExecution(normalized);
-    if (!preview.accepted) {
-      if (preview.status === "SYSTEM_ERROR") {
-        return res.status(502).json({
-          error: describeExecutionServiceFailure(preview.error),
-          details: preview.error ? [preview.error] : [],
-        });
+    if (!isLocallyValidatedDesktopRequest(req)) {
+      const preview = await previewChallengeExecution(normalized);
+      if (!preview.accepted) {
+        if (preview.status === "SYSTEM_ERROR") {
+          return res.status(502).json({
+            error: describeExecutionServiceFailure(preview.error),
+            details: preview.error ? [preview.error] : [],
+          });
+        }
+        return res
+          .status(400)
+          .json({
+            error: "Reference solution failed validation. Publish blocked.",
+            details: preview.results || [],
+          });
       }
-      return res
-        .status(400)
-        .json({
-          error: "Reference solution failed validation. Publish blocked.",
-          details: preview.results || [],
-        });
     }
 
     // Generate fresh starter code (not persisted in DB)

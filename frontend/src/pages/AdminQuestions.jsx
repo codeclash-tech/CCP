@@ -17,6 +17,7 @@ import {
 import SignatureBuilder from "../components/battleRoom/authoring/SignatureBuilder";
 import ParameterTestCaseEditor from "../components/battleRoom/authoring/ParameterTestCaseEditor";
 import ReferenceSolutionEditor from "../components/battleRoom/authoring/ReferenceSolutionEditor";
+import { generateExpectedOutputsLocally } from "../services/localExecutionService";
 import "./WeeklyAdminAssessment.css";
 
 const EMPTY_QUESTION = {
@@ -44,10 +45,20 @@ function hasParameterValues(testCase, signature) {
   });
 }
 
-function prepareCases(testCases, signature, label, minimum) {
+function prepareCases(
+  testCases,
+  signature,
+  label,
+  minimum,
+  { requireExpectedOutput = true } = {},
+) {
   const cases = (testCases || []).filter((testCase) =>
-    Object.values(testCase.parameterValues || {}).some(
-      (value) => value !== undefined && value !== null && String(value).trim() !== "",
+    testCase &&
+    (
+      (testCase.parameterValues &&
+        typeof testCase.parameterValues === "object") ||
+      String(testCase.input || "").trim() ||
+      String(testCase.expectedOutput || "").trim()
     ),
   );
   if (cases.length < minimum) {
@@ -56,7 +67,10 @@ function prepareCases(testCases, signature, label, minimum) {
   if (cases.some((testCase) => !hasParameterValues(testCase, signature))) {
     throw new Error(`Complete every parameter value in ${label.toLowerCase()}.`);
   }
-  if (cases.some((testCase) => !String(testCase.expectedOutput || "").trim())) {
+  if (
+    requireExpectedOutput &&
+    cases.some((testCase) => !String(testCase.expectedOutput || "").trim())
+  ) {
     throw new Error(`Generate expected outputs for ${label.toLowerCase()} before creating the question.`);
   }
   return cases.map((testCase) => ({
@@ -177,20 +191,47 @@ export default function AdminQuestions() {
         throw new Error("Generate the Java function signature before creating the question.");
       }
 
-      const visibleTestCases = prepareCases(
+      const localEngineAvailable =
+        typeof window !== "undefined" &&
+        typeof window.codeClashDesktop?.engine?.execute === "function";
+      let visibleTestCases = prepareCases(
         form.visibleTestCases,
         form.signature,
         "Visible test cases",
         3,
+        { requireExpectedOutput: !localEngineAvailable },
       );
-      const hiddenTestCases = prepareCases(
+      let hiddenTestCases = prepareCases(
         form.hiddenTestCases,
         form.signature,
         "Hidden test cases",
         1,
+        { requireExpectedOutput: !localEngineAvailable },
       );
       if (!form.referenceSolution.trim()) {
         throw new Error("Add a Java reference solution before creating the question.");
+      }
+
+      if (localEngineAvailable) {
+        const generated = await generateExpectedOutputsLocally({
+          signature: form.signature,
+          referenceSolution: form.referenceSolution,
+          referenceSolutionLanguage: form.referenceSolutionLanguage || "java",
+          visibleTestCases,
+          hiddenTestCases,
+        });
+        visibleTestCases = prepareCases(
+          generated.visibleTestCases,
+          form.signature,
+          "Visible test cases",
+          3,
+        );
+        hiddenTestCases = prepareCases(
+          generated.hiddenTestCases,
+          form.signature,
+          "Hidden test cases",
+          1,
+        );
       }
 
       const payload = {
@@ -209,6 +250,9 @@ export default function AdminQuestions() {
         })),
         visibleTestCases,
         hiddenTestCases,
+        ...(localEngineAvailable
+          ? { referenceSolutionValidatedLocally: true }
+          : {}),
       };
       const { data } = await api.post("/challenges", payload);
       const questionId = String(data.challenge?.id || data.challenge?._id || "");
@@ -405,8 +449,9 @@ export default function AdminQuestions() {
         />
         <p className="weekly-question-reference-note">
           Add at least three visible and one hidden test case, then generate
-          expected outputs before saving. The reference solution and hidden cases
-          are never shown to participants.
+          expected outputs before saving. In the desktop app, outputs are
+          regenerated locally when saving. The reference solution and hidden
+          cases are never shown to participants.
         </p>
 
         <div className="weekly-question-submit">
