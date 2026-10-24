@@ -1874,6 +1874,21 @@ export default function BattleRoomChallenge() {
               </div>
             </div>
 
+            {error && (
+              <p
+                role="alert"
+                style={{
+                  padding: "8px 16px",
+                  margin: 0,
+                  color: "var(--color-danger)",
+                  borderBottom: "1px solid var(--border-color)",
+                  fontSize: 12,
+                }}
+              >
+                {error}
+              </p>
+            )}
+
             <div
               role="status"
               aria-live="polite"
