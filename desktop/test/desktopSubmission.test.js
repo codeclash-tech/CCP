@@ -86,13 +86,19 @@ test("executes locally and submits a transcript bound to the source and one-use 
 
   assert.equal(result.questionResult.status, "ACCEPTED");
   assert.equal(requests.length, 2);
-  assert.equal(requests[0].url.endsWith("/ABC234/desktop-execution"), true);
+  assert.equal(
+    new URL(requests[0].url).pathname,
+    "/api/battle-rooms/ABC234/desktop-execution",
+  );
   assert.equal(
     requests[0].body.codeHash,
     createHash("sha256").update(request.code, "utf8").digest("hex"),
   );
   assert.match(requests[0].body.executionId, /^[a-f\d-]{36}$/i);
-  assert.equal(requests[1].url.endsWith("/ABC234/desktop-finalize"), true);
+  assert.equal(
+    new URL(requests[1].url).pathname,
+    "/api/battle-rooms/ABC234/desktop-finalize",
+  );
   assert.equal(requests[1].body.transcript.sourceHash, requests[0].body.codeHash);
   assert.equal(requests[1].body.transcript.nonce, "a".repeat(64));
   assert.equal(requests[1].body.transcript.executionId, requests[0].body.executionId);
@@ -189,11 +195,17 @@ test("submits Daily Challenge transcript using the cycle-bound grant routes", as
   );
 
   assert.equal(result.submission.status, "FINALIZED");
-  assert.equal(requests[0].url.endsWith("/weekly-assessments/desktop-grant"), true);
+  assert.equal(
+    new URL(requests[0].url).pathname,
+    "/api/weekly-assessments/desktop-grant",
+  );
   assert.equal(requests[0].body.cycleId, request.cycleId);
   assert.equal(requests[0].body.questionId, request.questionId);
   assert.equal(requests[0].body.sourceHash, createHash("sha256").update(request.code, "utf8").digest("hex"));
-  assert.equal(requests[1].url.endsWith("/weekly-assessments/desktop-finalize"), true);
+  assert.equal(
+    new URL(requests[1].url).pathname,
+    "/api/weekly-assessments/desktop-finalize",
+  );
 });
 
 test("rejects unapproved API origins before making a request", async () => {

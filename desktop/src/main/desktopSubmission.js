@@ -126,6 +126,12 @@ function normalizeGrant(grant) {
   return grant.nonce;
 }
 
+function apiEndpoint(apiBaseUrl, endpointPath) {
+  const basePath = apiBaseUrl.pathname.replace(/\/+$/, "");
+  const endpoint = endpointPath.replace(/^\/+/, "");
+  return new URL(`${basePath}/${endpoint}`, apiBaseUrl.origin);
+}
+
 async function submitDesktopLocalResult({
   assessmentType,
   fetchImpl = fetch,
@@ -145,15 +151,13 @@ async function submitDesktopLocalResult({
   const executionId = randomUUID();
   const basePath =
     assessmentType === "BATTLE_ROOM"
-      ? `/battle-rooms/${request.roomCode.toUpperCase()}`
-      : "/weekly-assessments";
+      ? `battle-rooms/${request.roomCode.toUpperCase()}`
+      : "weekly-assessments";
   const grant = await requestJson(
     fetchImpl,
-    new URL(
-      assessmentType === "BATTLE_ROOM"
-        ? `${basePath}/desktop-execution`
-        : `${basePath}/desktop-grant`,
+    apiEndpoint(
       apiBaseUrl,
+      `${basePath}/${assessmentType === "BATTLE_ROOM" ? "desktop-execution" : "desktop-grant"}`,
     ),
     request.accessToken,
     {
@@ -201,12 +205,7 @@ async function submitDesktopLocalResult({
 
   return requestJson(
     fetchImpl,
-    new URL(
-      assessmentType === "BATTLE_ROOM"
-        ? `${basePath}/desktop-finalize`
-        : `${basePath}/desktop-finalize`,
-      apiBaseUrl,
-    ),
+    apiEndpoint(apiBaseUrl, `${basePath}/desktop-finalize`),
     request.accessToken,
     { transcript, transcriptHash },
     REQUEST_TIMEOUT_MS,
