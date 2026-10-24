@@ -172,6 +172,10 @@
   font-size: 12px;
 }
 
+.weekly-end-test {
+  flex: 0 0 auto;
+}
+
 .weekly-challenge-timer {
   display: inline-flex;
   align-items: center;

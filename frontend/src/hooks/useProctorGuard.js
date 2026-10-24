@@ -1,42 +1,74 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-// Any single violation immediately disqualifies the user (score 0)
-export default function useProctorGuard({ onDisqualified, enabled = true }) {
+function createSessionId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
+
+export default function useProctorGuard({
+  assessmentId,
+  assessmentType,
+  onIntegrityEvent,
+  enabled = true,
+}) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [warning, setWarning] = useState(null);
-  const [isDisqualified, setIsDisqualified] = useState(false);
   const enabledRef = useRef(enabled);
   const wasEnabledRef = useRef(enabled);
-  const disqualifiedRef = useRef(false);
+  const sessionIdRef = useRef("");
+  const sequenceRef = useRef(0);
+  const onIntegrityEventRef = useRef(onIntegrityEvent);
+  const eventQueueRef = useRef(Promise.resolve());
+
+  useEffect(() => {
+    onIntegrityEventRef.current = onIntegrityEvent;
+  }, [onIntegrityEvent]);
+
+  useEffect(() => {
+    sessionIdRef.current = createSessionId();
+    sequenceRef.current = 0;
+    eventQueueRef.current = Promise.resolve();
+  }, [assessmentId, assessmentType]);
+
+  const recordIntegrityEvent = useCallback((eventType, reason = "") => {
+    if (!sessionIdRef.current) sessionIdRef.current = createSessionId();
+    const event = {
+      assessmentId,
+      assessmentType,
+      sessionId: sessionIdRef.current,
+      sequence: ++sequenceRef.current,
+      eventType,
+      timestamp: new Date().toISOString(),
+      reason,
+    };
+    setWarning({
+      reason,
+      message: "Integrity activity is recorded as evidence for review; it does not automatically disqualify you.",
+    });
+    const record = onIntegrityEventRef.current;
+    if (record) {
+      const queued = eventQueueRef.current
+        .catch(() => undefined)
+        .then(() => record(event));
+      eventQueueRef.current = queued;
+      queued.catch((error) => {
+        console.error("Failed to record assessment integrity evidence:", error);
+      });
+    }
+  }, [assessmentId, assessmentType]);
 
   useEffect(() => {
     enabledRef.current = enabled;
     if (wasEnabledRef.current && !enabled) {
       if (document.fullscreenElement && document.exitFullscreen) {
         document.exitFullscreen().catch((error) => {
-          console.error("Failed to exit fullscreen after the battle ended:", error);
+          console.error("Failed to exit fullscreen after the assessment ended:", error);
         });
       }
       setIsFullscreen(false);
     }
     wasEnabledRef.current = enabled;
   }, [enabled]);
-
-  const disqualify = useCallback(
-    (reason) => {
-      if (disqualifiedRef.current) return;
-      disqualifiedRef.current = true;
-      setIsDisqualified(true);
-      setWarning({
-        reason,
-        message: `Proctoring violation: ${reason}. Your official challenge score has been set to 0.`,
-      });
-      if (onDisqualified) {
-        onDisqualified(reason);
-      }
-    },
-    [onDisqualified]
-  );
 
   const requestFullscreen = useCallback(async () => {
     if (!enabledRef.current) return;
@@ -50,117 +82,100 @@ export default function useProctorGuard({ onDisqualified, enabled = true }) {
         setIsFullscreen(true);
       }
     } catch {
-      disqualify("Failed to enter fullscreen mode");
+      recordIntegrityEvent(
+        "FULLSCREEN_EXIT",
+        "Failed to enter fullscreen mode",
+      );
     }
-  }, [disqualify]);
+  }, [recordIntegrityEvent]);
 
   const exitAssessment = useCallback(() => {
-    try {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
-    } catch {
-      // ignore
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch((error) => {
+        console.error("Failed to exit assessment fullscreen:", error);
+      });
     }
     setIsFullscreen(false);
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
+    recordIntegrityEvent("ASSESSMENT_START", "Assessment monitoring started");
     const handleFullscreenChange = () => {
       const isFs = !!document.fullscreenElement;
       setIsFullscreen(isFs);
-      if (!isFs && !disqualifiedRef.current) {
-        disqualify("Exited fullscreen mode");
+      if (!isFs) {
+        recordIntegrityEvent("FULLSCREEN_EXIT", "Exited fullscreen mode");
       }
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden && !disqualifiedRef.current) {
-        disqualify("Tab switch detected");
+      if (document.hidden) {
+        recordIntegrityEvent("TAB_SWITCH", "Tab switch detected");
       }
     };
 
     const handleWindowBlur = () => {
-      if (!disqualifiedRef.current) {
-        disqualify("Window focus lost");
-      }
+      recordIntegrityEvent("WINDOW_BLUR", "Window focus lost");
     };
 
-    // Block copy/paste OUTSIDE the code editor.
-    // The code editor itself handles its own copy/paste via Monaco.
-    const handleCopy = (e) => {
-      // Allow copy if the target is inside the Monaco editor
-      const target = e.target;
-      if (target && target.closest && target.closest(".monaco-editor")) {
-        return;
-      }
-      e.preventDefault();
-      disqualify("Copy action outside editor detected");
+    const handleCopy = (event) => {
+      if (event.target?.closest?.(".monaco-editor")) return;
+      event.preventDefault();
+      recordIntegrityEvent("COPY_ATTEMPT", "Copy action outside editor detected");
     };
 
-    const handlePaste = (e) => {
-      const target = e.target;
-      if (target && target.closest && target.closest(".monaco-editor")) {
-        return;
-      }
-      e.preventDefault();
-      disqualify("Paste action outside editor detected");
+    const handlePaste = (event) => {
+      if (event.target?.closest?.(".monaco-editor")) return;
+      event.preventDefault();
+      recordIntegrityEvent("PASTE_ATTEMPT", "Paste action outside editor detected");
     };
 
-    const handleCut = (e) => {
-      const target = e.target;
-      if (target && target.closest && target.closest(".monaco-editor")) {
-        return;
-      }
-      e.preventDefault();
+    const handleCut = (event) => {
+      if (event.target?.closest?.(".monaco-editor")) return;
+      event.preventDefault();
     };
 
-    const handleContextMenu = (e) => {
-      e.preventDefault();
+    const handleContextMenu = (event) => event.preventDefault();
+
+    const handleSelectStart = (event) => {
+      if (event.target?.closest?.(".monaco-editor")) return;
+      event.preventDefault();
     };
 
-    const handleSelectStart = (e) => {
-      const target = e.target;
-      if (target && target.closest && target.closest(".monaco-editor")) {
-        return;
-      }
-      e.preventDefault();
-    };
-
-    const handleKeyDown = (e) => {
-      if (disqualifiedRef.current) return;
-
-      // Block dev tools
+    const handleKeyDown = (event) => {
       if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "J")) ||
-        (e.metaKey && e.shiftKey && (e.key === "I" || e.key === "J"))
+        event.key === "F12" ||
+        ((event.ctrlKey || event.metaKey) &&
+          event.shiftKey &&
+          ["I", "J"].includes(event.key.toUpperCase()))
       ) {
-        e.preventDefault();
-        e.stopPropagation();
-        disqualify("Developer tools access blocked");
+        event.preventDefault();
+        event.stopPropagation();
+        recordIntegrityEvent("DEVTOOLS_OPEN", "Developer tools shortcut detected");
         return;
       }
 
-      // Block copy/paste shortcuts OUTSIDE the editor
-      const isInEditor = e.target && e.target.closest && e.target.closest(".monaco-editor");
-      if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "v" || e.key === "x")) {
-        if (!isInEditor) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (e.key === "c" || e.key === "v") {
-            disqualify("Copy/paste shortcut outside editor");
-          }
+      const isInEditor = event.target?.closest?.(".monaco-editor");
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        ["c", "v", "x"].includes(event.key.toLowerCase()) &&
+        !isInEditor
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.key.toLowerCase() === "c") {
+          recordIntegrityEvent("COPY_ATTEMPT", "Copy shortcut outside editor detected");
+        } else if (event.key.toLowerCase() === "v") {
+          recordIntegrityEvent("PASTE_ATTEMPT", "Paste shortcut outside editor detected");
         }
       }
 
-      // Block view source
-      if ((e.ctrlKey || e.metaKey) && e.key === "u") {
-        e.preventDefault();
-        e.stopPropagation();
-        disqualify("View source blocked");
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "u") {
+        event.preventDefault();
+        event.stopPropagation();
+        recordIntegrityEvent("KEYBOARD_SHORTCUT", "View source shortcut detected");
       }
     };
 
@@ -185,14 +200,14 @@ export default function useProctorGuard({ onDisqualified, enabled = true }) {
       document.removeEventListener("selectstart", handleSelectStart, true);
       document.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [enabled, disqualify]);
+  }, [enabled, recordIntegrityEvent]);
 
   return {
     isFullscreen:
       isFullscreen ||
       (typeof document !== "undefined" && !!document.fullscreenElement),
     warning,
-    isDisqualified,
+    isDisqualified: false,
     requestFullscreen,
     exitAssessment,
   };

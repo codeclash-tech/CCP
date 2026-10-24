@@ -3,19 +3,21 @@ import { ShieldAlert, Maximize2, AlertTriangle, X } from "lucide-react";
 
 export default function ProctorGuard({
   challengeId,
+  assessmentId = challengeId,
+  assessmentType = "BATTLE_ROOM",
   challengeLabel = "battle",
-  onDisqualified,
+  onIntegrityEvent,
   enabled,
   onExit,
 }) {
   const {
     isFullscreen,
     warning,
-    isDisqualified,
     requestFullscreen,
   } = useProctorGuard({
-    challengeId,
-    onDisqualified,
+    assessmentId,
+    assessmentType,
+    onIntegrityEvent,
     enabled,
   });
 
@@ -119,7 +121,7 @@ export default function ProctorGuard({
         }
       `}</style>
 
-      {enabled && !isFullscreen && !isDisqualified && (
+      {enabled && !isFullscreen && (
         <div className="pg-overlay">
           <div className="pg-modal">
             <button className="pg-exit" type="button" aria-label="Leave challenge" onClick={onExit}>
@@ -139,27 +141,10 @@ export default function ProctorGuard({
         </div>
       )}
 
-      {enabled && isDisqualified && (
-        <div className="pg-overlay">
-          <div className="pg-modal pg-disqualified">
-            <ShieldAlert size={40} color="var(--color-danger)" style={{ marginBottom: 16 }} />
-            <h2>Disqualified</h2>
-            <p>
-              A proctoring violation was detected (tab switch, window blur, or
-              unauthorized copy/paste outside the editor).
-              Your official score has been set to 0.
-            </p>
-            <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 8 }}>
-              {warning ? `Reason: ${warning.reason}` : "Reason: Proctoring violation detected."}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {warning && !isDisqualified && (
+      {warning && (
         <div className="pg-warning-bar">
           <AlertTriangle size={13} style={{ marginRight: 6, verticalAlign: "middle" }} />
-          {warning.message}
+          {warning.message} {warning.reason ? `Reason: ${warning.reason}` : ""}
         </div>
       )}
     </>

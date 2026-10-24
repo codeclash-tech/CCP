@@ -1,5 +1,6 @@
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import AssessmentIntegritySession from "../models/AssessmentIntegritySession.js";
 import Nonce from "../models/Nonce.js";
 import { createHash } from "node:crypto";
 import { executionService } from "../services/executionService.js";
@@ -28,13 +29,19 @@ import {
 } from "../services/scheduleGuard.js";
 import {
   countRoomTestCases,
+  calculateQuestionScore,
 } from "../services/battleRoomScoring.js";
+import {
+  LOCAL_EXECUTION_PROTOCOL_VERSION,
+  validateLocalExecutionTranscript,
+} from "../services/localExecutionProtocol.js";
 import {
   RANKED_SUBMISSION_STATUSES,
   getRoomSubmissionTime,
   sortRoomSubmissions,
 } from "../services/battleRoomRanking.js";
 import { getOrganizationProfileName } from "../utils/organizationProfile.js";
+import { calculateIntegrityRisk } from "../services/assessmentIntegrityService.js";
 import {
   normalizeAllowedEmails,
 } from "../utils/battleRoomAccess.js";
@@ -48,6 +55,30 @@ import {
 } from "../services/battleRoomVerificationService.js";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
+const DESKTOP_ENGINE_VERSION = process.env.CODECLASH_ENGINE_VERSION || "1.0.0";
+
+function hashVersion(value) {
+  return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
+}
+
+function getQuestionExecutionVersions(question) {
+  const visibleTestCases = (question.visibleTestCases || []).map((testCase) => ({
+    input: testCase.input,
+    expectedOutput: testCase.expectedOutput ?? "",
+  }));
+  return {
+    challengeVersion: hashVersion({
+      title: question.title,
+      description: question.description,
+      signature: question.signature || null,
+      points: Number(question.points) || 0,
+      visibleTestCases,
+    }),
+    testSetVersion: hashVersion(visibleTestCases),
+    visibleTestCases,
+  };
+}
 
 function logBattleRoomSubmissionEvent(event, details) {
   if (process.env.BATTLE_ROOM_PERF_LOGS !== "true") return;
@@ -125,6 +156,7 @@ function buildParticipantSubmissionResponse(
       status: questionResult.status,
       verificationStatus:
         questionResult.verificationStatus || (verified ? "VERIFIED" : null),
+      executionMode: questionResult.executionMode || "SERVER_VERIFIED",
       verificationSubmittedAt: questionResult.verificationSubmittedAt || null,
       verificationStartedAt: questionResult.verificationStartedAt || null,
       verificationCompletedAt: questionResult.verificationCompletedAt || null,
@@ -165,6 +197,267 @@ function buildParticipantSubmissionResponse(
     submissionStatus: currentSubmission.status,
     allCompleted,
   };
+}
+
+export async function finalizeDesktopLocalSubmission(req, res) {
+  let nonceClaim = null;
+  try {
+    const { roomCode } = req.params;
+    const { transcript, transcriptHash } = req.body || {};
+    if (!/^[A-Z0-9]{6}$/i.test(roomCode || "")) {
+      return res.status(400).json({ error: "A valid battle room code is required." });
+    }
+    if (!transcript || typeof transcript !== "object" || Array.isArray(transcript)) {
+      return res.status(400).json({ error: "A local execution transcript is required." });
+    }
+    if (transcript.executionProtocolVersion !== LOCAL_EXECUTION_PROTOCOL_VERSION) {
+      return res.status(400).json({ error: "The execution protocol version is unsupported." });
+    }
+
+    const room = await BattleRoom.findOne({
+      roomCode: roomCode.toUpperCase(),
+      isActive: true,
+      isDeleted: false,
+    }).lean();
+    if (!room) return res.status(404).json({ error: "Battle room not found." });
+
+    const submission = await BattleRoomSubmission.findOne({
+      roomId: room._id,
+      userId: req.userId,
+    }).lean();
+    if (!submission) {
+      return res.status(403).json({ error: "You have not joined this battle." });
+    }
+    if (submission.status === "DISQUALIFIED") {
+      return res.status(403).json({ error: "You have been disqualified." });
+    }
+
+    const question = room.questions.find(
+      (candidate) => String(candidate._id) === transcript.challengeId,
+    );
+    if (!question) {
+      return res.status(404).json({ error: "Question not found in this room." });
+    }
+    const questionIndex = submission.questionResults.findIndex(
+      (result) => String(result.questionId) === transcript.challengeId,
+    );
+    if (questionIndex < 0) {
+      return res.status(403).json({ error: "Question is not assigned to your submission." });
+    }
+
+    const previous = submission.questionResults[questionIndex];
+    if (submission.status === "COMPLETED" || previous.executionId) {
+      return res.status(409).json({
+        error: "This local execution has already been finalized.",
+        code: "DUPLICATE_FINALIZATION",
+      });
+    }
+
+    const { challengeVersion, testSetVersion, visibleTestCases } =
+      getQuestionExecutionVersions(question);
+    const sourceHash = transcript.sourceHash;
+    const nonceResource =
+      `${room._id}:${submission._id}:${question._id}:${sourceHash}:${transcript.executionId}:${challengeVersion}:${testSetVersion}:${DESKTOP_CLIENT_VERSION}:${DESKTOP_ENGINE_VERSION}`;
+    if (typeof transcript.nonce !== "string" || !/^[a-f\d]{64}$/i.test(transcript.nonce)) {
+      return res.status(400).json({ error: "A valid execution grant is required." });
+    }
+    if (!isCodeExecutionAllowed(room)) {
+      const windowState = getRoomWindowState(room);
+      return res.status(403).json({
+        error:
+          windowState.state === ROOM_WINDOW_STATE.NOT_STARTED
+            ? "Challenge has not started yet."
+            : "Time is up! The battle has ended.",
+        windowState: windowState.state,
+        serverTime: windowState.now.toISOString(),
+      });
+    }
+
+    const validation = validateLocalExecutionTranscript({
+      transcript,
+      transcriptHash,
+      expected: {
+        executionId: transcript.executionId,
+        assessmentId: String(room._id),
+        submissionId: String(submission._id),
+        challengeId: String(question._id),
+        challengeVersion,
+        sourceHash,
+        nonce: transcript.nonce,
+        clientVersion: DESKTOP_CLIENT_VERSION,
+        engineVersion: DESKTOP_ENGINE_VERSION,
+        testSetVersion,
+        testCount: visibleTestCases.length,
+        allowedClientVersion: DESKTOP_CLIENT_VERSION,
+        allowedEngineVersion: DESKTOP_ENGINE_VERSION,
+      },
+    });
+
+    nonceClaim = await Nonce.claimDesktopSubmission(
+      req.userId,
+      transcript.nonce,
+      nonceResource,
+    );
+    if (!nonceClaim.nonce || !nonceClaim.claimed) {
+      return res.status(409).json({
+        error: "The local execution grant is invalid, expired, or already used.",
+        code: "EXECUTION_GRANT_REJECTED",
+      });
+    }
+
+    const submittedAt = new Date();
+    const resultDetails = validation.results.map((result, index) => ({
+      testCase: index + 1,
+      status: result.status,
+      executionTime: result.executionTime,
+      memoryUsed: result.memoryUsed,
+      isHidden: false,
+    }));
+    const passed = validation.passed;
+    const total = validation.total;
+    const failed = total - passed;
+    const score = calculateQuestionScore(
+      Number(question.points) || 0,
+      passed,
+      total,
+    );
+    const timeToSolve = Math.max(
+      0,
+      Math.floor((submittedAt - new Date(submission.startTime)) / 1000),
+    );
+    const result = {
+      ...previous,
+      revision: (previous.revision || 0) + 1,
+      executionId: transcript.executionId,
+      sourceHash,
+      executionMode: "DESKTOP_LOCAL",
+      transcriptHash: transcriptHash.toLowerCase(),
+      clientVersion: transcript.clientVersion,
+      engineVersion: transcript.engineVersion,
+      executionProtocolVersion: transcript.executionProtocolVersion,
+      riskSignals: validation.riskSignals,
+      riskScore: validation.riskScore,
+      riskLevel: validation.riskLevel,
+      executionTranscript: transcript,
+      code: "",
+      language: "java",
+      status: validation.status,
+      verificationStatus: "VERIFIED",
+      verificationSubmittedAt: submittedAt,
+      verificationStartedAt: new Date(transcript.startTime),
+      verificationCompletedAt: new Date(transcript.endTime),
+      verificationError: "",
+      verificationAttempts: 1,
+      verificationTestCases: [],
+      verificationSignature: null,
+      verificationPoints: 0,
+      score,
+      passed,
+      failed,
+      total,
+      executionTime: validation.durationMs,
+      memoryUsed: Math.max(...validation.results.map((item) => item.memoryUsed), 0),
+      timeToSolve,
+      output: "",
+      error: "",
+      results: resultDetails,
+    };
+    delete result._id;
+
+    const saved = await BattleRoomSubmission.updateOne(
+      {
+        _id: submission._id,
+        status: { $in: ["PENDING", "PROCESSING"] },
+        [`questionResults.${questionIndex}.revision`]: previous.revision || 0,
+        [`questionResults.${questionIndex}.executionId`]: previous.executionId || "",
+        [`questionResults.${questionIndex}.verificationStatus`]:
+          previous.verificationStatus ?? null,
+      },
+      {
+        $set: {
+          [`questionResults.${questionIndex}`]: result,
+          status: "PROCESSING",
+        },
+        $inc: {
+          totalScore: score - (previous.score || 0),
+          totalPassed: passed - (previous.passed || 0),
+          totalFailed: failed - (previous.failed || 0),
+        },
+      },
+    );
+    if (saved.matchedCount !== 1) {
+      await Nonce.releaseDesktopSubmission(
+        nonceClaim.nonce._id,
+        nonceClaim.claimId,
+      );
+      nonceClaim = null;
+      return res.status(409).json({
+        error: "The submission changed while the local result was being finalized.",
+        code: "SUBMISSION_STATE_CHANGED",
+      });
+    }
+
+    const completedGrant = await Nonce.completeDesktopSubmission(
+      nonceClaim.nonce._id,
+      nonceClaim.claimId,
+    );
+    if (!completedGrant) {
+      console.error("[LocalSubmission] Result saved but the execution grant could not be finalized.", {
+        executionId: transcript.executionId,
+        requestId: req.requestId || "",
+      });
+    }
+    nonceClaim = null;
+    await finalizeBattleRoomSubmission(String(submission._id));
+    const currentSubmission = await BattleRoomSubmission.findById(submission._id).lean();
+    if (currentSubmission?.status === "COMPLETED") {
+      try {
+        await AssessmentIntegritySession.updateMany(
+          {
+            assessmentType: "BATTLE_ROOM",
+            assessmentId: room._id,
+            userId: req.userId,
+            finalizedAt: null,
+          },
+          { $set: { finalizedAt: new Date() } },
+        );
+      } catch (error) {
+        console.error("[AssessmentIntegrity] Could not finalize Battle Room event sessions:", {
+          message: error.message,
+          submissionId: String(submission._id),
+        });
+      }
+    }
+    logBattleRoomSubmissionEvent("local_submission_finalized", {
+      executionId: transcript.executionId,
+      submissionId: String(submission._id),
+      userId: String(req.userId),
+      riskSignals: validation.riskSignals,
+      requestId: req.requestId || "",
+    });
+    return res.status(201).json(
+      buildParticipantSubmissionResponse(
+        result,
+        currentSubmission,
+        visibleTestCases.length,
+        0,
+      ),
+    );
+  } catch (error) {
+    if (nonceClaim?.claimed && nonceClaim.nonce) {
+      await Nonce.releaseDesktopSubmission(
+        nonceClaim.nonce._id,
+        nonceClaim.claimId,
+      );
+    }
+    console.error("Finalize local Battle Room submission error:", {
+      message: error?.message || String(error),
+      requestId: req.requestId || "",
+    });
+    return res.status(error instanceof TypeError ? 400 : 500).json({
+      error: error.message || "Could not finalize the local execution result.",
+    });
+  }
 }
 
 /**
@@ -1037,6 +1330,152 @@ export async function getRoomParticipants(req, res) {
       .sort({ createdAt: 1 })
       .select("userId participantEmail participantName participantOrganization status totalScore submittedAt startTime createdAt")
       .lean();
+    const [securitySubmissions, integritySessions] = await Promise.all([
+      BattleRoomSubmission.find({ roomId: room._id })
+        .select(
+          "userId questionResults.questionId questionResults.executionId questionResults.sourceHash questionResults.executionMode questionResults.transcriptHash questionResults.clientVersion questionResults.engineVersion questionResults.executionProtocolVersion questionResults.riskSignals questionResults.riskScore questionResults.riskLevel questionResults.status questionResults.score questionResults.passed questionResults.total questionResults.executionTime +questionResults.executionTranscript",
+        )
+        .lean(),
+      AssessmentIntegritySession.find({
+        assessmentType: "BATTLE_ROOM",
+        assessmentId: room._id,
+      }).lean(),
+    ]);
+    const sessionsByUser = new Map();
+    for (const session of integritySessions) {
+      const userId = String(session.userId);
+      const sessions = sessionsByUser.get(userId) || [];
+      sessions.push(session);
+      sessionsByUser.set(userId, sessions);
+    }
+    const participantNameByUser = new Map(
+      participants.map((participant) => [
+        String(participant.userId),
+        participant.participantName,
+      ]),
+    );
+    const sourceHashGroups = new Map();
+    for (const submission of securitySubmissions) {
+      for (const result of submission.questionResults || []) {
+        if (
+          result.executionMode !== "DESKTOP_LOCAL" ||
+          !result.sourceHash ||
+          ["PENDING", "PROCESSING"].includes(result.status)
+        ) {
+          continue;
+        }
+        const key = `${result.questionId}:${result.sourceHash}`;
+        const matching = sourceHashGroups.get(key) || [];
+        matching.push({
+          submissionId: String(submission._id),
+          userId: String(submission.userId),
+        });
+        sourceHashGroups.set(key, matching);
+      }
+    }
+    const reportByUser = new Map();
+    for (const submission of securitySubmissions) {
+      const sessions = sessionsByUser.get(String(submission.userId)) || [];
+      const executions = (submission.questionResults || [])
+        .filter((result) => result.executionMode === "DESKTOP_LOCAL")
+        .map((result) => {
+          const transcript = result.executionTranscript;
+          return {
+            questionId: String(result.questionId),
+            executionMode: result.executionMode,
+            executionId: result.executionId,
+            sourceHash: result.sourceHash,
+            transcriptHash: result.transcriptHash,
+            clientVersion: result.clientVersion,
+            engineVersion: result.engineVersion,
+            executionProtocolVersion: result.executionProtocolVersion,
+            resultStatus: result.status,
+            score: result.score,
+            passed: result.passed,
+            total: result.total,
+            riskSignals: result.riskSignals,
+            riskScore: result.riskScore,
+            riskLevel: result.riskLevel,
+            exactSourceMatches: (sourceHashGroups.get(
+              `${result.questionId}:${result.sourceHash}`,
+            ) || [])
+              .filter((match) => match.userId !== String(submission.userId))
+              .map((match) => ({
+                submissionId: match.submissionId,
+                candidateName:
+                  participantNameByUser.get(match.userId) || "Unknown participant",
+              })),
+            timeline: transcript
+              ? {
+                  startTime: transcript.startTime,
+                  endTime: transcript.endTime,
+                  durationMs: transcript.durationMs,
+                  testOutcomes: (transcript.results || []).map((outcome) => ({
+                    testCase: outcome.testCase,
+                    status: outcome.status,
+                    executionTimeMs: outcome.executionTimeMs,
+                    memoryUsedKb: outcome.memoryUsedKb,
+                  })),
+                }
+              : null,
+          };
+        });
+      const integrityRisk = calculateIntegrityRisk(
+        sessions.flatMap((session) => session.events),
+      );
+      const executionRiskScore = Math.max(
+        0,
+        ...executions.map((execution) => execution.riskScore || 0),
+      );
+      const hasExactSourceMatch = executions.some(
+        (execution) => execution.exactSourceMatches.length > 0,
+      );
+      const riskScore = Math.min(
+        100,
+        executionRiskScore +
+          integrityRisk.riskScore +
+          (hasExactSourceMatch ? 40 : 0),
+      );
+      reportByUser.set(String(submission.userId), {
+        executions,
+        integritySessions: sessions.map((session) => ({
+          sessionId: session.sessionId,
+          startedAt: session.startedAt,
+          lastEventAt: session.lastEventAt,
+          lastSequence: session.lastSequence,
+          events: [...session.events].sort(
+            (left, right) => left.sequence - right.sequence,
+          ),
+          ...calculateIntegrityRisk(session.events),
+        })),
+        riskScore,
+        riskLevel:
+          riskScore >= 60 ? "HIGH" : riskScore >= 25 ? "MEDIUM" : "LOW",
+        evidenceOnly: true,
+      });
+    }
+    for (const session of integritySessions) {
+      const userId = String(session.userId);
+      if (reportByUser.has(userId)) continue;
+      const sessions = sessionsByUser.get(userId) || [];
+      reportByUser.set(userId, {
+        executions: [],
+        integritySessions: sessions.map((item) => ({
+          sessionId: item.sessionId,
+          startedAt: item.startedAt,
+          lastEventAt: item.lastEventAt,
+          lastSequence: item.lastSequence,
+          events: [...item.events].sort(
+            (left, right) => left.sequence - right.sequence,
+          ),
+          ...calculateIntegrityRisk(item.events),
+        })),
+        ...calculateIntegrityRisk(
+          sessions.flatMap((item) => item.events),
+        ),
+        evidenceOnly: true,
+      });
+    }
     return res.json({
       room: {
         roomCode: room.roomCode,
@@ -1045,7 +1484,10 @@ export async function getRoomParticipants(req, res) {
         candidateAccess: room.candidateAccess || "OPEN",
         allowedEmails: room.allowedEmails || [],
       },
-      participants,
+      participants: participants.map((participant) => ({
+        ...participant,
+        securityReport: reportByUser.get(String(participant.userId)) || null,
+      })),
     });
   } catch (error) {
     console.error("Load room candidates error:", error.message);
@@ -1372,8 +1814,15 @@ export async function joinRoom(req, res) {
 
 export async function prepareDesktopSubmission(req, res) {
   try {
+    const {
+      questionId,
+      codeHash,
+      executionId,
+      clientVersion,
+      engineVersion,
+      executionProtocolVersion,
+    } = req.body || {};
     const { roomCode } = req.params;
-    const { questionId, codeHash } = req.body || {};
     const userId = req.userId;
     if (
       typeof roomCode !== "string" ||
@@ -1388,6 +1837,20 @@ export async function prepareDesktopSubmission(req, res) {
       !/^[a-f\d]{64}$/i.test(codeHash)
     ) {
       return res.status(400).json({ error: "A valid source-code digest is required." });
+    }
+    if (
+      typeof executionId !== "string" ||
+      !/^[a-f\d-]{36}$/i.test(executionId) ||
+      typeof clientVersion !== "string" ||
+      clientVersion !== DESKTOP_CLIENT_VERSION ||
+      typeof engineVersion !== "string" ||
+      engineVersion !== DESKTOP_ENGINE_VERSION ||
+      executionProtocolVersion !== LOCAL_EXECUTION_PROTOCOL_VERSION
+    ) {
+      return res.status(400).json({
+        error: "This CodeClash Desktop or execution protocol version is not supported.",
+        code: "DESKTOP_VERSION_UNSUPPORTED",
+      });
     }
 
     const room = await BattleRoom.findOne({
@@ -1448,10 +1911,8 @@ export async function prepareDesktopSubmission(req, res) {
       });
     }
 
-    const visibleTestCases = (question.visibleTestCases || []).map((testCase) => ({
-      input: testCase.input,
-      expectedOutput: testCase.expectedOutput ?? "",
-    }));
+    const { challengeVersion, testSetVersion, visibleTestCases } =
+      getQuestionExecutionVersions(question);
     const hiddenTestCases = (question.hiddenTestCases || []).map((testCase) => ({
       input: testCase.input,
       expectedOutput: testCase.expectedOutput ?? "",
@@ -1483,7 +1944,7 @@ export async function prepareDesktopSubmission(req, res) {
     }
 
     const nonceResource =
-      `${room._id}:${submission._id}:${questionId}:${codeHash.toLowerCase()}`;
+      `${room._id}:${submission._id}:${questionId}:${codeHash.toLowerCase()}:${executionId}:${challengeVersion}:${testSetVersion}:${clientVersion}:${engineVersion}`;
     const now = new Date();
     const matchingQuestionResult = submission.questionResults.find(
       (result) =>
@@ -1518,8 +1979,20 @@ export async function prepareDesktopSubmission(req, res) {
         nonceResource,
         5 * 60 * 1000,
       ));
+    const grant = await Nonce.findOne({ userId, nonce }).lean();
     return res.status(200).json({
       nonce,
+      executionId,
+      assessmentId: String(room._id),
+      submissionId: String(submission._id),
+      challengeId: String(question._id),
+      challengeVersion,
+      testSetVersion,
+      clientVersion,
+      engineVersion,
+      executionProtocolVersion: LOCAL_EXECUTION_PROTOCOL_VERSION,
+      testCount: visibleTestCases.length,
+      expiresAt: grant?.authorizationExpiresAt || null,
     });
   } catch (error) {
     console.error("Prepare desktop submission error:", error.message);

@@ -63,6 +63,7 @@ export default function RoomParticipants() {
                   <th style={{ padding: 10 }}>Organization</th>
                   <th style={{ padding: 10 }}>Status</th>
                   <th style={{ padding: 10 }}>Score</th>
+                  <th style={{ padding: 10 }}>Security report</th>
                 </tr>
               </thead>
               <tbody>
@@ -73,6 +74,56 @@ export default function RoomParticipants() {
                     <td style={{ padding: 10 }}>{participant.participantOrganization}</td>
                     <td style={{ padding: 10 }}>{participant.status}</td>
                     <td style={{ padding: 10 }}>{Number(participant.totalScore || 0).toFixed(2)}</td>
+                    <td style={{ padding: 10 }}>
+                      {participant.securityReport ? (
+                        <details>
+                          <summary>
+                            {participant.securityReport.riskLevel} risk · {participant.securityReport.riskScore}/100
+                          </summary>
+                          <div>
+                            {participant.securityReport.executions.map((execution) => (
+                              <section key={execution.executionId}>
+                                <p>Question {execution.questionId} · {execution.executionMode || "DESKTOP_LOCAL"} · {execution.resultStatus}</p>
+                                <p>Client / engine: {execution.clientVersion} / {execution.engineVersion}</p>
+                                <p>Protocol: {execution.executionProtocolVersion}</p>
+                                <p>Execution ID: <code>{execution.executionId}</code></p>
+                                <p>Source SHA-256: <code>{execution.sourceHash}</code></p>
+                                <p>Transcript SHA-256: <code>{execution.transcriptHash}</code></p>
+                                {execution.riskSignals?.length > 0
+                                  ? <p>Signals: {execution.riskSignals.join(", ")}</p>
+                                  : <p>No execution anomalies recorded.</p>}
+                                {execution.exactSourceMatches?.length > 0 && (
+                                  <>
+                                    <p>Exact source-hash match (review signal only):</p>
+                                    <ul>{execution.exactSourceMatches.map((match) => (
+                                      <li key={match.submissionId}>
+                                        {match.candidateName} · submission {match.submissionId}
+                                      </li>
+                                    ))}</ul>
+                                  </>
+                                )}
+                                <p>Desktop-local result; the server did not independently re-execute it.</p>
+                              </section>
+                            ))}
+                            {participant.securityReport.integritySessions.map((session) => (
+                              <section key={session.sessionId}>
+                                <p>Session {session.sessionId} · {session.riskLevel} risk ({session.riskScore}/100)</p>
+                                <ul>
+                                  {session.events.map((event) => (
+                                    <li key={event.sequence}>
+                                      #{event.sequence} {event.eventType} · {event.occurredAt}
+                                      {event.sequenceGapBefore > 0 ? ` · ${event.sequenceGapBefore} sequence gap(s)` : ""}
+                                      {event.reason ? ` · ${event.reason}` : ""}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </section>
+                            ))}
+                            <p>These signals are evidence for review, not proof of misconduct.</p>
+                          </div>
+                        </details>
+                      ) : "No report available"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

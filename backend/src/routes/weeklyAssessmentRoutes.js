@@ -1,15 +1,18 @@
 import { Router } from "express";
 import { authenticate } from "../middleware/auth.js";
 import { requireAssessmentRole } from "../middleware/rbac.js";
+import { executionLimiter } from "../middleware/security.js";
 import {
   assignCandidateOrganizationHandler,
   createAdminOrganization,
   createOwnOrganizationProfile,
+  createDesktopWeeklyExecutionGrant,
   createWeeklyCycleHandler,
   disqualifyWeeklyCandidateHandler,
   disqualifyCurrentWeeklyCandidateHandler,
   downloadWeeklyCertificate,
   finalizeWeeklyCycleHandler,
+  finalizeDesktopWeeklyExecution,
   getAdminWeeklyRoster,
   getCurrentWeeklyAssessment,
   getAdminGlobalChallenge,
@@ -41,6 +44,18 @@ const organizationUser = [authenticate, requireAssessmentRole("ORGANIZATION_USER
 
 router.get("/current", ...candidate, getCurrentWeeklyAssessment);
 router.post("/submit", ...candidate, submitCurrentWeeklyAnswer);
+router.post(
+  "/desktop-grant",
+  ...candidate,
+  executionLimiter,
+  createDesktopWeeklyExecutionGrant,
+);
+router.post(
+  "/desktop-finalize",
+  ...candidate,
+  executionLimiter,
+  finalizeDesktopWeeklyExecution,
+);
 router.post(
   "/cycles/:cycleId/disqualify",
   ...candidate,

@@ -1,8 +1,13 @@
-import { createHash } from "node:crypto";
+import { performance } from "node:perf_hooks";
+import { randomUUID } from "node:crypto";
+import {
+  createLocalExecutionTranscript,
+  hashSource,
+} from "./localExecutionTranscript.js";
 
 const PRODUCTION_API_HOST = "ccp-backend-qylz.onrender.com";
 const REQUEST_TIMEOUT_MS = 15_000;
-const SUBMISSION_TIMEOUT_MS = 15_000;
+const LOCAL_EXECUTION_PROTOCOL_VERSION = 1;
 
 function getApiBaseUrl(rawUrl, isPackaged) {
   let apiUrl;
@@ -34,15 +39,24 @@ function getApiBaseUrl(rawUrl, isPackaged) {
   return apiUrl;
 }
 
-function assertSubmissionRequest(request) {
+function assertSubmissionRequest(request, assessmentType) {
   if (!request || typeof request !== "object" || Array.isArray(request)) {
     throw new TypeError("A desktop submission request is required.");
   }
-  if (!/^[A-Z0-9]{6}$/i.test(request.roomCode || "")) {
-    throw new TypeError("A valid Battle Room code is required.");
-  }
   if (!/^[a-f\d]{24}$/i.test(request.questionId || "")) {
     throw new TypeError("A valid question ID is required.");
+  }
+  if (
+    assessmentType === "BATTLE_ROOM" &&
+    !/^[A-Z0-9]{6}$/i.test(request.roomCode || "")
+  ) {
+    throw new TypeError("A valid Battle Room code is required.");
+  }
+  if (
+    assessmentType === "DAILY_CHALLENGE" &&
+    !/^[a-f\d]{24}$/i.test(request.cycleId || "")
+  ) {
+    throw new TypeError("A valid Daily Challenge cycle ID is required.");
   }
   if (
     typeof request.code !== "string" ||
@@ -57,6 +71,21 @@ function assertSubmissionRequest(request) {
     request.accessToken.length > 8_192
   ) {
     throw new TypeError("An authenticated desktop session is required.");
+  }
+  if (
+    typeof request.executionCode !== "string" ||
+    !request.executionCode.trim() ||
+    !Array.isArray(request.testCases) ||
+    request.testCases.length === 0 ||
+    request.testCases.length > 50 ||
+    request.testCases.some(
+      (testCase) =>
+        !testCase ||
+        typeof testCase.input !== "string" ||
+        typeof testCase.expectedOutput !== "string",
+    )
+  ) {
+    throw new TypeError("The local execution test set is invalid.");
   }
 }
 
@@ -97,40 +126,108 @@ function normalizeGrant(grant) {
   return grant.nonce;
 }
 
-export async function submitDesktopQuestion({
+async function submitDesktopLocalResult({
+  assessmentType,
   fetchImpl = fetch,
+  engine,
   isPackaged,
   request,
+  clientVersion,
+  engineVersion,
 }) {
-  assertSubmissionRequest(request);
+  assertSubmissionRequest(request, assessmentType);
   const apiBaseUrl = getApiBaseUrl(request.apiBaseUrl, isPackaged);
-  const roomPath = `/battle-rooms/${request.roomCode.toUpperCase()}`;
+  if (isPackaged && typeof engine?.verifyIntegrity !== "function") {
+    throw new Error("The packaged Desktop integrity verifier is unavailable.");
+  }
+  await engine?.verifyIntegrity?.();
+  const sourceHash = hashSource(request.code);
+  const executionId = randomUUID();
+  const basePath =
+    assessmentType === "BATTLE_ROOM"
+      ? `/battle-rooms/${request.roomCode.toUpperCase()}`
+      : "/weekly-assessments";
   const grant = await requestJson(
     fetchImpl,
-    new URL(`${roomPath}/desktop-execution`, apiBaseUrl),
+    new URL(
+      assessmentType === "BATTLE_ROOM"
+        ? `${basePath}/desktop-execution`
+        : `${basePath}/desktop-grant`,
+      apiBaseUrl,
+    ),
     request.accessToken,
     {
       questionId: request.questionId,
-      codeHash: createHash("sha256").update(request.code, "utf8").digest("hex"),
+      ...(assessmentType === "BATTLE_ROOM" ? { codeHash: sourceHash } : { sourceHash }),
+      ...(assessmentType === "DAILY_CHALLENGE"
+        ? { cycleId: request.cycleId }
+        : {}),
+      executionId,
+      clientVersion,
+      engineVersion,
+      executionProtocolVersion: LOCAL_EXECUTION_PROTOCOL_VERSION,
     },
     REQUEST_TIMEOUT_MS,
   );
-  const nonce = normalizeGrant(grant);
-  const submission = await requestJson(
-    fetchImpl,
-    new URL(`${roomPath}/submit`, apiBaseUrl),
-    request.accessToken,
-    {
-      questionId: request.questionId,
-      code: request.code,
-      language: "java",
-      desktopNonce: nonce,
-    },
-    SUBMISSION_TIMEOUT_MS,
-  );
 
-  if (!submission.questionResult) {
-    throw new Error("The CodeClash backend returned an incomplete submission result.");
+  const nonce = normalizeGrant(grant);
+  if (
+    grant.executionId !== executionId ||
+    grant.clientVersion !== clientVersion ||
+    grant.engineVersion !== engineVersion ||
+    grant.executionProtocolVersion !== LOCAL_EXECUTION_PROTOCOL_VERSION ||
+    typeof grant.testCount !== "number" ||
+    grant.testCount !== request.testCases.length
+  ) {
+    throw new Error("The CodeClash backend returned a mismatched execution grant.");
   }
-  return submission;
+
+  const executionStartedAt = Date.now();
+  const performanceStartedAt = performance.now();
+  const execution = await engine.execute({
+    code: request.executionCode,
+    language: "java",
+    testCases: request.testCases,
+  });
+  const executionFinishedAt = Date.now();
+  const { transcript, transcriptHash } = createLocalExecutionTranscript({
+    grant: { ...grant, nonce },
+    sourceHash,
+    execution,
+    startedAt: executionStartedAt,
+    finishedAt: executionFinishedAt,
+    durationMs: performance.now() - performanceStartedAt,
+  });
+
+  return requestJson(
+    fetchImpl,
+    new URL(
+      assessmentType === "BATTLE_ROOM"
+        ? `${basePath}/desktop-finalize`
+        : `${basePath}/desktop-finalize`,
+      apiBaseUrl,
+    ),
+    request.accessToken,
+    { transcript, transcriptHash },
+    REQUEST_TIMEOUT_MS,
+  );
+}
+
+export function submitDesktopQuestion(options) {
+  return submitDesktopLocalResult({
+    ...options,
+    assessmentType: "BATTLE_ROOM",
+  }).then((result) => {
+    if (!result.questionResult) {
+      throw new Error("The CodeClash backend returned an incomplete submission result.");
+    }
+    return result;
+  });
+}
+
+export function submitDesktopDailyQuestion(options) {
+  return submitDesktopLocalResult({
+    ...options,
+    assessmentType: "DAILY_CHALLENGE",
+  });
 }

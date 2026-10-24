@@ -6,6 +6,7 @@ import {
   Clock3,
   Code2,
   EyeOff,
+  LogOut,
   Maximize2,
   Monitor,
   Play,
@@ -14,14 +15,23 @@ import {
   Timer,
 } from "lucide-react";
 import api from "../services/api";
-import { executeVisibleCasesLocally } from "../services/localExecutionService";
+import { getFreshAccessTokenForDesktopSubmission } from "../services/api";
+import {
+  executeVisibleCasesLocally,
+  submitDailyChallengeLocally,
+} from "../services/localExecutionService";
 import { runSolution as runOnWeb } from "../services/submissionService";
+import { API_BASE_URL } from "../utils/constants";
 import CodeEditorSandbox from "../components/editor/CodeEditorSandbox";
 import Console from "../components/editor/Console";
 import ProctorGuard from "../components/editor/ProctorGuard";
 import "./WeeklyAssessment.css";
 
 const STARTED_CYCLE_STORAGE_KEY = "ccp-weekly-started-cycle";
+
+function isDesktopLocalResult(submission) {
+  return submission?.executionMode === "DESKTOP_LOCAL";
+}
 
 function recoveryKey(cycleOrId, dayIndex) {
   const cycleId = typeof cycleOrId === "string" ? cycleOrId : cycleOrId.id;
@@ -83,7 +93,6 @@ export default function WeeklyAssessment() {
   const [running, setRunning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [proctoringViolation, setProctoringViolation] = useState(false);
   const [challengeStarted, setChallengeStarted] = useState(false);
   const [startedCycleId, setStartedCycleId] = useState("");
   const [fullscreenError, setFullscreenError] = useState("");
@@ -122,6 +131,9 @@ export default function WeeklyAssessment() {
         return;
       }
       setAssessment(data);
+      if (data.submission?.status === "FINALIZED") {
+        window.dispatchEvent(new Event("ccp-daily-challenge-updated"));
+      }
       const key = recoveryKey(data.cycle, data.dayIndex);
       const saved = readSavedSource(key);
       const initialCode = data.question.starterCodes?.java || "";
@@ -175,6 +187,21 @@ export default function WeeklyAssessment() {
       }
     }
 
+    if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
+      try {
+        await window.codeClashDesktop.window.setChallengeMode(true);
+      } catch (challengeModeError) {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+        setFullscreenError(
+          challengeModeError.message ||
+            "The secure fullscreen challenge window could not be opened.",
+        );
+        return;
+      }
+    }
+
     const cycleId = String(assessment.cycle.id);
     try {
       sessionStorage.setItem(STARTED_CYCLE_STORAGE_KEY, cycleId);
@@ -185,20 +212,48 @@ export default function WeeklyAssessment() {
     setChallengeStarted(true);
   };
 
-  const handleProctoringViolation = async (reason) => {
-    setProctoringViolation(true);
+  const exitChallengeMode = async () => {
+    if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
+      await window.codeClashDesktop.window.setChallengeMode(false);
+    }
+    if (document.fullscreenElement && document.exitFullscreen) {
+      await document.exitFullscreen();
+    }
+    try {
+      sessionStorage.removeItem(STARTED_CYCLE_STORAGE_KEY);
+    } catch (storageError) {
+      console.warn("Unable to clear global challenge session state:", storageError.message);
+    }
+    setChallengeStarted(false);
+    setStartedCycleId("");
+  };
+
+  const endChallenge = async () => {
+    if (!window.confirm("End the daily challenge now? Your current code will not be submitted.")) {
+      return;
+    }
+    try {
+      await exitChallengeMode();
+      navigate("/", { replace: true });
+    } catch (exitError) {
+      setError(exitError.message || "Could not exit the challenge workspace.");
+    }
+  };
+
+  const handleIntegrityEvent = async (event) => {
     if (!assessment?.cycle?.id) return;
     try {
-      await api.post(
-        `/weekly-assessments/cycles/${assessment.cycle.id}/disqualify`,
-        { reason },
-      );
-      await loadAssessment({ preserveError: true, silent: true });
+      await api.post("/assessment-integrity/events", {
+        ...event,
+        assessmentType: "DAILY_CHALLENGE",
+        assessmentId: assessment.cycle.id,
+      });
     } catch (violationError) {
       setError(
         violationError.message ||
-          "The proctoring violation could not be recorded. Contact support before continuing.",
+          "Integrity evidence could not be recorded. Please check your connection.",
       );
+      throw violationError;
     }
   };
 
@@ -261,8 +316,30 @@ export default function WeeklyAssessment() {
       console.warn("Unable to save submission source for recovery:", storageError.message);
     }
     try {
-      await api.post("/weekly-assessments/submit", { code });
+      const data = isDesktop
+        ? await submitDailyChallengeLocally({
+            apiBaseUrl: API_BASE_URL,
+            accessToken: await getFreshAccessTokenForDesktopSubmission(),
+            cycleId: String(assessment.cycle.id),
+            question: assessment.question,
+            code,
+          })
+        : (await api.post("/weekly-assessments/submit", { code })).data;
+      if (!data?.submission?.submissionId || !data.submission.status) {
+        throw new Error("The server did not acknowledge this submission. Please retry.");
+      }
+      setAssessment((current) => current
+        ? { ...current, submission: data.submission }
+        : current);
       await loadAssessment({ preserveError: true, silent: true });
+      window.dispatchEvent(new Event("ccp-daily-challenge-updated"));
+      try {
+        await exitChallengeMode();
+      } catch (exitError) {
+        setError(
+          `Submission received, but fullscreen could not be closed: ${exitError.message}`,
+        );
+      }
     } catch (submitError) {
       setError(submitError.message || "Submission could not be finalized. Retry using the unchanged code.");
       const submissionId = submitError.response?.data?.submissionId;
@@ -368,7 +445,6 @@ export default function WeeklyAssessment() {
     "JUDGING",
   ].includes(assessment.submission?.status);
   const isDisqualified =
-    proctoringViolation ||
     assessment.roster?.participationStatus === "DISQUALIFIED";
   const serverDisqualified =
     assessment.roster?.participationStatus === "DISQUALIFIED";
@@ -408,9 +484,9 @@ export default function WeeklyAssessment() {
           {fullscreenError && <p className="weekly-error" role="alert"><AlertCircle size={16} />{fullscreenError}</p>}
         </section>
         <footer className="weekly-instructions-footer">
-          <span>The challenge workspace opens immediately after you continue.</span>
+          <span>Review the rules before entering the timed challenge workspace.</span>
           <button type="button" className="btn-primary" onClick={enterChallenge}>
-            <Maximize2 size={16} /> Continue
+            <Maximize2 size={16} /> I am ready for the challenge
           </button>
         </footer>
       </main>
@@ -423,10 +499,18 @@ export default function WeeklyAssessment() {
           </div>
           <div className="weekly-coding-meta">
             {assessment.cycle.endAt && <GlobalChallengeTimer endAt={assessment.cycle.endAt} />}
+            <button
+              type="button"
+              className="btn-secondary weekly-end-test"
+              onClick={endChallenge}
+              disabled={submitting}
+            >
+              <LogOut size={14} /> End test
+            </button>
             <span>
               {hasFinalSubmission || !assessment.submission
                 ? `${assessment.roster.score.toFixed(2)} / 100 points today`
-                : "Official score pending verification"}
+                : "Score pending server verification"}
             </span>
           </div>
         </header>
@@ -458,7 +542,7 @@ export default function WeeklyAssessment() {
               <div className="weekly-recovery-row" key={submission.id}>
                 <span>
                   {submission.questionTitle} · {submission.status === "FINALIZED"
-                    ? `Official result: ${submission.resultStatus}`
+                    ? `${isDesktopLocalResult(submission) ? "Desktop local result" : "Server-verified result"}: ${submission.resultStatus}`
                     : submission.status}
                 </span>
                 {submission.status === "FINALIZED" ? (
@@ -527,7 +611,7 @@ export default function WeeklyAssessment() {
               {isVerifying ? (
                 <><strong>Submission received.</strong> Your solution is being verified by CodeClash.</>
               ) : hasFinalSubmission ? (
-                <><strong>Official result:</strong> {submissionResult?.passed ?? assessment.submission.passed}/{submissionResult?.total ?? assessment.submission.total} tests passed · {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} points</>
+                <><strong>{isDesktopLocalResult(submissionResult || assessment.submission) ? "Desktop local result (not independently re-executed)" : "Server-verified result"}:</strong> {submissionResult?.passed ?? assessment.submission.passed}/{submissionResult?.total ?? assessment.submission.total} tests passed · {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} points</>
               ) : canRetry ? (
                 <>Verification could not be completed. Retry the exact saved source.</>
               ) : (
@@ -566,7 +650,7 @@ export default function WeeklyAssessment() {
             </div>
             {hasFinalSubmission && (
               <section className="weekly-result weekly-authoritative-result weekly-final-result" aria-live="polite">
-                <h3><CheckCircle2 size={16} /> Authoritative result · {submissionResult?.resultStatus || submissionResult?.status || assessment.submission.resultStatus}</h3>
+                <h3><CheckCircle2 size={16} /> {isDesktopLocalResult(submissionResult || assessment.submission) ? "Desktop local result · not independently re-executed" : "Server-verified result"} · {submissionResult?.resultStatus || submissionResult?.status || assessment.submission.resultStatus}</h3>
                 <p>{submissionResult?.passed ?? assessment.submission.passed} / {submissionResult?.total ?? assessment.submission.total} test cases passed</p>
                 <p>Daily score: {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} / 100</p>
               </section>
@@ -575,9 +659,16 @@ export default function WeeklyAssessment() {
         </div>
         <ProctorGuard
           challengeId={assessment.cycle.id}
+          assessmentId={assessment.cycle.id}
+          assessmentType="DAILY_CHALLENGE"
           challengeLabel="daily challenge"
-          onDisqualified={handleProctoringViolation}
-          enabled={Boolean(hasStartedChallenge && !hasFinalSubmission && !serverDisqualified)}
+          onIntegrityEvent={handleIntegrityEvent}
+          enabled={Boolean(
+            hasStartedChallenge &&
+              !hasFinalSubmission &&
+              !isVerifying &&
+              !serverDisqualified,
+          )}
           onExit={() => navigate("/", { replace: true })}
         />
       </main>

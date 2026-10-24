@@ -309,3 +309,15 @@ test("daily submission and roster APIs allow any authenticated account", () => {
     assert.notEqual(route.route.stack[1].name, "requireAssessmentRole");
   }
 });
+
+test("Desktop local Daily Challenge endpoints require authentication and execution rate limiting", () => {
+  for (const path of ["/desktop-grant", "/desktop-finalize"]) {
+    const route = weeklyAssessmentRoutes.stack.find(
+      (layer) => layer.route?.path === path,
+    );
+    assert.ok(route, `missing route ${path}`);
+    assert.equal(route.route.stack[0].name, "authenticate");
+    assert.equal(route.route.stack.length, 3);
+    assert.notEqual(route.route.stack[1].name, "requireAssessmentRole");
+  }
+});

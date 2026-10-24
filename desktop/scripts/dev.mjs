@@ -15,11 +15,11 @@ const jarPath = path.join(
   "secure-code-engine-1.0.0.jar",
 );
 const vitePath = path.join(frontendDirectory, "node_modules", "vite", "bin", "vite.js");
-const electronExecutable = path.join(
+const electronCli = path.join(
   desktopDirectory,
   "node_modules",
-  ".bin",
-  process.platform === "win32" ? "electron.cmd" : "electron",
+  "electron",
+  "cli.js",
 );
 let vite = null;
 let electron = null;
@@ -48,7 +48,7 @@ async function waitForVite() {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch("http://127.0.0.1:5173", {
+      const response = await fetch("http://localhost:5173", {
         signal: AbortSignal.timeout(1_000),
       });
       if (response.ok) return;
@@ -69,12 +69,12 @@ async function main() {
 
   vite = spawn(
     process.execPath,
-    [vitePath, "--host", "127.0.0.1"],
+    [vitePath, "--host", "localhost"],
     {
       cwd: frontendDirectory,
       stdio: "inherit",
       windowsHide: true,
-      shell: process.platform === "win32",
+      shell: false,
     },
   );
   vite.once("exit", (code) => {
@@ -82,14 +82,14 @@ async function main() {
     process.exitCode = code || 0;
   });
   await waitForVite();
-  electron = spawn(electronExecutable, ["."], {
+  electron = spawn(process.execPath, [electronCli, "."], {
     cwd: desktopDirectory,
     stdio: "inherit",
     windowsHide: true,
-    shell: process.platform === "win32",
+    shell: false,
     env: {
       ...process.env,
-      CODECLASH_RENDERER_URL: "http://127.0.0.1:5173",
+      CODECLASH_RENDERER_URL: "http://localhost:5173",
     },
   });
   electron.once("exit", () => stopChild(vite));

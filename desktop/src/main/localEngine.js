@@ -1,5 +1,13 @@
-import { randomBytes } from "node:crypto";
-import { access, appendFile, mkdir, readdir, rm } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
+import {
+  access,
+  appendFile,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+} from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -10,7 +18,17 @@ const STARTUP_TIMEOUT_MS = 90_000;
 const SHUTDOWN_TIMEOUT_MS = 15_000;
 const HEALTH_POLL_MS = 250;
 const EXECUTION_TIMEOUT_MS = 300_000;
-const ENGINE_VERSION = "1.0.0";
+export const LOCAL_ENGINE_VERSION = "1.0.0";
+const ENGINE_VERSION = LOCAL_ENGINE_VERSION;
+const SHA256_PATTERN = /^[a-f\d]{64}$/i;
+
+async function hashFile(filePath) {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(filePath)) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
+}
 
 function waitForExit(child, timeoutMs) {
   if (child.exitCode !== null || child.signalCode !== null) {
@@ -155,7 +173,6 @@ export class LocalEngine {
         compilerPath: bundledExecutable(runtimeDirectory, "javac"),
       };
     }
-
     const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
     return {
       jarPath: path.join(
@@ -174,6 +191,57 @@ export class LocalEngine {
         : process.platform === "win32"
           ? "javac.exe"
           : "javac",
+    };
+  }
+
+  async verifyIntegrity() {
+    if (!this.isPackaged) {
+      return { verified: false, mode: "DEVELOPMENT" };
+    }
+    const manifestPath = path.join(
+      this.resourcesPath,
+      "integrity-manifest.json",
+    );
+    let manifest;
+    try {
+      manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+    } catch (error) {
+      throw new Error("The packaged application integrity manifest is missing or invalid.", {
+        cause: error,
+      });
+    }
+    if (
+      manifest?.protocolVersion !== 1 ||
+      manifest.applicationVersion !== this.app.getVersion() ||
+      manifest.engineVersion !== ENGINE_VERSION ||
+      !SHA256_PATTERN.test(manifest.files?.engineJar || "") ||
+      !SHA256_PATTERN.test(manifest.files?.java || "") ||
+      !SHA256_PATTERN.test(manifest.files?.javac || "") ||
+      !SHA256_PATTERN.test(manifest.files?.runtimeModules || "") ||
+      !SHA256_PATTERN.test(manifest.files?.runtimeRelease || "")
+    ) {
+      throw new Error("The packaged application integrity manifest does not match this release.");
+    }
+
+    const { jarPath, javaPath, compilerPath } = this.getArtifactPaths();
+    const runtimeDirectory = path.dirname(path.dirname(javaPath));
+    for (const [name, filePath, expectedHash] of [
+     ["engine JAR", jarPath, manifest.files.engineJar],
+     ["Java runtime", javaPath, manifest.files.java],
+     ["Java compiler", compilerPath, manifest.files.javac],
+     ["Java runtime modules", path.join(runtimeDirectory, "lib", "modules"), manifest.files.runtimeModules],
+     ["Java runtime release metadata", path.join(runtimeDirectory, "release"), manifest.files.runtimeRelease],
+    ]) {
+      const actualHash = await hashFile(filePath);
+      if (actualHash !== expectedHash.toLowerCase()) {
+        throw new Error(`The packaged ${name} failed its release integrity check.`);
+      }
+    }
+    return {
+      verified: true,
+      mode: "PACKAGED_HASH_CHECK",
+      applicationVersion: manifest.applicationVersion,
+      engineVersion: manifest.engineVersion,
     };
   }
 
@@ -234,6 +302,7 @@ export class LocalEngine {
 
     const { jarPath, javaPath: configuredJavaPath, compilerPath: configuredCompilerPath } =
       this.getArtifactPaths();
+    await this.verifyIntegrity();
     this.startupDetails = {
       ...this.startupDetails,
       jarPath,

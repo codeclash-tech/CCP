@@ -11,7 +11,9 @@ import WeeklyCertificate from "../models/WeeklyCertificate.js";
 import WeeklyCycle from "../models/WeeklyCycle.js";
 import WeeklyRosterEntry from "../models/WeeklyRosterEntry.js";
 import WeeklySubmission from "../models/WeeklySubmission.js";
+import Nonce from "../models/Nonce.js";
 import { getChallengeTestCaseGroups } from "./challengeTestCases.js";
+import { convertParameterValuesToInput } from "./parameterConverter.js";
 import { executionService } from "./executionService.js";
 import { composeProgram } from "./wrapperGenerator.js";
 import { generateStarterCodeForChallenge } from "./challengeAuthoringService.js";
@@ -25,9 +27,15 @@ import {
   takeNextQueuedQuestion,
   WEEKLY_SHRINKAGE_K,
 } from "../utils/weeklyAssessment.js";
+import {
+  LOCAL_EXECUTION_PROTOCOL_VERSION,
+  validateLocalExecutionTranscript,
+} from "./localExecutionProtocol.js";
 
 const RETRY_LEASE_MS = 6 * 60 * 1000;
 const DAILY_POINTS = 100;
+const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
+const DESKTOP_ENGINE_VERSION = process.env.CODECLASH_ENGINE_VERSION || "1.0.0";
 let weeklyVerificationWorkerStarted = false;
 
 function logWeeklyVerification(event, details = {}) {
@@ -646,6 +654,7 @@ export async function getCandidateWeeklyState(candidateId, now = new Date()) {
     submission: submission ? {
       id: submission._id,
       status: submission.status,
+      executionMode: submission.executionMode,
       resultStatus: submission.resultStatus,
       score: submission.score,
       passed: submission.passed,
@@ -661,6 +670,366 @@ export async function getCandidateWeeklyState(candidateId, now = new Date()) {
 
 function sourceHash(code) {
   return createHash("sha256").update(code, "utf8").digest("hex");
+}
+
+function hashVersion(value) {
+  return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
+}
+
+function weeklyLocalExecutionVersions(cycle, assignment) {
+  const question = assignment?.questionSnapshot;
+  if (!question) throw requestError("The assigned daily question is unavailable.", 503);
+  const { visible } = getChallengeTestCaseGroups(question);
+  const visibleTestCases = visible.map((testCase) => ({
+    input: String(
+      testCase.parameterValues &&
+        typeof testCase.parameterValues === "object" &&
+        question.signature?.name
+        ? convertParameterValuesToInput(question.signature, testCase.parameterValues)
+        : testCase.input ?? "",
+    ),
+    expectedOutput: String(testCase.expectedOutput ?? ""),
+  }));
+  return {
+    visibleTestCases,
+    testSetVersion: hashVersion(visibleTestCases),
+    challengeVersion: hashVersion({
+      cycleId: String(cycle._id),
+      challengeId: String(assignment.challengeId),
+      dayIndex: assignment.dayIndex,
+      title: question.title || "",
+      description: question.description || "",
+      signature: question.signature || null,
+      points: Number(question.points) || 0,
+      testSetVersion: hashVersion(visibleTestCases),
+    }),
+  };
+}
+
+function weeklyLocalGrantResource({
+  cycleId,
+  candidateId,
+  submissionId,
+  dayIndex,
+  challengeId,
+  sourceHash: hash,
+  executionId,
+  challengeVersion,
+  testSetVersion,
+  clientVersion,
+  engineVersion,
+}) {
+  return [
+    cycleId,
+    candidateId,
+    submissionId,
+    dayIndex,
+    challengeId,
+    hash,
+    executionId,
+    challengeVersion,
+    testSetVersion,
+    clientVersion,
+    engineVersion,
+  ].join(":");
+}
+
+async function getCurrentDailyExecutionContext(candidateId, now) {
+  let cycle = await WeeklyCycle.findOne({
+    startAt: { $lte: now },
+    endAt: { $gt: now },
+    status: { $in: ["SCHEDULED", "ACTIVE"] },
+  }).sort({ startAt: -1 });
+  if (!cycle) cycle = await getOrCreateCurrentDailyCycle(now);
+  if (!cycle) throw requestError("No open daily challenge submission window.", 403);
+  if (!cycle.rosterFrozenAt) await freezeWeeklyRoster(cycle._id);
+  const roster = await ensureDailyRosterEntry(cycle, candidateId, now);
+  if (!roster) {
+    throw requestError("Candidate was not in the frozen eligible roster.", 403);
+  }
+  if (roster.participationStatus === "DISQUALIFIED") {
+    throw requestError("Disqualified candidates cannot submit.", 403);
+  }
+  const dayIndex = getCurrentDayIndex(cycle, now);
+  const assignment = cycle.questionAssignments.find(
+    (item) => item.dayIndex === dayIndex,
+  );
+  if (!assignment?.questionSnapshot) {
+    throw requestError("The assigned daily question is unavailable.", 503);
+  }
+  return { cycle, roster, dayIndex, assignment };
+}
+
+export async function createWeeklyLocalExecutionGrant({
+  candidateId,
+  cycleId,
+  questionId,
+  sourceHash: hash,
+  executionId,
+  clientVersion,
+  engineVersion,
+  executionProtocolVersion,
+  now = new Date(),
+}) {
+  if (
+    !mongoose.Types.ObjectId.isValid(cycleId) ||
+    !mongoose.Types.ObjectId.isValid(questionId) ||
+    !/^[a-f\d]{64}$/i.test(hash || "") ||
+    !/^[a-f\d-]{36}$/i.test(executionId || "") ||
+    clientVersion !== DESKTOP_CLIENT_VERSION ||
+    engineVersion !== DESKTOP_ENGINE_VERSION ||
+    executionProtocolVersion !== LOCAL_EXECUTION_PROTOCOL_VERSION
+  ) {
+    throw requestError("The Desktop execution grant request is invalid or unsupported.", 400);
+  }
+
+  const { cycle, roster, dayIndex, assignment } =
+    await getCurrentDailyExecutionContext(candidateId, now);
+  if (String(cycle._id) !== cycleId) {
+    throw requestError("The Daily Challenge session is no longer current.", 409);
+  }
+  if (String(assignment.challengeId) !== questionId) {
+    throw requestError("The requested question is not assigned to this Daily Challenge.", 409);
+  }
+  const versions = weeklyLocalExecutionVersions(cycle, assignment);
+  if (
+    versions.visibleTestCases.length === 0 ||
+    versions.visibleTestCases.length > 50
+  ) {
+    throw requestError("The assigned question has an invalid visible test set.", 503);
+  }
+
+  const existingSubmission = await WeeklySubmission.findOne({
+    cycleId: cycle._id,
+    candidateId,
+    dayIndex,
+  }).select("+sourceHash");
+  if (existingSubmission?.status === "FINALIZED") {
+    throw requestError("Only one finalized submission is allowed per assessment day.", 409);
+  }
+  if (existingSubmission && existingSubmission.sourceHash !== hash.toLowerCase()) {
+    throw requestError("Retry must use the identical source submitted for this assessment day.", 409);
+  }
+  if (existingSubmission && existingSubmission.executionMode !== "DESKTOP_LOCAL") {
+    throw requestError("A submission is already in progress using another execution mode.", 409);
+  }
+
+  let reservation = existingSubmission;
+  if (!reservation) {
+    const reservationId = new mongoose.Types.ObjectId();
+    try {
+      reservation = await WeeklySubmission.create({
+        _id: reservationId,
+        cycleId: cycle._id,
+        candidateId,
+        rosterEntryId: roster._id,
+        dayIndex,
+        challengeId: assignment.challengeId,
+        sourceHash: hash.toLowerCase(),
+        sourceCode: "",
+        executionMode: "DESKTOP_LOCAL",
+        status: "AUTHORIZED",
+      });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      reservation = await WeeklySubmission.findOne({
+        cycleId: cycle._id,
+        candidateId,
+        dayIndex,
+      }).select("+sourceHash");
+      if (!reservation) throw error;
+      if (reservation.sourceHash !== hash.toLowerCase()) {
+        throw requestError("A different source is already reserved for this assessment day.", 409);
+      }
+      if (
+        reservation.executionMode !== "DESKTOP_LOCAL" ||
+        !["AUTHORIZED", "RETRYABLE"].includes(reservation.status)
+      ) {
+        throw requestError("A submission is already in progress using another execution mode.", 409);
+      }
+    }
+  }
+  const submissionId = String(reservation._id);
+  const resourceId = weeklyLocalGrantResource({
+    cycleId: String(cycle._id),
+    candidateId: String(candidateId),
+    submissionId,
+    dayIndex,
+    challengeId: String(assignment.challengeId),
+    sourceHash: hash.toLowerCase(),
+    executionId,
+    challengeVersion: versions.challengeVersion,
+    testSetVersion: versions.testSetVersion,
+    clientVersion,
+    engineVersion,
+  });
+  const existingGrant = await Nonce.findOne({
+    userId: candidateId,
+    action: "SUBMIT",
+    resourceId,
+    recoveryExpiresAt: { $gt: now },
+    $or: [
+      { state: "AVAILABLE", authorizationExpiresAt: { $gt: now } },
+      { state: { $in: ["PROCESSING", "RETRYABLE"] } },
+    ],
+  }).lean();
+  const nonce =
+    existingGrant?.nonce ||
+    (await Nonce.generate(candidateId, "SUBMIT", resourceId, 5 * 60 * 1000));
+  const savedGrant = await Nonce.findOne({ userId: candidateId, nonce }).lean();
+
+  return {
+    nonce,
+    executionId,
+    submissionId,
+    assessmentId: String(cycle._id),
+    challengeId: String(assignment.challengeId),
+    challengeVersion: versions.challengeVersion,
+    testSetVersion: versions.testSetVersion,
+    clientVersion,
+    engineVersion,
+    executionProtocolVersion: LOCAL_EXECUTION_PROTOCOL_VERSION,
+    testCount: versions.visibleTestCases.length,
+    expiresAt: savedGrant?.authorizationExpiresAt || null,
+  };
+}
+
+export async function finalizeWeeklyLocalExecution({
+  candidateId,
+  transcript,
+  transcriptHash,
+  now = new Date(),
+}) {
+  if (!transcript || typeof transcript !== "object" || Array.isArray(transcript)) {
+    throw requestError("A local execution transcript is required.", 400);
+  }
+  const { cycle, roster, dayIndex, assignment } =
+    await getCurrentDailyExecutionContext(candidateId, now);
+  if (String(cycle._id) !== String(transcript.assessmentId)) {
+    throw requestError("The execution transcript belongs to a different assessment.", 409);
+  }
+  const versions = weeklyLocalExecutionVersions(cycle, assignment);
+  const validation = validateLocalExecutionTranscript({
+    transcript,
+    transcriptHash,
+    expected: {
+      executionId: transcript.executionId,
+      submissionId: transcript.submissionId,
+      assessmentId: String(cycle._id),
+      challengeId: String(assignment.challengeId),
+      challengeVersion: versions.challengeVersion,
+      sourceHash: transcript.sourceHash,
+      nonce: transcript.nonce,
+      clientVersion: DESKTOP_CLIENT_VERSION,
+      engineVersion: DESKTOP_ENGINE_VERSION,
+      testSetVersion: versions.testSetVersion,
+      testCount: versions.visibleTestCases.length,
+      allowedClientVersion: DESKTOP_CLIENT_VERSION,
+      allowedEngineVersion: DESKTOP_ENGINE_VERSION,
+    },
+    now: now.getTime(),
+  });
+  const resourceId = weeklyLocalGrantResource({
+    cycleId: String(cycle._id),
+    candidateId: String(candidateId),
+    submissionId: String(transcript.submissionId),
+    dayIndex,
+    challengeId: String(assignment.challengeId),
+    sourceHash: transcript.sourceHash,
+    executionId: transcript.executionId,
+    challengeVersion: versions.challengeVersion,
+    testSetVersion: versions.testSetVersion,
+    clientVersion: DESKTOP_CLIENT_VERSION,
+    engineVersion: DESKTOP_ENGINE_VERSION,
+  });
+  const nonceClaim = await Nonce.claimDesktopSubmission(
+    candidateId,
+    transcript.nonce,
+    resourceId,
+  );
+  if (!nonceClaim.nonce || !nonceClaim.claimed) {
+    throw requestError("The local execution grant is invalid, expired, or already used.", 409);
+  }
+
+  try {
+    const score =
+      Math.round((DAILY_POINTS * validation.passed / validation.total) * 100) / 100;
+    const finalizedAt = new Date(now);
+    const update = {
+      cycleId: cycle._id,
+      candidateId,
+      rosterEntryId: roster._id,
+      dayIndex,
+      challengeId: assignment.challengeId,
+      sourceHash: transcript.sourceHash,
+      sourceCode: "",
+      executionId: transcript.executionId,
+      executionMode: "DESKTOP_LOCAL",
+      transcriptHash: transcriptHash.toLowerCase(),
+      clientVersion: transcript.clientVersion,
+      engineVersion: transcript.engineVersion,
+      executionProtocolVersion: transcript.executionProtocolVersion,
+      riskSignals: validation.riskSignals,
+      riskScore: validation.riskScore,
+      riskLevel: validation.riskLevel,
+      executionTranscript: transcript,
+      status: "FINALIZED",
+      resultStatus: validation.status,
+      verificationAttempts: 0,
+      verificationStartedAt: new Date(transcript.startTime),
+      verificationCompletedAt: new Date(transcript.endTime),
+      verificationError: "",
+      score,
+      passed: validation.passed,
+      total: validation.total,
+      executionTime: validation.durationMs,
+      finalizedAt,
+      judgeLeaseAt: finalizedAt,
+    };
+    const finalizedSubmission = await WeeklySubmission.findOneAndUpdate(
+      {
+        cycleId: cycle._id,
+        candidateId,
+        dayIndex,
+        status: { $in: ["AUTHORIZED", "RETRYABLE"] },
+        sourceHash: transcript.sourceHash,
+        executionMode: "DESKTOP_LOCAL",
+      },
+      { $set: update },
+      { new: true },
+    ).select("+sourceHash");
+    if (!finalizedSubmission || String(finalizedSubmission._id) !== transcript.submissionId) {
+      throw requestError("The authorized Daily Challenge submission is no longer available.", 409);
+    }
+    const completedGrant = await Nonce.completeDesktopSubmission(
+      nonceClaim.nonce._id,
+      nonceClaim.claimId,
+    );
+    if (!completedGrant) {
+      console.error("[DailyLocalSubmission] Result saved but the grant could not be finalized.", {
+        executionId: transcript.executionId,
+        submissionId: String(finalizedSubmission._id),
+      });
+    }
+    await synchronizeRosterScore(roster._id);
+    return {
+      submissionId: String(finalizedSubmission._id),
+      status: "FINALIZED",
+      resultStatus: validation.status,
+      score,
+      passed: validation.passed,
+      total: validation.total,
+      executionTime: validation.durationMs,
+      executionMode: "DESKTOP_LOCAL",
+      riskSignals: validation.riskSignals,
+    };
+  } catch (error) {
+    await Nonce.releaseDesktopSubmission(nonceClaim.nonce._id, nonceClaim.claimId);
+    if (error?.code === 11000) {
+      throw requestError("A submission for this assessment day has already been finalized.", 409);
+    }
+    throw error;
+  }
 }
 
 function isRetryableJudgeFailure(result) {
@@ -1048,6 +1417,9 @@ export async function submitWeeklyAnswer({ candidateId, code, now = new Date() }
       error.statusCode = 409;
       throw error;
     }
+    if (submission.executionMode === "DESKTOP_LOCAL") {
+      throw requestError("This submission is reserved for Desktop local execution.", 409);
+    }
     if (submission.sourceHash !== hash) {
       throw requestError("Retry must use the identical source submitted for this assessment day.", 409);
     }
@@ -1111,6 +1483,9 @@ export async function retryWeeklyAnswer({ candidateId, submissionId, code, now =
     candidateId,
   }).select("+sourceHash +sourceCode");
   if (!submission) throw requestError("Recoverable weekly submission not found.", 404);
+  if (submission.executionMode === "DESKTOP_LOCAL") {
+    throw requestError("Desktop-local submissions must be recovered through the Desktop execution flow.", 409);
+  }
   if (submission.status === "FINALIZED") {
     throw requestError("Finalized weekly submissions cannot be replayed.", 409);
   }
@@ -1181,19 +1556,20 @@ export async function listRecoverableWeeklySubmissions(candidateId, now = new Da
       $in: ["PENDING_VERIFICATION", "VERIFYING", "JUDGING", "RETRYABLE", "FINALIZED"],
     },
   }).select(
-    "cycleId dayIndex status resultStatus score passed total verificationCompletedAt judgeLeaseAt createdAt",
+    "cycleId dayIndex status executionMode resultStatus score passed total verificationCompletedAt judgeLeaseAt createdAt",
   ).sort({ cycleId: 1, dayIndex: 1 });
   const cycleById = new Map(cycles.map((cycle) => [String(cycle._id), cycle]));
   return submissions
     .map((submission) => {
       const cycle = cycleById.get(String(submission.cycleId));
       const canRetry =
-        submission.status === "RETRYABLE" ||
-        (["JUDGING", "VERIFYING", "PENDING_VERIFICATION"].includes(
-          submission.status,
-        ) &&
-          now - (submission.judgeLeaseAt || submission.createdAt) >=
-            RETRY_LEASE_MS);
+        submission.executionMode !== "DESKTOP_LOCAL" &&
+        (submission.status === "RETRYABLE" ||
+          (["JUDGING", "VERIFYING", "PENDING_VERIFICATION"].includes(
+            submission.status,
+          ) &&
+            now - (submission.judgeLeaseAt || submission.createdAt) >=
+              RETRY_LEASE_MS));
       return {
         id: submission._id,
         cycleId: submission.cycleId,
@@ -1206,6 +1582,7 @@ export async function listRecoverableWeeklySubmissions(candidateId, now = new Da
           cycle?.questionAssignments.find((item) => item.dayIndex === submission.dayIndex)
             ?.questionTitleSnapshot || "Weekly question",
         status: submission.status,
+        executionMode: submission.executionMode,
         canRetry,
         createdAt: submission.createdAt,
         ...(submission.status === "FINALIZED"

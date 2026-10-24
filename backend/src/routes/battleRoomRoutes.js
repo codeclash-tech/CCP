@@ -9,6 +9,7 @@ import {
   getRoomByCode,
   joinRoom,
   prepareDesktopSubmission,
+  finalizeDesktopLocalSubmission,
   submitQuestionSolution,
   runQuestionSolution,
   endTest,
@@ -91,6 +92,12 @@ router.post(
   authenticate,
   executionLimiter,
   prepareDesktopSubmission,
+);
+router.post(
+  "/:roomCode/desktop-finalize",
+  authenticate,
+  executionLimiter,
+  finalizeDesktopLocalSubmission,
 );
 router.post(
   "/:roomCode/submit",

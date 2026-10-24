@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LockKeyhole, LockKeyholeOpen, LogOut } from "lucide-react";
+import api from "../../services/api";
 import UserAvatar from "../user/UserAvatar";
 import { ROLE_NAVIGATION } from "../../routes/roleNavigation";
 import { getAssessmentRole } from "../../routes/roleAccess";
@@ -14,10 +15,41 @@ export default function RoleNavigation({
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [signOutError, setSignOutError] = useState("");
+  const [dailyChallengeCompleted, setDailyChallengeCompleted] = useState(false);
+  const role = user ? getAssessmentRole(user) : null;
+  const links = role ? ROLE_NAVIGATION[role] || ROLE_NAVIGATION.CANDIDATE : [];
+
+  useEffect(() => {
+    let mounted = true;
+    const refreshDailyChallengeStatus = async () => {
+      if (!user) {
+        setDailyChallengeCompleted(false);
+        return;
+      }
+      try {
+        const { data } = await api.get("/weekly-assessments/current");
+        if (mounted) {
+          setDailyChallengeCompleted(data?.submission?.status === "FINALIZED");
+        }
+      } catch (statusError) {
+        console.warn(
+          "Unable to load daily challenge completion status:",
+          statusError.message,
+        );
+      }
+    };
+    const handleDailyChallengeUpdate = () => refreshDailyChallengeStatus();
+
+    refreshDailyChallengeStatus();
+    window.addEventListener("ccp-daily-challenge-updated", handleDailyChallengeUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener("ccp-daily-challenge-updated", handleDailyChallengeUpdate);
+    };
+  }, [user]);
+
   if (!user) return null;
 
-  const role = getAssessmentRole(user);
-  const links = ROLE_NAVIGATION[role] || ROLE_NAVIGATION.CANDIDATE;
   const handleSignOut = async () => {
     setSignOutError("");
     try {
@@ -76,6 +108,23 @@ export default function RoleNavigation({
             >
               <Icon size={17} aria-hidden="true" />
               <span>{label}</span>
+              {path === "/weekly-assessment" && (
+                dailyChallengeCompleted ? (
+                  <LockKeyholeOpen
+                    className="daily-challenge-lock"
+                    size={15}
+                    aria-label="Daily challenge completed"
+                    title="Daily challenge completed"
+                  />
+                ) : (
+                  <LockKeyhole
+                    className="daily-challenge-lock"
+                    size={15}
+                    aria-label="Daily challenge not completed"
+                    title="Daily challenge not completed"
+                  />
+                )
+              )}
             </NavLink>
           ))}
         </nav>

@@ -5,10 +5,10 @@ import {
   submitSolution as submitQuestionSolution,
   runSolution as runQuestionSolution,
   startRoom,
-  disqualifySubmission as disqualifyRoomSubmission,
   shareKey,
   endTest as endRoomTest,
 } from "../services/battleRoomService";
+import api from "../services/api";
 
 import CodeEditorSandbox from "../components/editor/CodeEditorSandbox";
 import Console from "../components/editor/Console";
@@ -400,34 +400,22 @@ export default function BattleRoomChallenge() {
     navigate("/battle-room", { replace: true });
   };
 
-  const handleDisqualified = useCallback(
-    async (reason) => {
-      setDisqualified(true);
-      setSubmitted(true);
-      setProctorEnabled(false);
+  const activeRoomId = room?._id;
+  const handleIntegrityEvent = useCallback(
+    async (event) => {
+      if (!activeRoomId) return;
       try {
-        await disqualifyRoomSubmission(roomCode, {
-          reason: reason || "Proctoring violation",
+        await api.post("/assessment-integrity/events", {
+          ...event,
+          assessmentType: "BATTLE_ROOM",
+          assessmentId: activeRoomId,
         });
-      } catch (e) {
-        console.error("Failed to record disqualification:", e.message);
+      } catch (error) {
+        setError(error.message || "Integrity evidence could not be recorded.");
+        throw error;
       }
-      setCurrentResult({
-        status: "DISQUALIFIED",
-        accepted: false,
-        passed: 0,
-        failed: 0,
-        total: 0,
-        output: "",
-        error: reason
-          ? `Disqualified: ${reason}`
-          : "Disqualified due to proctoring violation.",
-        executionTime: 0,
-        memoryUsed: 0,
-        results: [],
-      });
     },
-    [roomCode],
+    [activeRoomId],
   );
 
   const handleQuestionSelect = (index) => {
@@ -505,7 +493,10 @@ export default function BattleRoomChallenge() {
         question,
       });
 
-      const qr = result.questionResult || {};
+      if (!result?.questionResult) {
+        throw new Error("The server did not acknowledge this submission. Please retry.");
+      }
+      const qr = result.questionResult;
       codeByQuestionRef.current[question._id] = code;
       saveRoomEditorCache(
         roomCode,
@@ -1963,7 +1954,9 @@ export default function BattleRoomChallenge() {
 
       <ProctorGuard
         challengeId={room._id}
-        onDisqualified={handleDisqualified}
+        assessmentId={room._id}
+        assessmentType="BATTLE_ROOM"
+        onIntegrityEvent={handleIntegrityEvent}
         enabled={proctorEnabled && !submitted}
         onExit={exitChallenge}
       />

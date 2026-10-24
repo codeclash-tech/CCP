@@ -7,6 +7,7 @@ import WeeklyCycle from "./WeeklyCycle.js";
 import WeeklyRosterEntry from "./WeeklyRosterEntry.js";
 import WeeklySubmission from "./WeeklySubmission.js";
 import WeeklyCertificate from "./WeeklyCertificate.js";
+import AssessmentIntegritySession from "./AssessmentIntegritySession.js";
 import User from "./User.js";
 import config from "../config/env.js";
 
@@ -102,6 +103,7 @@ export async function ensureWeeklyAssessmentIndexes() {
     WeeklyRosterEntry.createIndexes(),
     WeeklySubmission.createIndexes(),
     WeeklyCertificate.createIndexes(),
+    AssessmentIntegritySession.createIndexes(),
   ]);
   console.log("[Models] Weekly assessment indexes ensured.");
 }

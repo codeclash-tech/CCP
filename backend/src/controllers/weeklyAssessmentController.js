@@ -5,6 +5,8 @@ import User from "../models/User.js";
 import WeeklyCertificate from "../models/WeeklyCertificate.js";
 import WeeklyCycle from "../models/WeeklyCycle.js";
 import WeeklyRosterEntry from "../models/WeeklyRosterEntry.js";
+import WeeklySubmission from "../models/WeeklySubmission.js";
+import AssessmentIntegritySession from "../models/AssessmentIntegritySession.js";
 import { getAssessmentRole } from "../models/User.js";
 import {
   assignCandidateOrganization,
@@ -20,9 +22,12 @@ import {
   removeCandidateOrganization,
   retryWeeklyAnswer,
   submitWeeklyAnswer,
+  createWeeklyLocalExecutionGrant,
+  finalizeWeeklyLocalExecution,
   saveGlobalChallengeConfiguration,
 } from "../services/weeklyAssessmentService.js";
 import { streamWeeklyCertificate } from "../services/weeklyCertificateService.js";
+import { calculateIntegrityRisk } from "../services/assessmentIntegrityService.js";
 
 function sendFailure(res, error, fallback = "Weekly assessment request failed.", additional = {}) {
   const status = Number(error?.statusCode) || 500;
@@ -63,6 +68,47 @@ export async function submitCurrentWeeklyAnswer(req, res) {
     return sendFailure(res, error, "Authoritative daily challenge judging failed.", {
       ...(error.submissionId ? { submissionId: error.submissionId } : {}),
     });
+  }
+}
+
+export async function createDesktopWeeklyExecutionGrant(req, res) {
+  try {
+    const grant = await createWeeklyLocalExecutionGrant({
+      candidateId: req.userId,
+      ...req.body,
+    });
+    return res.status(200).json(grant);
+  } catch (error) {
+    return sendFailure(res, error, "Could not authorize local Daily Challenge execution.");
+  }
+}
+
+export async function finalizeDesktopWeeklyExecution(req, res) {
+  try {
+    const submission = await finalizeWeeklyLocalExecution({
+      candidateId: req.userId,
+      transcript: req.body?.transcript,
+      transcriptHash: req.body?.transcriptHash,
+    });
+    try {
+      await AssessmentIntegritySession.updateMany(
+        {
+          assessmentType: "DAILY_CHALLENGE",
+          assessmentId: req.body?.transcript?.assessmentId,
+          userId: req.userId,
+          finalizedAt: null,
+        },
+        { $set: { finalizedAt: new Date() } },
+      );
+    } catch (error) {
+      console.error(
+        "[AssessmentIntegrity] Could not finalize Daily Challenge event sessions:",
+        { message: error.message, submissionId: submission.submissionId },
+      );
+    }
+    return res.status(201).json({ submission });
+  } catch (error) {
+    return sendFailure(res, error, "Could not finalize local Daily Challenge execution.");
   }
 }
 
@@ -304,7 +350,139 @@ export async function getAdminWeeklyRoster(req, res) {
       .sort({ organizationNameSnapshot: 1, candidateNameSnapshot: 1 })
       .select("candidateId candidateNameSnapshot organizationId organizationNameSnapshot eligibilityStatus participationStatus score completedDays disqualifiedAt disqualificationReason")
       .lean();
-    return res.json({ cycle, roster });
+    const submissions = await WeeklySubmission.find({ cycleId: cycle._id })
+      .select(
+        "candidateId rosterEntryId dayIndex challengeId status resultStatus score passed total executionMode executionId sourceHash transcriptHash clientVersion engineVersion executionProtocolVersion riskSignals riskScore riskLevel finalizedAt +sourceHash +executionTranscript",
+      )
+      .lean();
+    const integritySessions = await AssessmentIntegritySession.find({
+      assessmentType: "DAILY_CHALLENGE",
+      assessmentId: cycle._id,
+    }).lean();
+    const submissionByRoster = new Map(
+      submissions.map((submission) => [
+        String(submission.rosterEntryId),
+        submission,
+      ]),
+    );
+    const sourceHashGroups = new Map();
+    for (const submission of submissions) {
+      if (
+        submission.status !== "FINALIZED" ||
+        submission.executionMode !== "DESKTOP_LOCAL" ||
+        !submission.sourceHash
+      ) {
+        continue;
+      }
+      const key = `${submission.challengeId}:${submission.sourceHash}`;
+      const matching = sourceHashGroups.get(key) || [];
+      matching.push(submission);
+      sourceHashGroups.set(key, matching);
+    }
+    const rosterNameByCandidate = new Map(
+      roster.map((entry) => [
+        String(entry.candidateId),
+        entry.candidateNameSnapshot,
+      ]),
+    );
+    const sessionsByCandidate = new Map();
+    for (const session of integritySessions) {
+      const candidateKey = String(session.userId);
+      const candidateSessions = sessionsByCandidate.get(candidateKey) || [];
+      candidateSessions.push(session);
+      sessionsByCandidate.set(candidateKey, candidateSessions);
+    }
+    const securityReport = (submission, candidateId) => {
+      const transcript = submission?.executionTranscript;
+      const sessions = sessionsByCandidate.get(String(candidateId)) || [];
+      if (!submission && sessions.length === 0) return null;
+      const exactSourceMatches =
+        submission?.executionMode === "DESKTOP_LOCAL" && submission.sourceHash
+          ? (sourceHashGroups.get(
+              `${submission.challengeId}:${submission.sourceHash}`,
+            ) || [])
+              .filter((match) => String(match.candidateId) !== String(candidateId))
+              .map((match) => ({
+                submissionId: String(match._id),
+                candidateId: String(match.candidateId),
+                candidateName:
+                  rosterNameByCandidate.get(String(match.candidateId)) ||
+                  "Unknown participant",
+              }))
+          : [];
+      const integrityRisk = calculateIntegrityRisk(
+        sessions.flatMap((session) => session.events),
+      );
+      const riskScore = Math.min(
+        100,
+        (submission?.riskScore || 0) +
+          integrityRisk.riskScore +
+          (exactSourceMatches.length ? 40 : 0),
+      );
+      return {
+        ...(submission
+          ? {
+              submissionId: String(submission._id),
+              dayIndex: submission.dayIndex,
+              status: submission.status,
+              executionMode: submission.executionMode,
+              resultStatus: submission.resultStatus,
+              score: submission.score,
+              passed: submission.passed,
+              total: submission.total,
+              executionId: submission.executionId,
+              sourceHash: submission.sourceHash,
+              transcriptHash: submission.transcriptHash,
+              clientVersion: submission.clientVersion,
+              engineVersion: submission.engineVersion,
+              executionProtocolVersion: submission.executionProtocolVersion,
+              riskSignals: submission.riskSignals,
+              finalizedAt: submission.finalizedAt,
+            }
+          : {}),
+        riskScore,
+        riskLevel:
+          riskScore >= 60 ? "HIGH" : riskScore >= 25 ? "MEDIUM" : "LOW",
+        similarityWarnings: exactSourceMatches.length
+          ? ["EXACT_SOURCE_HASH_MATCH"]
+          : [],
+        exactSourceMatches,
+        timeline: transcript
+          ? {
+              startTime: transcript.startTime,
+              endTime: transcript.endTime,
+              durationMs: transcript.durationMs,
+              testOutcomes: (transcript.results || []).map((result) => ({
+                testCase: result.testCase,
+                status: result.status,
+                executionTimeMs: result.executionTimeMs,
+                memoryUsedKb: result.memoryUsedKb,
+              })),
+            }
+          : null,
+        integritySessions: sessions.map((session) => ({
+          sessionId: session.sessionId,
+          startedAt: session.startedAt,
+          lastEventAt: session.lastEventAt,
+          lastSequence: session.lastSequence,
+          events: [...session.events].sort(
+            (left, right) => left.sequence - right.sequence,
+          ),
+          ...calculateIntegrityRisk(session.events),
+        })),
+        evidenceOnly: true,
+      };
+    };
+    return res.json({
+      cycle,
+      roster: roster.map((entry) => ({
+        ...entry,
+        securityReport: securityReport(
+          submissionByRoster.get(String(entry._id)),
+          entry.candidateId,
+        ),
+      })),
+    });
   } catch (error) {
     return sendFailure(res, error, "Could not load the weekly roster.");
   }

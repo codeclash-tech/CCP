@@ -432,12 +432,74 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
               {view === "roster" && (
                 roster.length ? (
                   <div className="weekly-admin-table-wrap"><table className="weekly-admin-table">
-                    <thead><tr><th>Participant</th><th>Organization snapshot</th><th>Status</th><th>Score</th><th>Questions</th><th>Action</th></tr></thead>
+                    <thead><tr><th>Participant</th><th>Organization snapshot</th><th>Status</th><th>Score</th><th>Questions</th><th>Security report</th><th>Action</th></tr></thead>
                     <tbody>{roster.map((entry) => (
                       <tr key={entry._id}>
                         <td>{entry.candidateNameSnapshot}</td><td>{entry.organizationNameSnapshot}</td>
                         <td>{entry.participationStatus}</td><td>{entry.score.toFixed(2)}</td>
                         <td>{entry.completedDays.length}/1</td>
+                        <td>
+                          {entry.securityReport ? (
+                            <details>
+                              <summary>
+                                {entry.securityReport.riskLevel || "LOW"} risk · {entry.securityReport.riskScore || 0}/100
+                              </summary>
+                              <div>
+                                <p>Mode: {entry.securityReport.executionMode || (entry.securityReport.submissionId ? "SERVER_VERIFIED" : "INTEGRITY EVENTS ONLY")}</p>
+                                {entry.securityReport.executionMode === "DESKTOP_LOCAL" && (
+                                  <p>Desktop-local evidence is integrity metadata only; this result was not independently re-executed by the server.</p>
+                                )}
+                                <p>Result: {entry.securityReport.resultStatus || entry.securityReport.status} · {entry.securityReport.passed ?? 0}/{entry.securityReport.total ?? 0} tests</p>
+                                <p>Client / engine: {entry.securityReport.clientVersion || "—"} / {entry.securityReport.engineVersion || "—"}</p>
+                                <p>Protocol: {entry.securityReport.executionProtocolVersion || "—"}</p>
+                                <p>Execution ID: <code>{entry.securityReport.executionId || "—"}</code></p>
+                                <p>Source SHA-256: <code>{entry.securityReport.sourceHash || "—"}</code></p>
+                                <p>Transcript SHA-256: <code>{entry.securityReport.transcriptHash || "—"}</code></p>
+                                {entry.securityReport.riskSignals?.length ? (
+                                  <ul>{entry.securityReport.riskSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+                                ) : <p>No server-derived anomalies recorded.</p>}
+                                {entry.securityReport.exactSourceMatches?.length > 0 && (
+                                  <section>
+                                    <p>Exact source-hash match (review signal only):</p>
+                                    <ul>{entry.securityReport.exactSourceMatches.map((match) => (
+                                      <li key={match.submissionId}>
+                                        {match.candidateName} · submission {match.submissionId}
+                                      </li>
+                                    ))}</ul>
+                                  </section>
+                                )}
+                                {entry.securityReport.timeline && (
+                                  <>
+                                    <p>Started: {entry.securityReport.timeline.startTime || "—"}</p>
+                                    <p>Ended: {entry.securityReport.timeline.endTime || "—"} · {entry.securityReport.timeline.durationMs ?? 0} ms</p>
+                                    <ul>
+                                      {entry.securityReport.timeline.testOutcomes.map((outcome) => (
+                                        <li key={outcome.testCase}>
+                                          Test {outcome.testCase}: {outcome.status} · {outcome.executionTimeMs} ms · {outcome.memoryUsedKb} KB
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </>
+                                )}
+                                {entry.securityReport.integritySessions?.map((session) => (
+                                  <section key={session.sessionId}>
+                                    <p>Monitoring session {session.sessionId} · risk {session.riskLevel} ({session.riskScore}/100)</p>
+                                    <ul>
+                                      {session.events.map((event) => (
+                                        <li key={event.sequence}>
+                                          #{event.sequence} {event.eventType} · {event.occurredAt}
+                                          {event.sequenceGapBefore > 0 ? ` · ${event.sequenceGapBefore} sequence gap(s) before event` : ""}
+                                          {event.reason ? ` · ${event.reason}` : ""}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </section>
+                                ))}
+                                <p>Integrity events are client-reported risk evidence, not proof of misconduct.</p>
+                              </div>
+                            </details>
+                          ) : "No submission report"}
+                        </td>
                         <td>{entry.participationStatus !== "DISQUALIFIED" && activeCycle?.status === "ACTIVE" &&
                           <button type="button" onClick={async () => {
                             const reason = window.prompt("Disqualification reason:");

@@ -41,6 +41,10 @@
       {
         "from": "runtime-dist",
         "to": "runtime"
+      },
+      {
+        "from": "build-integrity-manifest.json",
+        "to": "integrity-manifest.json"
       }
     ],
     "win": {

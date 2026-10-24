@@ -91,6 +91,46 @@ The API URL is embedded in the build. To change it later, build and install a
 new version of the desktop app. Ensure the selected backend is running and
 allows requests from the packaged desktop app.
 
+## Desktop integrity and assessment trust
+
+The Windows packaging script creates an integrity manifest for the bundled
+Secure Code Engine JAR, Java launchers, Java runtime modules, and runtime
+release metadata. The packaged app verifies those hashes during startup and
+again before an official Desktop-local submission.
+Development runs do not require the packaged manifest. The manifest is an
+additional tamper-detection check, not a signed attestation: a determined
+participant who controls the machine and application can modify the app and
+its manifest.
+
+Desktop-local results use a short-lived, user/challenge/source-bound grant,
+single-use nonce, and structured transcript. The backend checks the grant,
+transcript digest, source binding, versions, timing, test-count consistency,
+and duplicate state before persisting the result. These checks prevent ordinary
+replay and inconsistent payloads, but do not prove that an untrusted local
+engine produced the reported outcomes. Desktop-local assessment results are
+marked as not independently re-executed by the server. Hidden test cases and
+expected hidden outputs are not sent to participants; local Desktop scoring is
+limited to the visible test cases.
+
+Fullscreen, focus, copy/paste, and related events are client-reported evidence
+for risk review. A single event does not automatically disqualify a candidate,
+and these signals are not proof of misconduct. Administrators can review the
+recorded event sequence and execution metadata in existing participant views.
+The platform does not continuously collect unrelated process lists or claim to
+detect assistance from a second physical device. Similarity reporting currently
+flags exact source-hash matches only; it does not claim to detect renamed
+variables, structural similarity, or AI assistance.
+
+### Windows code signing
+
+No development certificate is included and a build without signing credentials
+is not represented as signed. Electron Builder can sign release artifacts when
+valid credentials are securely supplied to the packaging environment (for
+example, with `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`). Keep certificate
+material and passwords in the release system's secret store; do not commit
+them to the repository. Validate the signed installer and update artifacts
+using the release certificate before distribution.
+
 ## Troubleshooting
 
 - **`JAVA_HOME` must point to a Java 21 JDK:** Set `JAVA_HOME` to the JDK
@@ -101,5 +141,17 @@ allows requests from the packaged desktop app.
   `frontend` and `desktop` folders as shown above.
 - **The installer still connects to the previous backend:** Set
   `CODECLASH_API_URL` before building; the URL is baked into the installer.
+- **Electron-builder reports a TLS socket disconnect:** `package:win` reuses
+  the local Electron archive and Windows resource editor when they are cached.
+  If the required cache files are unavailable, allow the build machine to reach
+  the Electron and electron-builder download hosts, then rerun the command.
 - **Build fails:** Read the first reported command error in the terminal,
   resolve that prerequisite or build error, and rerun the packaging command.
+
+//.exe build
+$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.11.10-hotspot"
+Test-Path "$env:JAVA_HOME\bin\java.exe"
+Test-Path "$env:JAVA_HOME\bin\javac.exe"
+Test-Path "$env:JAVA_HOME\bin\jlink.exe"
+mvn -version
+npm run package:win

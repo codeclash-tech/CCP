@@ -208,6 +208,19 @@ export async function submitQuestionLocally({
   const executionCode = question.signature?.name
     ? composeProgram(question, code, language)
     : code;
+  const testCases = (question.visibleTestCases || [])
+    .filter(
+      (testCase) =>
+        (testCase.input !== undefined && testCase.input !== null) ||
+        (testCase.parameterValues &&
+          typeof testCase.parameterValues === "object" &&
+          question.signature?.name &&
+          Object.keys(testCase.parameterValues).length > 0),
+    )
+    .map((testCase) => ({
+      input: getExecutionInput(testCase, question.signature),
+      expectedOutput: String(testCase.expectedOutput ?? ""),
+    }));
   return window.codeClashDesktop.assessment.submit({
     apiBaseUrl,
     accessToken,
@@ -215,6 +228,50 @@ export async function submitQuestionLocally({
     questionId,
     code,
     executionCode,
+    testCases,
     language,
+  });
+}
+
+export async function submitDailyChallengeLocally({
+  apiBaseUrl,
+  accessToken,
+  cycleId,
+  question,
+  code,
+}) {
+  if (!question || typeof code !== "string") {
+    throw new TypeError("A question and source code are required for local submission.");
+  }
+  if (typeof window.codeClashDesktop?.assessment?.submitDaily !== "function") {
+    throw new Error("The CodeClash desktop submission service is not available.");
+  }
+  const visibleTestCases = (question.visibleTestCases || [])
+    .filter(
+      (testCase) =>
+        (testCase.input !== undefined && testCase.input !== null) ||
+        (testCase.parameterValues &&
+          typeof testCase.parameterValues === "object" &&
+          question.signature?.name &&
+          Object.keys(testCase.parameterValues).length > 0),
+    )
+    .map((testCase) => ({
+      input: getExecutionInput(testCase, question.signature),
+      expectedOutput: String(testCase.expectedOutput ?? ""),
+    }));
+  if (visibleTestCases.length === 0) {
+    throw new Error("No visible test cases are available for this question.");
+  }
+
+  return window.codeClashDesktop.assessment.submitDaily({
+    apiBaseUrl,
+    accessToken,
+    cycleId,
+    questionId: question.id,
+    code,
+    executionCode: question.signature?.name
+      ? composeProgram(question, code, "java")
+      : code,
+    testCases: visibleTestCases,
   });
 }

@@ -44,6 +44,17 @@ function activeRoom(roomId, questionId) {
   };
 }
 
+function desktopGrantRequest(questionId, codeHash = "c".repeat(64)) {
+  return {
+    questionId: questionId.toString(),
+    codeHash,
+    executionId: "0a10b0c0-d0e0-40f0-80a0-0a10b0c0d0e0",
+    clientVersion: "1.0.0",
+    engineVersion: "1.0.0",
+    executionProtocolVersion: 1,
+  };
+}
+
 test("issues a one-use submission grant without returning test cases", async (t) => {
   const roomId = new mongoose.Types.ObjectId();
   const questionId = new mongoose.Types.ObjectId();
@@ -70,7 +81,7 @@ test("issues a one-use submission grant without returning test cases", async (t)
   await prepareDesktopSubmission(
     {
       params: { roomCode: "ABC234" },
-      body: { questionId: questionId.toString(), codeHash: "c".repeat(64) },
+      body: desktopGrantRequest(questionId),
       userId,
     },
     res,
@@ -78,13 +89,12 @@ test("issues a one-use submission grant without returning test cases", async (t)
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.nonce, nonceValue);
-  assert.deepEqual(Object.keys(res.body), ["nonce"]);
-  assert.deepEqual(nonceArguments, [
-    userId,
-    "SUBMIT",
-    `${roomId}:${submissionId}:${questionId}:${"c".repeat(64)}`,
-    5 * 60 * 1000,
-  ]);
+  assert.equal(res.body.executionId, desktopGrantRequest(questionId).executionId);
+  assert.equal(res.body.testCount, 1);
+  assert.equal(nonceArguments[0], userId);
+  assert.equal(nonceArguments[1], "SUBMIT");
+  assert.ok(nonceArguments[2].startsWith(`${roomId}:${submissionId}:${questionId}:${"c".repeat(64)}:`));
+  assert.equal(nonceArguments[3], 5 * 60 * 1000);
 });
 
 test("reuses an unexpired authorization after a repeated grant request", async (t) => {
@@ -105,7 +115,7 @@ test("reuses an unexpired authorization after a repeated grant request", async (
   }));
   let grantQuery;
   t.mock.method(Nonce, "findOne", (query) => {
-    grantQuery = query;
+    if (query.resourceId) grantQuery = query;
     return {
       lean: async () => ({
         nonce,
@@ -121,10 +131,7 @@ test("reuses an unexpired authorization after a repeated grant request", async (
   await prepareDesktopSubmission(
     {
       params: { roomCode: "ABC234" },
-      body: {
-        questionId: questionId.toString(),
-        codeHash: "c".repeat(64),
-      },
+      body: desktopGrantRequest(questionId),
       userId,
     },
     res,
@@ -134,8 +141,10 @@ test("reuses an unexpired authorization after a repeated grant request", async (
   assert.equal(res.body.nonce, nonce);
   assert.equal(grantQuery.userId, userId);
   assert.equal(
-    grantQuery.resourceId,
-    `${roomId}:${submissionId}:${questionId}:${"c".repeat(64)}`,
+    grantQuery.resourceId.startsWith(
+      `${roomId}:${submissionId}:${questionId}:${"c".repeat(64)}:`,
+    ),
+    true,
   );
 });
 
@@ -163,7 +172,7 @@ test("reissues a reconciliation grant for a completed result after the room clos
   }));
   let grantQuery;
   t.mock.method(Nonce, "findOne", (query) => {
-    grantQuery = query;
+    if (query.resourceId) grantQuery = query;
     return { lean: async () => ({ nonce, state: "COMPLETED" }) };
   });
   t.mock.method(Nonce, "generate", async () => {
@@ -174,7 +183,7 @@ test("reissues a reconciliation grant for a completed result after the room clos
   await prepareDesktopSubmission(
     {
       params: { roomCode: "ABC234" },
-      body: { questionId: questionId.toString(), codeHash },
+      body: desktopGrantRequest(questionId, codeHash),
       userId,
     },
     res,
@@ -182,10 +191,13 @@ test("reissues a reconciliation grant for a completed result after the room clos
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.nonce, nonce);
-  assert.deepEqual(Object.keys(res.body), ["nonce"]);
+  assert.equal(res.body.executionId, desktopGrantRequest(questionId).executionId);
+  assert.equal(res.body.testCount, 1);
   assert.equal(
-    grantQuery.resourceId,
-    `${roomId}:${submissionId}:${questionId}:${codeHash}`,
+    grantQuery.resourceId.startsWith(
+      `${roomId}:${submissionId}:${questionId}:${codeHash}:`,
+    ),
+    true,
   );
 });
 
@@ -219,12 +231,12 @@ test("does not authorize new code for a completed submission after the room clos
   await prepareDesktopSubmission(
     {
       params: { roomCode: "ABC234" },
-      body: {
-        questionId: questionId.toString(),
-        codeHash: createHash("sha256")
+      body: desktopGrantRequest(
+        questionId,
+        createHash("sha256")
           .update("class Main { int changed; }", "utf8")
           .digest("hex"),
-      },
+      ),
       userId,
     },
     res,
@@ -253,7 +265,7 @@ test("does not issue hidden-case grants to a user without a room submission", as
   await prepareDesktopSubmission(
     {
       params: { roomCode: "ABC234" },
-      body: { questionId: questionId.toString(), codeHash: "c".repeat(64) },
+      body: desktopGrantRequest(questionId),
       userId: new mongoose.Types.ObjectId(),
     },
     res,

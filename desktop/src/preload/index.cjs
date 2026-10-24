@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld(
     assessment: Object.freeze({
       submit: (request) =>
         ipcRenderer.invoke("codeclash:assessment-submit", request),
+      submitDaily: (request) =>
+        ipcRenderer.invoke("codeclash:daily-submit", request),
+    }),
+    window: Object.freeze({
+      setChallengeMode: (enabled) =>
+        ipcRenderer.invoke("codeclash:challenge-mode", enabled),
     }),
     auth: Object.freeze({
       getTokens: () => ipcRenderer.invoke("codeclash:auth-get-tokens"),

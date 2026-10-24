@@ -10,9 +10,12 @@ import {
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { LocalEngine } from "./localEngine.js";
+import { LocalEngine, LOCAL_ENGINE_VERSION } from "./localEngine.js";
 import { normalizeExecutionRequest } from "./executionRequest.js";
-import { submitDesktopQuestion } from "./desktopSubmission.js";
+import {
+  submitDesktopDailyQuestion,
+  submitDesktopQuestion,
+} from "./desktopSubmission.js";
 import { SecureAuthStore } from "./secureAuthStore.js";
 import {
   CODECLASH_RENDERER_ORIGIN,
@@ -45,6 +48,7 @@ const authStore = new SecureAuthStore({
 });
 
 let mainWindow = null;
+let challengeFocusMode = false;
 let shutdownInProgress = false;
 let shutdownComplete = false;
 const activeAssessmentSubmissions = new Set();
@@ -116,6 +120,11 @@ async function createMainWindow() {
   mainWindow.webContents.on("devtools-opened", () => {
     if (app.isPackaged) mainWindow?.webContents.closeDevTools();
   });
+  mainWindow.on("close", (event) => {
+    if (challengeFocusMode && !shutdownInProgress) {
+      event.preventDefault();
+    }
+  });
   mainWindow.webContents.on("before-input-event", (event, input) => {
     const key = input.key.toLowerCase();
     const devToolsShortcut =
@@ -182,11 +191,53 @@ ipcMain.handle("codeclash:assessment-submit", async (event, request) => {
     return await submitDesktopQuestion({
       engine,
       isPackaged: app.isPackaged,
+      clientVersion: app.getVersion(),
+      engineVersion: LOCAL_ENGINE_VERSION,
       request,
     });
   } finally {
     activeAssessmentSubmissions.delete(submissionKey);
   }
+});
+
+ipcMain.handle("codeclash:daily-submit", async (event, request) => {
+  requireTrustedSender(event);
+  const submissionKey = `daily:${String(request?.cycleId || "")}:${String(request?.questionId || "")}`;
+  if (activeAssessmentSubmissions.has(submissionKey)) {
+    throw new Error("A submission for this Daily Challenge is already in progress.");
+  }
+  activeAssessmentSubmissions.add(submissionKey);
+  try {
+    return await submitDesktopDailyQuestion({
+      engine,
+      isPackaged: app.isPackaged,
+      clientVersion: app.getVersion(),
+      engineVersion: LOCAL_ENGINE_VERSION,
+      request,
+    });
+  } finally {
+    activeAssessmentSubmissions.delete(submissionKey);
+  }
+});
+
+ipcMain.handle("codeclash:challenge-mode", (event, enabled) => {
+  requireTrustedSender(event);
+  if (typeof enabled !== "boolean") {
+    throw new TypeError("Challenge mode must be enabled or disabled.");
+  }
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error("The CodeClash application window is unavailable.");
+  }
+
+  if (enabled) {
+    mainWindow.setKiosk(true);
+    mainWindow.setFullScreen(true);
+  } else {
+    mainWindow.setKiosk(false);
+    mainWindow.setFullScreen(false);
+  }
+  challengeFocusMode = enabled;
+  return challengeFocusMode;
 });
 
 ipcMain.handle("codeclash:auth-get-tokens", (event) => {
