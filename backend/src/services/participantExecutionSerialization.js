@@ -6,6 +6,7 @@ const PUBLIC_EXECUTION_ERRORS = new Map([
   ["OUTPUT_LIMIT_EXCEEDED", "Program output exceeded the allowed limit."],
   ["INTERNAL_ENGINE_ERROR", "The execution service could not complete this submission."],
   ["SYSTEM_ERROR", "The execution service could not complete this submission."],
+  ["ERROR", "The execution service could not complete this submission."],
 ]);
 const MAX_PUBLIC_TEST_OUTPUT_CHARACTERS = 32_000;
 

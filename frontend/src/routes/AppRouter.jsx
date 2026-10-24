@@ -72,7 +72,7 @@ function AppLayout({ children }) {
   );
 }
 
-function ProtectedLayout({ children, allowedRoles }) {
+function ProtectedLayout({ children, allowedRoles, fullScreen = false }) {
   const { user, isAuthenticated, loading, sessionError } = useAuth();
   const location = useLocation();
   if (loading && !isAuthenticated) {
@@ -110,7 +110,13 @@ function ProtectedLayout({ children, allowedRoles }) {
       </AppLayout>
     );
   }
-  return <AppLayout>{children}</AppLayout>;
+  return fullScreen ? (
+    <div style={{ minHeight: "100vh", background: "var(--bg-main)" }}>
+      <Suspense fallback={<RouteSkeleton fullScreen />}>{children}</Suspense>
+    </div>
+  ) : (
+    <AppLayout>{children}</AppLayout>
+  );
 }
 
 function AccessDeniedPage() {
@@ -289,7 +295,7 @@ export default function AppRouter() {
           <Route
             path="/weekly-assessment"
             element={
-              <ProtectedLayout>
+              <ProtectedLayout fullScreen>
                 <WeeklyAssessment />
               </ProtectedLayout>
             }

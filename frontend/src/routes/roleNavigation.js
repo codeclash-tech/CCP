@@ -13,7 +13,7 @@ export const ROLE_NAVIGATION = {
   [ASSESSMENT_ROLES.CANDIDATE]: [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/battle-room", label: "Battle Rooms", icon: Swords },
-    { path: "/weekly-assessment", label: "Daily Global Challenge", icon: CalendarDays },
+    { path: "/weekly-assessment", label: "Daily Challenge", icon: CalendarDays },
     { path: "/rankings", label: "Rankings", icon: BarChart3 },
     { path: "/certificates", label: "Certificates", icon: Award },
     { path: "/profile", label: "Profile", icon: UserRound },
@@ -21,7 +21,7 @@ export const ROLE_NAVIGATION = {
   [ASSESSMENT_ROLES.ORGANIZATION_USER]: [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
     { path: "/battle-room", label: "My Battle Rooms", icon: Swords },
-    { path: "/weekly-assessment", label: "Daily Global Challenge", icon: CalendarDays },
+    { path: "/weekly-assessment", label: "Daily Challenge", icon: CalendarDays },
     { path: "/rankings", label: "Rankings", icon: BarChart3 },
     { path: "/certificates", label: "Certificates", icon: Award },
     { path: "/profile", label: "Profile", icon: UserRound },

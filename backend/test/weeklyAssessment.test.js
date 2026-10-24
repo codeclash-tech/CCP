@@ -8,6 +8,7 @@ import {
   getWeeklyDayIndex,
   getWeeklyRecoveryDeadline,
   shouldWaitForWeeklyRecovery,
+  takeNextQueuedQuestion,
 } from "../src/utils/weeklyAssessment.js";
 import { getWeeklyCertificateCategory } from "../src/services/weeklyAssessmentService.js";
 
@@ -46,6 +47,32 @@ test("global challenge cycles repeat every 24 hours from the configured Asia/Kol
   assert.equal(firstCycle.endAt.toISOString(), "2025-04-02T04:30:00.000Z");
   assert.equal(secondCycle.cycleIndex, 1);
   assert.equal(secondCycle.cycleKey, "2025-04-02");
+});
+
+test("daily global challenge queue consumes questions once in FIFO order and never cycles", () => {
+  const queue = ["first", "second", "third"];
+  const firstDay = takeNextQueuedQuestion(queue);
+  const secondDay = takeNextQueuedQuestion(firstDay.remainingQuestionIds);
+  const thirdDay = takeNextQueuedQuestion(secondDay.remainingQuestionIds);
+  const exhausted = takeNextQueuedQuestion(thirdDay.remainingQuestionIds);
+
+  assert.deepEqual(firstDay, {
+    questionId: "first",
+    remainingQuestionIds: ["second", "third"],
+  });
+  assert.deepEqual(secondDay, {
+    questionId: "second",
+    remainingQuestionIds: ["third"],
+  });
+  assert.deepEqual(thirdDay, {
+    questionId: "third",
+    remainingQuestionIds: [],
+  });
+  assert.deepEqual(exhausted, { questionId: null, remainingQuestionIds: [] });
+  assert.deepEqual(takeNextQueuedQuestion([]), {
+    questionId: null,
+    remainingQuestionIds: [],
+  });
 });
 
 test("weekly recovery deadline is 24 hours after close and delays finalization only for recoverable submissions", () => {

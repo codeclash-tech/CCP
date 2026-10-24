@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Code2, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import UserAvatar from "../user/UserAvatar";
 import { ROLE_NAVIGATION } from "../../routes/roleNavigation";
 import { getAssessmentRole } from "../../routes/roleAccess";
@@ -44,24 +44,34 @@ export default function RoleNavigation({
         aria-label="Main navigation"
       >
         {desktop && (
-          <Link to="/" className="desktop-navigation-brand" onClick={onNavigate}>
-            <Code2 size={21} aria-hidden="true" />
-            <span>CodeClash</span>
+          <Link
+            to="/"
+            className="desktop-navigation-brand"
+            onClick={onNavigate}
+          >
+            <span>Welcome,</span>
+            <strong>{user.name || "there"}</strong>
           </Link>
         )}
-        <div className="role-navigation-heading">
-          <span className="role-navigation-role">Workspace</span>
-          {!desktop && (
+        {!desktop && (
+          <div className="role-navigation-heading">
             <span className="role-navigation-caption">CodeClash</span>
-          )}
-        </div>
+          </div>
+        )}
         <nav className="role-navigation-links">
           {links.map(({ path, label, icon: Icon }) => (
             <NavLink
               key={path}
               to={path}
               end={path === "/" || path === "/admin"}
-              className={({ isActive }) => (isActive ? "active" : "")}
+              className={({ isActive }) =>
+                [
+                  isActive ? "active" : "",
+                  path === "/weekly-assessment" ? "daily-challenge-link" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")
+              }
               onClick={onNavigate}
             >
               <Icon size={17} aria-hidden="true" />

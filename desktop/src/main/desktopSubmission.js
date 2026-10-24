@@ -1,10 +1,8 @@
 import { createHash } from "node:crypto";
-import { normalizeExecutionRequest } from "./executionRequest.js";
 
 const PRODUCTION_API_HOST = "ccp-backend-qylz.onrender.com";
-const EXECUTION_TIMEOUT_MS = 300_000;
-const SUBMISSION_TIMEOUT_MS = 330_000;
 const REQUEST_TIMEOUT_MS = 15_000;
+const SUBMISSION_TIMEOUT_MS = 15_000;
 
 function getApiBaseUrl(rawUrl, isPackaged) {
   let apiUrl;
@@ -54,14 +52,6 @@ function assertSubmissionRequest(request) {
     throw new TypeError("Java source code must contain 1 to 50000 characters.");
   }
   if (
-    request.executionCode !== undefined &&
-    (typeof request.executionCode !== "string" ||
-      !request.executionCode.trim() ||
-      request.executionCode.length > 50_000)
-  ) {
-    throw new TypeError("The Java source for execution is invalid or too long.");
-  }
-  if (
     typeof request.accessToken !== "string" ||
     request.accessToken.length < 16 ||
     request.accessToken.length > 8_192
@@ -95,43 +85,24 @@ async function requestJson(fetchImpl, url, accessToken, body, timeoutMs) {
   return responseBody;
 }
 
-function normalizeGrant(grant, code) {
+function normalizeGrant(grant) {
   if (
     !grant ||
     typeof grant.nonce !== "string" ||
-    !/^[a-f\d]{64}$/i.test(grant.nonce) ||
-    !Array.isArray(grant.testCases) ||
-    !Number.isInteger(grant.visibleTestCaseCount) ||
-    grant.visibleTestCaseCount < 0 ||
-    grant.visibleTestCaseCount !== grant.testCases.length
+    !/^[a-f\d]{64}$/i.test(grant.nonce)
   ) {
     throw new Error("The CodeClash backend returned an invalid execution grant.");
   }
 
-  const executionRequest = normalizeExecutionRequest({
-    code,
-    language: "JAVA",
-    testCases: grant.testCases,
-    timeLimit: grant.timeLimit,
-    memoryLimit: grant.memoryLimit,
-  });
-  return {
-    nonce: grant.nonce,
-    visibleTestCaseCount: grant.visibleTestCaseCount,
-    executionRequest,
-  };
+  return grant.nonce;
 }
 
 export async function submitDesktopQuestion({
-  engine,
   fetchImpl = fetch,
   isPackaged,
   request,
 }) {
   assertSubmissionRequest(request);
-  if (!engine || typeof engine.execute !== "function") {
-    throw new TypeError("The local Java engine is not available.");
-  }
   const apiBaseUrl = getApiBaseUrl(request.apiBaseUrl, isPackaged);
   const roomPath = `/battle-rooms/${request.roomCode.toUpperCase()}`;
   const grant = await requestJson(
@@ -144,16 +115,7 @@ export async function submitDesktopQuestion({
     },
     REQUEST_TIMEOUT_MS,
   );
-  const normalizedGrant = normalizeGrant(
-    grant,
-    request.executionCode ?? request.code,
-  );
-  try {
-    await engine.execute(normalizedGrant.executionRequest);
-  } catch (error) {
-    console.error("Local execution failed during Desktop submission:", error);
-    throw new Error("Code execution is currently unavailable.");
-  }
+  const nonce = normalizeGrant(grant);
   const submission = await requestJson(
     fetchImpl,
     new URL(`${roomPath}/submit`, apiBaseUrl),
@@ -162,7 +124,7 @@ export async function submitDesktopQuestion({
       questionId: request.questionId,
       code: request.code,
       language: "java",
-      desktopNonce: normalizedGrant.nonce,
+      desktopNonce: nonce,
     },
     SUBMISSION_TIMEOUT_MS,
   );

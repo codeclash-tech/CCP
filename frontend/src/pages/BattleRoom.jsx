@@ -343,16 +343,25 @@ export default function BattleRoom() {
 
   return (
     <div className="battle-room-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
-      <div style={{ marginBottom: 32, padding: "28px 32px", background: "var(--bg-elevated)", border: "1px solid var(--border-color)", borderRadius: 12 }}>
-        <h1 style={{ color: "var(--text-primary)", fontSize: 22, margin: "0 0 8px", fontWeight: 700, display: "flex", alignItems: "center", gap: 10 }}>
-          <Swords size={24} color="var(--accent-blue-bright)" />
-          Battle Room
-        </h1>
-        <p style={{ color: "var(--text-muted)", fontSize: 13, margin: 0 }}>
-          Create your own coding war room with custom challenges. Share the key for others to join and compete!
-          Rooms are private — only people with the key can join.
-        </p>
-      </div>
+      <header className="battle-room-hero">
+        <div className="battle-room-hero-copy">
+          <p className="battle-room-hero-eyebrow">CODECLASH ARENA</p>
+          <h1>
+            <Swords size={25} aria-hidden="true" />
+            Battle Room
+          </h1>
+          <p>
+            Create a private coding arena, share its key, and put your problem
+            solving to the test with friends or teammates.
+          </p>
+          <span className="battle-room-hero-flow">CREATE <i /> INVITE <i /> COMPETE</span>
+        </div>
+        <div className="battle-room-hero-art" aria-hidden="true">
+          <span className="battle-room-hero-art-ring" />
+          <Swords size={68} strokeWidth={1.15} />
+          <span className="battle-room-hero-art-caption">YOUR ROOM. YOUR RULES.</span>
+        </div>
+      </header>
 
       <div className="battle-room-tabs-wrap">
         <button

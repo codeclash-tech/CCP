@@ -45,6 +45,7 @@ const organizationRankingSchema = new mongoose.Schema(
 const weeklyCycleSchema = new mongoose.Schema(
   {
     cycleKey: { type: String, required: true, unique: true, match: /^\d{4}-\d{2}-\d{2}$/ },
+    isGlobalChallenge: { type: Boolean, default: false, index: true },
     name: { type: String, required: true, trim: true, maxlength: 160 },
     timezone: { type: String, required: true, enum: ["Asia/Kolkata"], default: "Asia/Kolkata" },
     startAt: { type: Date, required: true, index: true },

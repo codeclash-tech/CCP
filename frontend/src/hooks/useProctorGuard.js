@@ -29,7 +29,7 @@ export default function useProctorGuard({ onDisqualified, enabled = true }) {
       setIsDisqualified(true);
       setWarning({
         reason,
-        message: `Proctoring violation: ${reason}. Your submission has been auto-submitted with score 0.`,
+        message: `Proctoring violation: ${reason}. Your official challenge score has been set to 0.`,
       });
       if (onDisqualified) {
         onDisqualified(reason);

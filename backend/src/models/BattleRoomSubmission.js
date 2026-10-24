@@ -54,6 +54,64 @@ const questionResultSchema = new mongoose.Schema(
       ],
       default: "PENDING",
     },
+    verificationStatus: {
+      type: String,
+      enum: ["PENDING_VERIFICATION", "VERIFYING", "VERIFIED", "FAILED", "ERROR"],
+      default: null,
+    },
+    verificationSubmittedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationStartedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationCompletedAt: {
+      type: Date,
+      default: null,
+    },
+    verificationLeaseExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    verificationLeaseId: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    verificationAttempts: {
+      type: Number,
+      default: 0,
+    },
+    verificationError: {
+      type: String,
+      default: "",
+    },
+    verificationTestCases: {
+      type: [
+        {
+          testCaseId: { type: String, default: "" },
+          input: { type: String, required: true },
+          expectedOutput: { type: String, required: true },
+          isHidden: { type: Boolean, default: false },
+          _id: false,
+        },
+      ],
+      default: [],
+      select: false,
+    },
+    verificationSignature: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      select: false,
+    },
+    verificationPoints: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
     score: {
       type: Number,
       default: 0,
@@ -199,6 +257,10 @@ const battleRoomSubmissionSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    endRequestedAt: {
+      type: Date,
+      default: null,
+    },
     // Coding behavior analytics
     codingBehavior: {
       totalLinesWritten: { type: Number, default: 0 },
@@ -227,11 +289,21 @@ battleRoomSubmissionSchema.methods.toPublicJSON = function ({
     userId: this.userId,
     participantName: this.participantName,
     participantOrganization: this.participantOrganization,
-    totalScore: this.totalScore,
-    totalPassed: this.totalPassed,
-    totalFailed: this.totalFailed,
+    totalScore:
+      this.status === "COMPLETED" || this.status === "DISQUALIFIED"
+        ? this.totalScore
+        : null,
+    totalPassed:
+      this.status === "COMPLETED" || this.status === "DISQUALIFIED"
+        ? this.totalPassed
+        : null,
+    totalFailed:
+      this.status === "COMPLETED" || this.status === "DISQUALIFIED"
+        ? this.totalFailed
+        : null,
     totalQuestions: this.totalQuestions,
     status: this.status,
+    endRequestedAt: this.endRequestedAt,
     disqualifyReason: this.disqualifyReason,
     moderationFlags: this.moderationFlags || [],
     startTime: this.startTime,
@@ -254,12 +326,30 @@ battleRoomSubmissionSchema.methods.toPublicJSON = function ({
         questionTitle: qr.questionTitle,
         code: qr.code || "",
         status: qr.status,
-        score: qr.score,
-        passed: qr.passed,
-        failed: qr.failed,
+        verificationStatus: qr.verificationStatus,
+        verificationSubmittedAt: qr.verificationSubmittedAt,
+        verificationStartedAt: qr.verificationStartedAt,
+        verificationCompletedAt: qr.verificationCompletedAt,
+        verificationError: sanitizeParticipantExecutionError(
+          qr.status,
+          qr.verificationError || qr.error,
+        ),
+        verificationStatus: qr.verificationStatus,
+        verificationSubmittedAt: qr.verificationSubmittedAt,
+        verificationStartedAt: qr.verificationStartedAt,
+        verificationCompletedAt: qr.verificationCompletedAt,
+        verificationError: sanitizeParticipantExecutionError(
+          qr.status,
+          qr.verificationError || qr.error,
+        ),
+        score: qr.verificationStatus === "VERIFIED" ? qr.score : null,
+        passed: qr.verificationStatus === "VERIFIED" ? qr.passed : null,
+        failed: qr.verificationStatus === "VERIFIED" ? qr.failed : null,
         total: qr.total,
-        executionTime: qr.executionTime,
-        memoryUsed: qr.memoryUsed,
+        executionTime:
+          qr.verificationStatus === "VERIFIED" ? qr.executionTime : null,
+        memoryUsed:
+          qr.verificationStatus === "VERIFIED" ? qr.memoryUsed : null,
         timeToSolve: qr.timeToSolve,
         output: getVisibleExecutionOutput(results),
         error: sanitizeParticipantExecutionError(qr.status, qr.error),

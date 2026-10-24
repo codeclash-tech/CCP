@@ -7,6 +7,7 @@ import {
   createOwnOrganizationProfile,
   createWeeklyCycleHandler,
   disqualifyWeeklyCandidateHandler,
+  disqualifyCurrentWeeklyCandidateHandler,
   downloadWeeklyCertificate,
   finalizeWeeklyCycleHandler,
   getAdminWeeklyRoster,
@@ -40,6 +41,11 @@ const organizationUser = [authenticate, requireAssessmentRole("ORGANIZATION_USER
 
 router.get("/current", ...candidate, getCurrentWeeklyAssessment);
 router.post("/submit", ...candidate, submitCurrentWeeklyAnswer);
+router.post(
+  "/cycles/:cycleId/disqualify",
+  ...candidate,
+  disqualifyCurrentWeeklyCandidateHandler,
+);
 router.post("/retry/:submissionId", ...candidate, retryWeeklyAnswerHandler);
 router.get("/recoverable", ...candidate, listRecoverableWeeklySubmissionsHandler);
 router.get("/history", ...candidate, listMyWeeklyHistory);

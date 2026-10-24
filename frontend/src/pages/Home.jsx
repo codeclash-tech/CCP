@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
   CalendarDays,
+  Code2,
   KeyRound,
   PlusCircle,
   Swords,
+  Trophy,
   Mail,
   Terminal,
   CheckCircle2,
@@ -57,46 +58,117 @@ const targetAudiences = [
 ];
 
 export default function Home() {
-  const { user } = useAuth();
   const isDesktop =
     typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   if (isDesktop) {
-    const firstName = (user?.name || "").trim().split(/\s+/)[0];
     return (
       <main className="product-page desktop-dashboard">
-        <header className="product-page-heading">
+        <header className="desktop-dashboard-intro">
           <div>
-            <p className="product-eyebrow">CODECLASH WORKSPACE</p>
-            <h1>{firstName ? `Welcome, ${firstName}` : "Welcome to CodeClash"}</h1>
-            <p>Choose where you would like to continue.</p>
+            <p className="product-eyebrow">CODECLASH · AN AMUX PRODUCT</p>
+            <h1>Build skill. Beat the clock.</h1>
+            <p>
+              A focused coding arena for daily practice, head-to-head battles,
+              and measurable progress.
+            </p>
           </div>
+          <span className="desktop-dashboard-tag">YOUR CODING ARENA</span>
         </header>
-        <div className="desktop-dashboard-grid">
-          <Link className="desktop-dashboard-card" to="/weekly-assessment">
-            <span className="desktop-dashboard-icon"><CalendarDays size={20} /></span>
-            <span>
-              <strong>Daily Global Challenge</strong>
-              <small>Compete today; scores and organization ranks reset daily.</small>
+
+        <section className="desktop-daily-challenge" aria-labelledby="desktop-daily-title">
+          <div className="desktop-daily-content">
+            <span className="desktop-daily-badge">
+              <CalendarDays size={15} aria-hidden="true" />
+              DAILY CHALLENGE
             </span>
-            <ArrowRight size={17} />
-          </Link>
-          <Link className="desktop-dashboard-card" to="/battle-room">
-            <span className="desktop-dashboard-icon"><Swords size={20} /></span>
-            <span>
-              <strong>Battle Rooms</strong>
-              <small>Join a room or continue a battle.</small>
+            <h2 id="desktop-daily-title">A new problem.<br />A sharper you.</h2>
+            <p>
+              Take on a fresh coding challenge, sharpen your problem-solving
+              skills, and see how you stack up on the daily leaderboard.
+            </p>
+            <div className="desktop-daily-actions">
+              <Link className="desktop-daily-primary" to="/weekly-assessment">
+                Start today&apos;s challenge
+                <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+              <Link className="desktop-daily-secondary" to="/rankings">
+                View rankings
+              </Link>
+            </div>
+            <span className="desktop-daily-note">
+              <Trophy size={15} aria-hidden="true" />
+              Your daily progress, recognized.
             </span>
-            <ArrowRight size={17} />
-          </Link>
-          <Link className="desktop-dashboard-card" to="/battle-room/create">
-            <span className="desktop-dashboard-icon"><PlusCircle size={20} /></span>
-            <span>
-              <strong>Create a Battle Room</strong>
-              <small>Build a room with your questions and test cases.</small>
-            </span>
-            <ArrowRight size={17} />
-          </Link>
-        </div>
+          </div>
+          <div className="desktop-daily-art" aria-hidden="true">
+            <div className="desktop-daily-art-orbit" />
+            <div className="desktop-daily-art-icon">
+              <CalendarDays size={54} strokeWidth={1.3} />
+            </div>
+            <span className="desktop-daily-art-label">NEW EVERY DAY</span>
+            <span className="desktop-daily-art-number">01</span>
+          </div>
+        </section>
+
+        <section className="desktop-dashboard-section" aria-labelledby="desktop-arena-title">
+          <div className="desktop-dashboard-section-heading">
+            <div>
+              <p className="product-eyebrow">CHOOSE YOUR NEXT MOVE</p>
+              <h2 id="desktop-arena-title">Your arena</h2>
+            </div>
+            <p>Practice solo or bring your people into the competition.</p>
+          </div>
+          <div className="desktop-dashboard-quick-links">
+            <Link className="desktop-dashboard-quick-link" to="/battle-room">
+              <span className="desktop-dashboard-icon"><Swords size={20} /></span>
+              <span>
+                <strong>Battle Rooms</strong>
+                <small>Join a private coding competition.</small>
+              </span>
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+            <Link className="desktop-dashboard-quick-link" to="/battle-room/create">
+              <span className="desktop-dashboard-icon"><PlusCircle size={20} /></span>
+              <span>
+                <strong>Create a Battle Room</strong>
+                <small>Set up challenges and invite others.</small>
+              </span>
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+            <Link className="desktop-dashboard-quick-link" to="/rankings">
+              <span className="desktop-dashboard-icon"><Trophy size={20} /></span>
+              <span>
+                <strong>Rankings</strong>
+                <small>Follow daily and live room standings.</small>
+              </span>
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+          </div>
+        </section>
+
+        <section className="desktop-dashboard-about" aria-labelledby="desktop-about-title">
+          <div className="desktop-dashboard-about-codeclash">
+            <p className="product-eyebrow">MADE FOR MOMENTUM</p>
+            <h2 id="desktop-about-title">About CodeClash</h2>
+            <p>
+              A coding arena for daily practice, friendly competition, and
+              measurable progress.
+            </p>
+          </div>
+          <div className="desktop-dashboard-about-brand">
+            <span className="desktop-dashboard-about-mark"><Code2 size={22} /></span>
+            <strong>CodeClash</strong>
+            <span>by AMUX</span>
+          </div>
+          <div className="desktop-dashboard-about-amux">
+            <h2>About AMUX</h2>
+            <p>
+              AMUX builds technology products that address practical problems
+              with thoughtful product design and engineering. We provide
+              specialized services through AMUX Ideon and Thrive.
+            </p>
+          </div>
+        </section>
       </main>
     );
   }

@@ -137,7 +137,7 @@ export default function AdminQuestions() {
 
   const saveRotation = async (nextQuestionIds) => {
     if (!globalChallenge) {
-      throw new Error("Set up the Global Challenge before adding questions to its rotation.");
+      throw new Error("Set up the Global Challenge before adding questions to its daily queue.");
     }
     const { data } = await api.put(
       "/weekly-assessments/admin/global-challenge",
@@ -168,11 +168,11 @@ export default function AdminQuestions() {
       await saveRotation(nextQuestionIds);
       setNotice(
         isInRotation
-          ? "Question removed from the rotation. Changes apply to upcoming daily cycles."
-          : "Question added to the rotation. Changes apply to upcoming daily cycles.",
+          ? "Question removed from the daily queue."
+          : "Question added to the end of the daily queue.",
       );
     } catch (rotationError) {
-      setError(rotationError.message || "Could not update the question rotation.");
+      setError(rotationError.message || "Could not update the daily question queue.");
     } finally {
       setRotationSavingId("");
     }
@@ -264,11 +264,11 @@ export default function AdminQuestions() {
         try {
           await saveRotation([...questionIds, questionId]);
           setNotice(
-            "Question created, reference-solution checks passed, and it was added to the rotation. Changes apply to upcoming daily cycles.",
+            "Question created, reference-solution checks passed, and it was added to the end of the daily queue.",
           );
         } catch (rotationError) {
           setError(
-            `Question created, but it could not be added to the rotation: ${rotationError.message || "Please try again from Saved questions."}`,
+            `Question created, but it could not be added to the daily queue: ${rotationError.message || "Please try again from Saved questions."}`,
           );
         }
       } else {
@@ -315,7 +315,7 @@ export default function AdminQuestions() {
             <Plus size={14} /> New question
           </button>
           <Link className="btn-secondary weekly-question-link" to="/admin">
-            Manage rotation <ArrowRight size={14} />
+            Manage daily queue <ArrowRight size={14} />
           </Link>
         </div>
       </header>
@@ -330,8 +330,8 @@ export default function AdminQuestions() {
             <strong>Question saved</strong>
             <p>
               {globalChallenge
-                ? "It is available in the question pool. Rotation changes apply to upcoming daily cycles; an active cycle keeps its saved question."
-                : "Set up the Global Challenge rotation, then add this question from the saved questions list."}
+                ? "It is available in the question pool. Queue changes apply to upcoming days; today's question stays unchanged."
+                : "Set up the Global Challenge daily queue, then add this question from the saved questions list."}
             </p>
           </div>
           <Link to="/admin">
@@ -472,7 +472,7 @@ export default function AdminQuestions() {
             <h2>Saved questions</h2>
             <p>{loading ? "Loading questions…" : `${challenges.length} question${challenges.length === 1 ? "" : "s"} in the pool`}</p>
           </div>
-          <Link to="/admin">Add or remove questions from the rotation</Link>
+          <Link to="/admin">Add or remove questions from the daily queue</Link>
         </div>
         {!loading && challenges.length === 0 ? (
           <p>No saved questions yet. Create the first question above.</p>
@@ -500,7 +500,6 @@ export default function AdminQuestions() {
                           loading ||
                           saving ||
                           rotationSavingId === questionId ||
-                          (!inRotation && questionIds.length >= 50) ||
                           (inRotation && questionIds.length <= 1)
                         }
                         aria-label={`${inRotation ? "Remove" : "Add"} ${challenge.title} ${inRotation ? "from" : "to"} the rotation`}

@@ -1,7 +1,13 @@
 import useProctorGuard from "../../hooks/useProctorGuard";
 import { ShieldAlert, Maximize2, AlertTriangle, X } from "lucide-react";
 
-export default function ProctorGuard({ challengeId, onDisqualified, enabled, onExit }) {
+export default function ProctorGuard({
+  challengeId,
+  challengeLabel = "battle",
+  onDisqualified,
+  enabled,
+  onExit,
+}) {
   const {
     isFullscreen,
     warning,
@@ -122,7 +128,7 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled, onE
             <ShieldAlert size={40} color="var(--accent-blue-bright)" style={{ marginBottom: 16 }} />
             <h2>Fullscreen Required</h2>
             <p>
-              This battle requires fullscreen mode to maintain integrity.
+              This {challengeLabel} requires fullscreen mode to maintain integrity.
               Please click the button below to enter fullscreen and start coding.
             </p>
             <button className="pg-btn" onClick={requestFullscreen}>
@@ -141,7 +147,7 @@ export default function ProctorGuard({ challengeId, onDisqualified, enabled, onE
             <p>
               A proctoring violation was detected (tab switch, window blur, or
               unauthorized copy/paste outside the editor).
-              Your submission has been auto-submitted with a score of 0.
+              Your official score has been set to 0.
             </p>
             <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 8 }}>
               {warning ? `Reason: ${warning.reason}` : "Reason: Proctoring violation detected."}

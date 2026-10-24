@@ -102,7 +102,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
       setStartAt(
         saved?.startAt
           ? toIstDateTimeInput(saved.startAt)
-          : toIstDateTimeInput(Date.now() + 24 * 60 * 60 * 1000),
+          : toIstDateTimeInput(Date.now() + 60 * 1000),
       );
       setQuestionIds((saved?.questionIds || []).map((item) =>
         String(item?._id || item),
@@ -179,7 +179,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
         },
       );
       setChallenge(data.globalChallenge);
-      setNotice("Global challenge saved. New cycles will use the updated question rotation.");
+      setNotice("Global challenge saved. The next queued question will be used for each new day.");
       await loadSetup(true);
     } catch (saveError) {
       setError(saveError.message || "Could not save the global challenge.");
@@ -200,7 +200,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
           <p>
             {view === "rankings"
               ? "Live participant standings for each daily cycle."
-              : "Schedule a daily challenge and manage the questions rotating through its cycles."}
+              : "Schedule a daily challenge and manage its first-in, first-out question queue."}
           </p>
         </div>
         <button
@@ -264,15 +264,15 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
             </label>
             {hasStarted && (
               <p className="weekly-admin-notice">
-                The start time is fixed after launch. Question changes apply to upcoming daily cycles; the current cycle remains unchanged.
+                The start time is fixed after launch. Queue changes apply to upcoming days; today's question remains unchanged.
               </p>
             )}
             <fieldset className="weekly-rotation-editor">
-              <legend>Daily question rotation</legend>
+              <legend>Daily question queue</legend>
               <p className="weekly-rotation-help">
-                One selected question is used for each new daily cycle, in this
-                order. Add or remove questions whenever needed; changes do not
-                alter a cycle that has already started.
+                The first question is used today and removed from the queue.
+                Each following question is used once on the next day. Questions
+                are never repeated automatically.
               </p>
               <div className="weekly-rotation-selected">
                 {selectedQuestions.length ? selectedQuestions.map((question) => {
@@ -290,11 +290,9 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
                         type="button"
                         className="weekly-rotation-remove"
                         onClick={() => toggleQuestion(id)}
-                        disabled={saving || questionIds.length <= 1}
+                        disabled={saving}
                         aria-label={`Remove ${question.title} from the rotation`}
-                        title={questionIds.length <= 1
-                          ? "At least one question must remain in the rotation"
-                          : "Remove from rotation"}
+                        title="Remove from queue"
                       >
                         <X size={16} />
                       </button>
@@ -323,9 +321,9 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
                         type="button"
                         className="weekly-rotation-add"
                         onClick={() => toggleQuestion(id)}
-                        disabled={saving || questionIds.length >= 50}
+                        disabled={saving}
                       >
-                        <Plus size={15} /> Add
+                        <Plus size={15} /> Queue
                       </button>
                     </div>
                   );
@@ -341,7 +339,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
             <button
               type="submit"
               className="btn-primary"
-              disabled={saving || questionIds.length === 0 || !startAt}
+              disabled={saving || (!challenge && questionIds.length === 0) || !startAt}
             >
               <Save size={15} /> {saving ? "Saving…" : "Save rotation"}
             </button>
@@ -351,11 +349,14 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
             <h2>Daily cycle schedule</h2>
             {challenge ? (
               <>
-                <p>Starts {dateLabel(challenge.startAt)} and repeats every 24 hours in Asia/Kolkata.</p>
-                <p>{questionIds.length} active question{questionIds.length === 1 ? "" : "s"} rotate in selection order.</p>
+                <p>Starts {dateLabel(challenge.startAt)} and advances once every 24 hours in Asia/Kolkata.</p>
+                {challenge.activeQuestionId?.title && (
+                  <p>Today's question: <strong>{challenge.activeQuestionId.title}</strong></p>
+                )}
+                <p>{questionIds.length} question{questionIds.length === 1 ? "" : "s"} remain in the queue.</p>
               </>
             ) : (
-              <p>After saving, a new daily cycle starts at the selected time and rotates through the selected questions.</p>
+              <p>After saving, the first queued question starts at the selected time. Each remaining question is used once, in queue order.</p>
             )}
             {cycles.length > 0 && (
               <div className="weekly-cycle-list">

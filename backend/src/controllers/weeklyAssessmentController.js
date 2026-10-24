@@ -58,7 +58,7 @@ export async function submitCurrentWeeklyAnswer(req, res) {
       candidateId: req.userId,
       code: req.body?.code,
     });
-    return res.status(200).json({ result });
+    return res.status(202).json({ submission: result });
   } catch (error) {
     return sendFailure(res, error, "Authoritative daily challenge judging failed.", {
       ...(error.submissionId ? { submissionId: error.submissionId } : {}),
@@ -73,7 +73,7 @@ export async function retryWeeklyAnswerHandler(req, res) {
       submissionId: req.params.submissionId,
       code: req.body?.code,
     });
-    return res.status(200).json({ result });
+    return res.status(202).json({ submission: result });
   } catch (error) {
     return sendFailure(res, error, "Authoritative daily challenge retry failed.", {
       ...(error.submissionId ? { submissionId: error.submissionId } : {}),
@@ -187,6 +187,11 @@ export async function getWeeklyRankings(req, res) {
       if (!rosterEntry) return res.status(403).json({ error: "Weekly results are available only to eligible roster candidates." });
     }
     const results = await getWeeklyCycleResults(cycle._id);
+    const individualRankings = results.individualRankings.map((ranking) => ({
+      ...ranking,
+      candidateNameSnapshot:
+        ranking.completedQuestions > 0 ? ranking.candidateNameSnapshot : null,
+    }));
     return res.json({
       cycle: {
         id: cycle._id,
@@ -197,7 +202,7 @@ export async function getWeeklyRankings(req, res) {
         status: cycle.status,
         finalizedAt: cycle.finalizedAt,
       },
-      individualRankings: results.individualRankings,
+      individualRankings,
       organizationRankings: results.organizationRankings,
     });
   } catch (error) {
@@ -318,6 +323,22 @@ export async function disqualifyWeeklyCandidateHandler(req, res) {
     return res.json({ rosterEntry });
   } catch (error) {
     return sendFailure(res, error, "Could not disqualify the weekly candidate.");
+  }
+}
+
+export async function disqualifyCurrentWeeklyCandidateHandler(req, res) {
+  try {
+    if (!validId(req.params.cycleId) || !validId(req.userId)) {
+      return res.status(400).json({ error: "Invalid weekly cycle or candidate ID." });
+    }
+    const rosterEntry = await disqualifyWeeklyCandidate({
+      cycleId: req.params.cycleId,
+      candidateId: req.userId,
+      reason: req.body?.reason,
+    });
+    return res.json({ rosterEntry });
+  } catch (error) {
+    return sendFailure(res, error, "Could not record the proctoring violation.");
   }
 }
 

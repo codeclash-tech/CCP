@@ -20,10 +20,12 @@ const globalChallengeSchema = new mongoose.Schema(
     questionIds: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Challenge" }],
       required: true,
-      validate: [
-        (questionIds) => questionIds.length > 0,
-        "At least one question is required for the global challenge.",
-      ],
+    },
+    lastScheduledCycleKey: { type: String, default: null },
+    activeQuestionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Challenge",
+      default: null,
     },
   },
   { timestamps: true },

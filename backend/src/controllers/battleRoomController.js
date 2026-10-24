@@ -27,7 +27,6 @@ import {
   ROOM_WINDOW_STATE,
 } from "../services/scheduleGuard.js";
 import {
-  calculateQuestionScore,
   countRoomTestCases,
 } from "../services/battleRoomScoring.js";
 import {
@@ -43,8 +42,20 @@ import {
   sanitizeParticipantExecutionError,
   sanitizeParticipantTestResult,
 } from "../services/participantExecutionSerialization.js";
+import {
+  finalizeBattleRoomSubmission,
+  wakeBattleRoomVerificationWorker,
+} from "../services/battleRoomVerificationService.js";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+function logBattleRoomSubmissionEvent(event, details) {
+  if (process.env.BATTLE_ROOM_PERF_LOGS !== "true") return;
+  console.info(
+    "[ExecutionPerf] " +
+      JSON.stringify({ event, timestamp: new Date().toISOString(), ...details }),
+  );
+}
 
 function warmUpJudgeEngine() {
   executionService.warmUp().catch((error) => {
@@ -71,9 +82,16 @@ function buildParticipantSubmissionResponse(
   visibleCount,
   hiddenCount,
 ) {
-  const results = (questionResult.results || []).map(
-    sanitizeParticipantTestResult,
-  );
+  const officialSubmissionFinal =
+    currentSubmission.status === "COMPLETED" ||
+    currentSubmission.status === "DISQUALIFIED";
+  const verified =
+    questionResult.verificationStatus === "VERIFIED" ||
+    (!questionResult.verificationStatus &&
+      !["PENDING", "PROCESSING", "ERROR"].includes(questionResult.status));
+  const results = verified
+    ? (questionResult.results || []).map(sanitizeParticipantTestResult)
+    : [];
   const visibleResults = results.slice(0, visibleCount);
   const hiddenResults = results.slice(visibleCount);
   const isPassed = (result) =>
@@ -90,47 +108,60 @@ function buildParticipantSubmissionResponse(
           Math.max(0, (questionResult.passed || 0) - visiblePassed),
         );
   const allCompleted = currentSubmission.questionResults.every(
-    (result) => !["PENDING", "PROCESSING"].includes(result.status),
+    (result) =>
+      result.verificationStatus === "VERIFIED" ||
+      (!result.verificationStatus &&
+        !["PENDING", "PROCESSING", "ERROR"].includes(result.status)) ||
+      result.status === "REJECTED",
   );
 
   return {
-    message: "Solution submitted!",
+    message: verified ? "Solution verified." : "Submission received.",
+    submissionId: currentSubmission._id,
     questionResult: {
       questionId: questionResult.questionId,
       questionTitle: questionResult.questionTitle,
       language: questionResult.language,
       status: questionResult.status,
-      score: questionResult.score,
-      passed: questionResult.passed,
-      failed: questionResult.failed,
+      verificationStatus:
+        questionResult.verificationStatus || (verified ? "VERIFIED" : null),
+      verificationSubmittedAt: questionResult.verificationSubmittedAt || null,
+      verificationStartedAt: questionResult.verificationStartedAt || null,
+      verificationCompletedAt: questionResult.verificationCompletedAt || null,
+      verificationError: questionResult.verificationError || "",
+      score: verified ? questionResult.score : null,
+      passed: verified ? questionResult.passed : null,
+      failed: verified ? questionResult.failed : null,
       total: questionResult.total,
-      executionTime: questionResult.executionTime,
-      memoryUsed: questionResult.memoryUsed,
+      executionTime: verified ? questionResult.executionTime : null,
+      memoryUsed: verified ? questionResult.memoryUsed : null,
       timeToSolve: questionResult.timeToSolve,
       output: "",
       error: sanitizeParticipantExecutionError(
         questionResult.status,
         questionResult.error,
       ),
-      visiblePassed,
-      visibleFailed: visibleCount - visiblePassed,
+      visiblePassed: verified ? visiblePassed : null,
+      visibleFailed: verified ? visibleCount - visiblePassed : null,
       hiddenCount,
-      hiddenPassed,
-      hiddenFailed: hiddenCount - hiddenPassed,
+      hiddenPassed: verified ? hiddenPassed : null,
+      hiddenFailed: verified ? hiddenCount - hiddenPassed : null,
       results,
     },
     status: questionResult.status,
-    score: questionResult.score,
-    passed: questionResult.passed,
-    failed: questionResult.failed,
+    verificationStatus:
+      questionResult.verificationStatus || (verified ? "VERIFIED" : null),
+    score: verified ? questionResult.score : null,
+    passed: verified ? questionResult.passed : null,
+    failed: verified ? questionResult.failed : null,
     total: questionResult.total,
     executionTime: questionResult.executionTime,
     memoryUsed: questionResult.memoryUsed,
     hiddenPassed,
     hiddenFailed: hiddenCount - hiddenPassed,
-    totalScore: currentSubmission.totalScore,
-    totalPassed: currentSubmission.totalPassed,
-    totalFailed: currentSubmission.totalFailed,
+    totalScore: officialSubmissionFinal ? currentSubmission.totalScore : null,
+    totalPassed: officialSubmissionFinal ? currentSubmission.totalPassed : null,
+    totalFailed: officialSubmissionFinal ? currentSubmission.totalFailed : null,
     submissionStatus: currentSubmission.status,
     allCompleted,
   };
@@ -1088,7 +1119,7 @@ export async function getRoomByCode(req, res) {
         roomId: room._id,
         userId,
       })
-        .select("status totalScore submittedAt")
+        .select("status totalScore submittedAt totalPassed totalFailed totalQuestions questionResults")
         .lean();
 
       return res.status(200).json({
@@ -1100,8 +1131,38 @@ export async function getRoomByCode(req, res) {
         userSubmission: userSubmission
           ? {
               status: userSubmission.status,
-              totalScore: userSubmission.totalScore,
+              totalScore:
+                ["COMPLETED", "DISQUALIFIED"].includes(userSubmission.status)
+                  ? userSubmission.totalScore
+                  : null,
               submittedAt: userSubmission.submittedAt,
+              totalPassed: userSubmission.totalPassed,
+              totalFailed: userSubmission.totalFailed,
+              totalQuestions: userSubmission.totalQuestions,
+              questionResults: (userSubmission.questionResults || []).map(
+                (result) => ({
+                  questionId: result.questionId,
+                  status: result.status,
+                  verificationStatus: result.verificationStatus,
+                  verificationError: sanitizeParticipantExecutionError(
+                    result.status,
+                    result.verificationError || result.error,
+                  ),
+                  score:
+                    result.verificationStatus === "VERIFIED"
+                      ? result.score
+                      : null,
+                  passed:
+                    result.verificationStatus === "VERIFIED"
+                      ? result.passed
+                      : null,
+                  failed:
+                    result.verificationStatus === "VERIFIED"
+                      ? result.failed
+                      : null,
+                  total: result.total,
+                }),
+              ),
             }
           : null,
       });
@@ -1110,7 +1171,7 @@ export async function getRoomByCode(req, res) {
     const userSubmission = await BattleRoomSubmission.findOne({
       roomId: room._id,
       userId,
-    }).lean();
+    });
     const isParticipant = !!userSubmission;
     if (!isCreator && !isParticipant) {
       return res.status(403).json({
@@ -1138,11 +1199,14 @@ export async function getRoomByCode(req, res) {
       questionsVisible: isCreator || windowState.state === ROOM_WINDOW_STATE.ACTIVE,
       roomKey: isCreator ? room.roomCode : undefined,
       userSubmission: userSubmission
-        ? {
-            status: userSubmission.status,
-            totalScore: userSubmission.totalScore,
-            submittedAt: userSubmission.submittedAt,
-          }
+        ? userSubmission.toPublicJSON({
+            visibleTestCaseCounts: Object.fromEntries(
+              room.questions.map((question) => [
+                String(question._id),
+                question.visibleTestCases.length,
+              ]),
+            ),
+          })
         : null,
       timeRemaining: room.endTime
         ? Math.max(0, Math.floor((room.endTime - new Date()) / 1000))
@@ -1421,6 +1485,16 @@ export async function prepareDesktopSubmission(req, res) {
     const nonceResource =
       `${room._id}:${submission._id}:${questionId}:${codeHash.toLowerCase()}`;
     const now = new Date();
+    const matchingQuestionResult = submission.questionResults.find(
+      (result) =>
+        String(result.questionId) === String(questionId) &&
+        createHash("sha256").update(result.code || "", "utf8").digest("hex") ===
+          requestedCodeHash,
+    );
+    const reusableGrantStates = ["PROCESSING", "RETRYABLE"];
+    if (matchingQuestionResult?.verificationStatus !== "ERROR") {
+      reusableGrantStates.push("COMPLETED");
+    }
     const existingGrant = await Nonce.findOne({
       userId,
       action: "SUBMIT",
@@ -1432,9 +1506,7 @@ export async function prepareDesktopSubmission(req, res) {
           authorizationExpiresAt: { $gt: now },
         },
         {
-          state: {
-            $in: ["PROCESSING", "RETRYABLE", "COMPLETED"],
-          },
+          state: { $in: reusableGrantStates },
         },
       ],
     }).lean();
@@ -1448,10 +1520,6 @@ export async function prepareDesktopSubmission(req, res) {
       ));
     return res.status(200).json({
       nonce,
-      visibleTestCaseCount: visibleTestCases.length,
-      testCases: visibleTestCases,
-      timeLimit: 5_000,
-      memoryLimit: 131_072,
     });
   } catch (error) {
     console.error("Prepare desktop submission error:", error.message);
@@ -1637,10 +1705,8 @@ export async function runQuestionSolution(req, res) {
 /**
  * LIGHTWEIGHT SUBMIT
  * POST /api/battle-rooms/:roomCode/submit
- * - Never stores raw user code.
- * - Persists only competition metadata via atomic updateOne ($set / $inc / $addToSet).
- * - The version checker (__v) is bypassed entirely, so a concurrent proctoring
- *   disqualification merges cleanly without throwing a VersionError.
+ * - Persists source and server-only test snapshots before acknowledging verification.
+ * - Official scores are written only by the asynchronous server verification worker.
  */
 export async function submitQuestionSolution(req, res) {
   let nonceClaim = null;
@@ -1749,7 +1815,13 @@ export async function submitQuestionSolution(req, res) {
     if (
       desktopNonce === undefined &&
       existingQuestionResult.code === code &&
-      !["PENDING", "PROCESSING"].includes(existingQuestionResult.status)
+      (["PENDING_VERIFICATION", "VERIFYING", "VERIFIED"].includes(
+        existingQuestionResult.verificationStatus,
+      ) ||
+        (!existingQuestionResult.verificationStatus &&
+          !["PENDING", "PROCESSING", "ERROR"].includes(
+            existingQuestionResult.status,
+          )))
     ) {
       return res.status(200).json(
         buildParticipantSubmissionResponse(
@@ -1823,8 +1895,23 @@ export async function submitQuestionSolution(req, res) {
         !nonceClaim.claimed &&
         nonceClaim.nonce.state === "PROCESSING"
       ) {
+        if (
+          existingQuestionResult.code === code &&
+          ["PENDING_VERIFICATION", "VERIFYING", "VERIFIED"].includes(
+            existingQuestionResult.verificationStatus,
+          )
+        ) {
+          return res.status(202).json(
+            buildParticipantSubmissionResponse(
+              existingQuestionResult,
+              submission,
+              question.visibleTestCases.length,
+              question.hiddenTestCases.length,
+            ),
+          );
+        }
         return res.status(409).json({
-          error: "This submission is still being judged. Retry shortly to retrieve its result.",
+          error: "This submission is still being verified. Refresh shortly to retrieve its status.",
           code: "SUBMISSION_IN_PROGRESS",
           retryable: true,
         });
@@ -1850,17 +1937,21 @@ export async function submitQuestionSolution(req, res) {
       )
         .select("+questionResults.executionGrantNonce")
         .lean();
-      const existingQuestionResult = currentSubmission?.questionResults?.find(
+      const persistedCandidateResult = currentSubmission?.questionResults?.find(
         (result) =>
           result.questionId.toString() === questionId &&
           result.code === code &&
-          !["PENDING", "PROCESSING"].includes(result.status),
+          (["PENDING_VERIFICATION", "VERIFYING", "VERIFIED"].includes(
+            result.verificationStatus,
+          ) ||
+            (!result.verificationStatus &&
+              !["PENDING", "PROCESSING", "ERROR"].includes(result.status))),
       );
       const persistedQuestionResult =
-        existingQuestionResult &&
-        (existingQuestionResult.executionGrantNonce === desktopNonce ||
+        persistedCandidateResult &&
+        (persistedCandidateResult.executionGrantNonce === desktopNonce ||
           nonceClaim.claimed)
-          ? existingQuestionResult
+          ? persistedCandidateResult
           : null;
       if (persistedQuestionResult) {
         if (nonceClaim.claimed) {
@@ -1926,73 +2017,11 @@ export async function submitQuestionSolution(req, res) {
       });
     }
 
-    let executionResult;
-    if (question.signature && question.signature.name) {
-      executionResult = await executeComposedQuestion(
-        question,
-        code,
-        lang,
-        allTestCases,
-      );
-    } else {
-      executionResult = await executionService.execute(
-        code,
-        allTestCases,
-        lang,
-        {
-          timeLimit: 5_000,
-          memoryLimit: 131_072,
-        },
-      );
-    }
-
-    if (
-      ["SYSTEM_ERROR", "INTERNAL_ENGINE_ERROR"].includes(
-        executionResult.status,
-      )
-    ) {
-      throw new Error("Authoritative judging could not complete.");
-    }
-
-    if (!isCodeExecutionAllowed(room)) {
-      if (nonceClaim?.claimed) {
-        await Nonce.releaseDesktopSubmission(
-          nonceClaim.nonce._id,
-          nonceClaim.claimId,
-        );
-        nonceClaim = null;
-      }
-      const win = getRoomWindowState(room);
-      return res.status(403).json({
-        error: "The scheduled battle window ended while your code was running.",
-        windowState: win.state,
-        serverTime: win.now.toISOString(),
-      });
-    }
-
     const visibleCount = question.visibleTestCases.length;
     const hiddenCount = question.hiddenTestCases.length;
     const totalCount = visibleCount + hiddenCount;
-
-    const passedCount =
-      executionResult.status === "SYSTEM_ERROR"
-        ? 0
-        : executionResult.results.filter(
-            (r) => r.status === "PASSED" || r.status === "ACCEPTED",
-          ).length;
-    const failedCount = totalCount - passedCount;
-
-    const questionScore = calculateQuestionScore(
-      question.points,
-      passedCount,
-      totalCount,
-    );
-
-    const qrResults = [...submission.questionResults];
-    const previousQuestionResult = qrResults[qrIndex];
-
-    // Keep the submitted source with the result so the room owner can audit
-    // the complete battle record after the battle.
+    const previousQuestionResult = submission.questionResults[qrIndex];
+    const submittedAt = new Date();
     const qr = {
       questionId: question._id,
       questionTitle: question.title,
@@ -2000,70 +2029,57 @@ export async function submitQuestionSolution(req, res) {
       ...(desktopNonce ? { executionGrantNonce: desktopNonce } : {}),
       code,
       language: lang,
-      status: executionResult.status,
-      score: Math.round(questionScore * 100) / 100,
-      passed: passedCount,
-      failed: failedCount,
+      status: "PROCESSING",
+      verificationStatus: "PENDING_VERIFICATION",
+      verificationSubmittedAt: submittedAt,
+      verificationStartedAt: null,
+      verificationCompletedAt: null,
+      verificationLeaseExpiresAt: null,
+      verificationLeaseId: null,
+      verificationAttempts: 0,
+      verificationError: "",
+      verificationTestCases: allTestCases.map((testCase, index) => ({
+        testCaseId: testCase._id ? String(testCase._id) : "",
+        input: testCase.input,
+        expectedOutput: testCase.expectedOutput,
+        isHidden: index >= visibleCount,
+      })),
+      verificationSignature: question.signature || null,
+      verificationPoints: Number(question.points) || 0,
+      score: 0,
+      passed: 0,
+      failed: 0,
       total: totalCount,
-      executionTime: executionResult.executionTime ?? 0,
-      memoryUsed: executionResult.memoryUsed ?? 0,
+      executionTime: 0,
+      memoryUsed: 0,
       timeToSolve,
-      output: executionResult.results
-        .slice(0, visibleCount)
-        .map((result) => result.output ?? "")
-        .join("\n"),
-      error: sanitizeParticipantExecutionError(
-        executionResult.status,
-        executionResult.error,
-      ),
-      results: executionResult.results.map((r, idx) =>
-        sanitizeParticipantTestResult({
-          ...(r.testCaseId ? { testCaseId: r.testCaseId } : {}),
-          testCase: r.testCase ?? idx + 1,
-          input: r.input ?? allTestCases[idx]?.input ?? "",
-          status: r.status,
-          executionTime: r.executionTime ?? 0,
-          memoryUsed: r.memoryUsed ?? 0,
-          output: r.output ?? "",
-          expectedOutput:
-            idx < visibleCount
-              ? (r.expectedOutput ?? allTestCases[idx]?.expectedOutput ?? "")
-              : "",
-          error: r.error ?? "",
-          isHidden: idx >= visibleCount,
-        }),
-      ),
+      output: "",
+      error: "",
+      results: [],
     };
 
-    // Compute deltas from the question snapshot; $inc preserves updates from
-    // concurrent submissions to other questions in the same room.
-    qrResults[qrIndex] = qr;
-
     const lines = code.split("\n").length;
-
-    // Build the atomic update operator.
     const update = {
       $set: {
         [`questionResults.${qrIndex}`]: qr,
+        status: "PROCESSING",
       },
       $inc: {
-        totalScore: qr.score - (previousQuestionResult.score || 0),
-        totalPassed: qr.passed - (previousQuestionResult.passed || 0),
-        totalFailed: qr.failed - (previousQuestionResult.failed || 0),
+        totalScore: -(previousQuestionResult.score || 0),
+        totalPassed: -(previousQuestionResult.passed || 0),
+        totalFailed: -(previousQuestionResult.failed || 0),
         "codingBehavior.totalLinesWritten": lines,
         "codingBehavior.totalEdits": 1,
       },
     };
 
-    // Atomic merge.
-    // If a proctoring event already set DISQUALIFIED (or the user completed),
-    // this filter matches nothing and we return a clean conflict instead of
-    // crashing with a VersionError.
     const result = await BattleRoomSubmission.updateOne(
       {
         _id: submission._id,
         status: { $in: ["PENDING", "PROCESSING"] },
         [`questionResults.${qrIndex}.status`]: previousQuestionResult.status,
+        [`questionResults.${qrIndex}.verificationStatus`]:
+          previousQuestionResult.verificationStatus ?? null,
         [`questionResults.${qrIndex}.revision`]: previousQuestionResult.revision || 0,
         [`questionResults.${qrIndex}.score`]: previousQuestionResult.score || 0,
         [`questionResults.${qrIndex}.passed`]: previousQuestionResult.passed || 0,
@@ -2074,16 +2090,31 @@ export async function submitQuestionSolution(req, res) {
     );
 
     if (result.matchedCount === 0) {
-      const current = await BattleRoomSubmission.findOne(
-        { _id: submission._id },
-        { status: 1, totalScore: 1 },
-      ).lean();
+      const current = await BattleRoomSubmission.findById(submission._id).lean();
       if (nonceClaim?.claimed) {
         await Nonce.releaseDesktopSubmission(
           nonceClaim.nonce._id,
           nonceClaim.claimId,
         );
         nonceClaim = null;
+      }
+      const currentQuestionResult = current?.questionResults?.find(
+        (result) => result.questionId.toString() === questionId,
+      );
+      if (
+        currentQuestionResult?.code === code &&
+        ["PENDING_VERIFICATION", "VERIFYING"].includes(
+          currentQuestionResult.verificationStatus,
+        )
+      ) {
+        return res.status(202).json(
+          buildParticipantSubmissionResponse(
+            currentQuestionResult,
+            current,
+            visibleCount,
+            hiddenCount,
+          ),
+        );
       }
       return res.status(409).json({
         error:
@@ -2106,67 +2137,27 @@ export async function submitQuestionSolution(req, res) {
       nonceClaim = null;
     }
 
-    let currentSubmission = await BattleRoomSubmission.findById(
+    const currentSubmission = await BattleRoomSubmission.findById(
       submission._id,
-      {
-        status: 1,
-        totalScore: 1,
-        totalPassed: 1,
-        totalFailed: 1,
-        questionResults: 1,
-      },
     ).lean();
     if (!currentSubmission) {
       return res.status(404).json({ error: "Submission no longer exists." });
     }
-    const allCompleted = currentSubmission.questionResults.every(
-      (questionResult) =>
-        !["PENDING", "PROCESSING"].includes(questionResult.status),
+    logBattleRoomSubmissionEvent("submission_received", {
+      submissionId: String(submission._id),
+      questionId,
+      userId: String(userId),
+      requestId: req.requestId || "",
+    });
+    wakeBattleRoomVerificationWorker();
+    return res.status(202).json(
+      buildParticipantSubmissionResponse(
+        qr,
+        currentSubmission,
+        visibleCount,
+        hiddenCount,
+      ),
     );
-    if (allCompleted) {
-      await BattleRoomSubmission.updateOne(
-        {
-          _id: submission._id,
-          status: { $in: ["PENDING", "PROCESSING"] },
-          questionResults: {
-            $not: {
-              $elemMatch: { status: { $in: ["PENDING", "PROCESSING"] } },
-            },
-          },
-        },
-        { $set: { status: "COMPLETED", submittedAt: new Date() } },
-      );
-      currentSubmission = await BattleRoomSubmission.findById(
-        submission._id,
-        {
-          status: 1,
-          totalScore: 1,
-          totalPassed: 1,
-          totalFailed: 1,
-          questionResults: 1,
-        },
-      ).lean();
-    }
-    if (!currentSubmission) {
-      return res.status(404).json({ error: "Submission no longer exists." });
-    }
-
-    // SECURITY: never expose hidden test case inputs, expected outputs, or
-    // actual outputs to the participant. Visible cases keep full detail; hidden
-    // cases are reduced to pass/fail only. Top-level stdout is suppressed on
-    // submit because it may contain output produced from hidden inputs. The
-    // full record (including code and hidden results) remains persisted
-    // server-side for the creator report.
-    return res
-      .status(200)
-      .json(
-        buildParticipantSubmissionResponse(
-          qr,
-          currentSubmission,
-          visibleCount,
-          hiddenCount,
-        ),
-      );
   } catch (error) {
     if (nonceClaim?.claimed && nonceClaim.nonce) {
       try {
@@ -2350,13 +2341,12 @@ export async function endTest(req, res) {
       Math.floor((new Date() - submission.startTime) / 1000),
     );
     const totalEdits = submission.codingBehavior?.totalEdits || 0;
-
-    const finalized = await BattleRoomSubmission.updateOne(
+    await BattleRoomSubmission.updateOne(
       { _id: submission._id, status: { $in: ["PENDING", "PROCESSING"] } },
       {
         $set: {
-          status: "COMPLETED",
-          submittedAt: new Date(),
+          status: "PROCESSING",
+          endRequestedAt: new Date(),
           "codingBehavior.timePerQuestion":
             submission.totalQuestions > 0
               ? totalTime / submission.totalQuestions
@@ -2368,35 +2358,20 @@ export async function endTest(req, res) {
         },
       },
     );
-    if (finalized.matchedCount === 0) {
-      const current = await BattleRoomSubmission.findById(
-        submission._id,
-        { status: 1, totalScore: 1, totalPassed: 1, totalFailed: 1 },
-      ).lean();
-      if (
-        !current ||
-        !["COMPLETED", "DISQUALIFIED"].includes(current.status)
-      ) {
-        return res.status(409).json({
-          error: "Your submission changed while the test was ending.",
-        });
-      }
-      return res.status(200).json({
-        message: "Test already finalized.",
-        status: current.status,
-        totalScore: current.totalScore || 0,
-        totalPassed: current.totalPassed || 0,
-        totalFailed: current.totalFailed || 0,
-      });
-    }
-
+    await finalizeBattleRoomSubmission(submission._id);
+    wakeBattleRoomVerificationWorker();
     const current = await BattleRoomSubmission.findById(
       submission._id,
       { status: 1, totalScore: 1, totalPassed: 1, totalFailed: 1 },
     ).lean();
-
-    return res.status(200).json({
-      message: "Test ended. Your score has been finalized.",
+    if (!current) {
+      return res.status(404).json({ error: "Submission no longer exists." });
+    }
+    const isFinal = ["COMPLETED", "DISQUALIFIED"].includes(current.status);
+    return res.status(isFinal ? 200 : 202).json({
+      message: isFinal
+        ? "Test ended. Your verified score has been finalized."
+        : "Your submitted solutions are still being verified.",
       status: current.status,
       totalScore: current.totalScore || 0,
       totalPassed: current.totalPassed || 0,

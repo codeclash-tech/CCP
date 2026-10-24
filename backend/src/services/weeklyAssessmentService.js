@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
+import cron from "node-cron";
 import mongoose from "mongoose";
+import { performance } from "node:perf_hooks";
 import Challenge from "../models/Challenge.js";
 import GlobalChallenge from "../models/GlobalChallenge.js";
 import OrganizationMembership from "../models/OrganizationMembership.js";
@@ -20,11 +22,33 @@ import {
   getRecurringCycleBounds,
   getWeeklyRecoveryDeadline,
   shouldWaitForWeeklyRecovery,
+  takeNextQueuedQuestion,
   WEEKLY_SHRINKAGE_K,
 } from "../utils/weeklyAssessment.js";
 
 const RETRY_LEASE_MS = 6 * 60 * 1000;
 const DAILY_POINTS = 100;
+let weeklyVerificationWorkerStarted = false;
+
+function logWeeklyVerification(event, details = {}) {
+  if (process.env.BATTLE_ROOM_PERF_LOGS !== "true") return;
+  console.info(
+    "[ExecutionPerf] " +
+      JSON.stringify({
+        event: `daily_${event}`,
+        timestamp: new Date().toISOString(),
+        ...details,
+      }),
+  );
+}
+
+function weeklySubmissionAcknowledgement(submission) {
+  return {
+    submissionId: String(submission._id),
+    status: submission.status,
+    message: "Submission received. CodeClash is verifying your solution.",
+  };
+}
 
 function requestError(message, statusCode = 400) {
   const error = new Error(message);
@@ -263,6 +287,7 @@ export async function createWeeklyCycle({ cycleKey, name, questionIds }) {
 export async function getGlobalChallengeConfiguration() {
   return GlobalChallenge.findOne({ key: "global" })
     .populate("questionIds", "title difficulty isActive")
+    .populate("activeQuestionId", "title difficulty isActive")
     .lean();
 }
 
@@ -277,8 +302,8 @@ export async function saveGlobalChallengeConfiguration({
   if (!Number.isFinite(parsedStartAt.getTime())) {
     throw requestError("Choose a valid global challenge start date and time.");
   }
-  if (!Array.isArray(questionIds) || questionIds.length === 0 || questionIds.length > 50) {
-    throw requestError("Select between 1 and 50 questions for the global challenge.");
+  if (!Array.isArray(questionIds) || (!existing && questionIds.length === 0)) {
+    throw requestError("Select at least one question for the global challenge.");
   }
   const normalizedIds = questionIds.map(String);
   if (new Set(normalizedIds).size !== normalizedIds.length ||
@@ -319,7 +344,9 @@ export async function saveGlobalChallengeConfiguration({
       $setOnInsert: { key: "global" },
     },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
-  ).populate("questionIds", "title difficulty isActive");
+  )
+    .populate("questionIds", "title difficulty isActive")
+    .populate("activeQuestionId", "title difficulty isActive");
 }
 
 export async function freezeWeeklyRoster(cycleId) {
@@ -430,18 +457,115 @@ export function getCurrentDayIndex(cycle, now = new Date()) {
   return getWeeklyDayIndex(now, cycle.startAt);
 }
 
-async function getOrCreateCurrentDailyCycle(now) {
-  const globalChallenge = await GlobalChallenge.findOne({ key: "global" }).lean();
-  if (!globalChallenge || now < globalChallenge.startAt || globalChallenge.questionIds.length === 0) {
-    return null;
+async function removeExpiredGlobalCycleData(globalChallenge, currentStartAt) {
+  const escapedName = String(globalChallenge.name || "Global Challenge")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const expiredCycles = await WeeklyCycle.find({
+    startAt: { $gte: globalChallenge.startAt, $lt: currentStartAt },
+    $or: [
+      { isGlobalChallenge: true },
+      {
+        isGlobalChallenge: { $exists: false },
+        name: { $regex: `^${escapedName} · ` },
+      },
+    ],
+  }).select("_id");
+  if (expiredCycles.length === 0) return;
+
+  const cycleIds = expiredCycles.map((cycle) => cycle._id);
+  await Promise.all([
+    WeeklySubmission.deleteMany({ cycleId: { $in: cycleIds } }),
+    WeeklyRosterEntry.deleteMany({ cycleId: { $in: cycleIds } }),
+    WeeklyCertificate.deleteMany({ cycleId: { $in: cycleIds } }),
+  ]);
+  await WeeklyCycle.deleteMany({ _id: { $in: cycleIds } });
+}
+
+async function reserveQuestionForCycle(globalChallenge, bounds, existingCycle = null) {
+  const scheduledForDay = await GlobalChallenge.findOne({
+    key: "global",
+    lastScheduledCycleKey: bounds.cycleKey,
+  }).select("activeQuestionId").lean();
+  if (scheduledForDay) return scheduledForDay.activeQuestionId;
+
+  let queue = globalChallenge.questionIds || [];
+  let nextQuestionId;
+  let remainingQuestionIds;
+
+  if (existingCycle) {
+    nextQuestionId = existingCycle.questionAssignments[0]?.challengeId || null;
+    const assignedIndex = queue.findIndex(
+      (questionId) => String(questionId) === String(nextQuestionId),
+    );
+    remainingQuestionIds = assignedIndex < 0
+      ? queue
+      : queue.slice(assignedIndex + 1);
+  } else {
+    ({ questionId: nextQuestionId, remainingQuestionIds } =
+      takeNextQueuedQuestion(queue));
   }
 
-  const bounds = getRecurringCycleBounds(globalChallenge.startAt, now);
-  const existing = await WeeklyCycle.findOne({ cycleKey: bounds.cycleKey });
-  if (existing) return existing;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const reserved = await GlobalChallenge.findOneAndUpdate(
+      {
+        key: "global",
+        lastScheduledCycleKey: { $ne: bounds.cycleKey },
+        questionIds: queue,
+      },
+      {
+        $set: {
+          lastScheduledCycleKey: bounds.cycleKey,
+          activeQuestionId: nextQuestionId,
+          questionIds: remainingQuestionIds,
+        },
+      },
+      { new: true },
+    ).select("activeQuestionId").lean();
+    if (reserved) return reserved.activeQuestionId;
 
-  const questionId =
-    globalChallenge.questionIds[bounds.cycleIndex % globalChallenge.questionIds.length];
+    const concurrentReservation = await GlobalChallenge.findOne({
+      key: "global",
+      lastScheduledCycleKey: bounds.cycleKey,
+    }).select("activeQuestionId").lean();
+    if (concurrentReservation) return concurrentReservation.activeQuestionId;
+
+    globalChallenge = await GlobalChallenge.findOne({ key: "global" }).lean();
+    if (!globalChallenge) {
+      throw requestError("Global challenge configuration is unavailable.", 503);
+    }
+    const updatedQueue = globalChallenge.questionIds || [];
+    if (existingCycle) {
+      nextQuestionId = existingCycle.questionAssignments[0]?.challengeId || null;
+      const assignedIndex = updatedQueue.findIndex(
+        (questionId) => String(questionId) === String(nextQuestionId),
+      );
+      remainingQuestionIds = assignedIndex < 0
+        ? updatedQueue
+        : updatedQueue.slice(assignedIndex + 1);
+    } else {
+      ({ questionId: nextQuestionId, remainingQuestionIds } =
+        takeNextQueuedQuestion(updatedQueue));
+    }
+    queue = updatedQueue;
+  }
+
+  throw requestError("Could not reserve the next daily challenge question; retry shortly.", 503);
+}
+
+async function getOrCreateCurrentDailyCycle(now) {
+  let globalChallenge = await GlobalChallenge.findOne({ key: "global" }).lean();
+  if (!globalChallenge || now < globalChallenge.startAt) return null;
+
+  const bounds = getRecurringCycleBounds(globalChallenge.startAt, now);
+  await removeExpiredGlobalCycleData(globalChallenge, bounds.startAt);
+  const existing = await WeeklyCycle.findOne({ cycleKey: bounds.cycleKey });
+  if (existing) {
+    await reserveQuestionForCycle(globalChallenge, bounds, existing);
+    return existing;
+  }
+
+  const questionId = await reserveQuestionForCycle(globalChallenge, bounds);
+  if (!questionId) return null;
   const question = await Challenge.findOne({ _id: questionId, isActive: true });
   if (!question) {
     throw requestError("A scheduled global challenge question is no longer active.", 503);
@@ -450,6 +574,7 @@ async function getOrCreateCurrentDailyCycle(now) {
     return await WeeklyCycle.create({
       cycleKey: bounds.cycleKey,
       name: `${globalChallenge.name} · ${bounds.cycleKey}`,
+      isGlobalChallenge: true,
       timezone: "Asia/Kolkata",
       startAt: bounds.startAt,
       endAt: bounds.endAt,
@@ -468,12 +593,19 @@ export async function ensureCurrentGlobalCycle(now = new Date()) {
 }
 
 export async function getCandidateWeeklyState(candidateId, now = new Date()) {
-  let cycle = await WeeklyCycle.findOne({
-    startAt: { $lte: now },
-    endAt: { $gt: now },
-    status: { $in: ["SCHEDULED", "ACTIVE"] },
-  }).sort({ startAt: -1 });
-  if (!cycle) cycle = await getOrCreateCurrentDailyCycle(now);
+  const globalCycle = await getOrCreateCurrentDailyCycle(now);
+  let cycle = globalCycle;
+  if (!cycle) {
+    const globalChallenge = await GlobalChallenge.findOne({ key: "global" })
+      .select("startAt")
+      .lean();
+    if (globalChallenge && now >= globalChallenge.startAt) return null;
+    cycle = await WeeklyCycle.findOne({
+      startAt: { $lte: now },
+      endAt: { $gt: now },
+      status: { $in: ["SCHEDULED", "ACTIVE"] },
+    }).sort({ startAt: -1 });
+  }
   if (!cycle) return null;
   if (!["SCHEDULED", "ACTIVE"].includes(cycle.status) || now < cycle.startAt || now >= cycle.endAt) {
     return null;
@@ -512,6 +644,7 @@ export async function getCandidateWeeklyState(candidateId, now = new Date()) {
     },
     question,
     submission: submission ? {
+      id: submission._id,
       status: submission.status,
       resultStatus: submission.resultStatus,
       score: submission.score,
@@ -519,6 +652,9 @@ export async function getCandidateWeeklyState(candidateId, now = new Date()) {
       total: submission.total,
       executionTime: submission.executionTime,
       finalizedAt: submission.finalizedAt,
+      verificationStartedAt: submission.verificationStartedAt,
+      verificationCompletedAt: submission.verificationCompletedAt,
+      verificationError: submission.verificationError,
     } : null,
   };
 }
@@ -543,26 +679,43 @@ function sanitizedResult(result, score) {
 }
 
 async function claimWeeklySubmission(submission, now) {
-  if (submission.status === "JUDGING" && now - submission.judgeLeaseAt < RETRY_LEASE_MS) {
-    throw requestError("This submission is already being judged.", 409);
-  }
   const claimed = await WeeklySubmission.findOneAndUpdate(
+    { _id: submission._id, status: "RETRYABLE" },
     {
-      _id: submission._id,
-      status: { $in: ["RETRYABLE", "JUDGING"] },
-      $or: [
-        { status: "RETRYABLE" },
-        { judgeLeaseAt: { $lte: new Date(now.getTime() - RETRY_LEASE_MS) } },
-      ],
+      $set: {
+        status: "PENDING_VERIFICATION",
+        verificationError: "",
+        verificationCompletedAt: null,
+      },
     },
-    { $set: { status: "JUDGING", judgeLeaseAt: now } },
     { new: true },
-  ).select("+sourceHash");
-  if (!claimed) throw requestError("Submission retry lease could not be acquired.", 409);
+  ).select("+sourceHash +sourceCode");
+  if (!claimed) {
+    const current = await WeeklySubmission.findById(submission._id)
+      .select("+sourceHash +sourceCode");
+    if (current && ["PENDING_VERIFICATION", "VERIFYING"].includes(current.status)) {
+      return current;
+    }
+    throw requestError("Submission retry lease could not be acquired.", 409);
+  }
   return claimed;
 }
 
 async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
+  const startedAt = performance.now();
+  const startedDate = new Date();
+  logWeeklyVerification("verification_started", {
+    submissionId: String(submission._id),
+    queueWaitMs: Math.max(0, startedDate.getTime() - new Date(submission.createdAt || startedDate).getTime()),
+  });
+  await WeeklySubmission.updateOne(
+    {
+      _id: submission._id,
+      status: "VERIFYING",
+      judgeLeaseAt: submission.judgeLeaseAt,
+    },
+    { $set: { verificationStartedAt: startedDate } },
+  );
   const challenge = assignment?.questionSnapshot;
   if (!challenge) throw requestError("The assigned daily question is unavailable.", 503);
   const { visible, hidden } = getChallengeTestCaseGroups(challenge);
@@ -571,10 +724,16 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
     await WeeklySubmission.updateOne(
       {
         _id: submission._id,
-        status: "JUDGING",
+        status: "VERIFYING",
         judgeLeaseAt: submission.judgeLeaseAt,
       },
-      { $set: { status: "RETRYABLE" } },
+      {
+        $set: {
+          status: "RETRYABLE",
+          verificationCompletedAt: new Date(),
+          verificationError: "Assigned question has an invalid test-case configuration.",
+        },
+      },
     );
     const error = requestError("Assigned question has an invalid test-case configuration.", 503);
     error.submissionId = String(submission._id);
@@ -584,9 +743,18 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
   let result;
   try {
     const program = composeProgram(challenge, code, "java");
+    const executionStartedAt = performance.now();
+    logWeeklyVerification("execution_started", {
+      submissionId: String(submission._id),
+    });
     result = await executionService.execute(program, cases, "java", {
       timeLimit: 2000,
       memoryLimit: 65536,
+    });
+    logWeeklyVerification("execution_completed", {
+      submissionId: String(submission._id),
+      status: result.status,
+      durationMs: Number((performance.now() - executionStartedAt).toFixed(3)),
     });
   } catch (error) {
     result = {
@@ -603,10 +771,17 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
     await WeeklySubmission.updateOne(
       {
         _id: submission._id,
-        status: "JUDGING",
+        status: "VERIFYING",
         judgeLeaseAt: submission.judgeLeaseAt,
       },
-      { $set: { status: "RETRYABLE", resultStatus: result.status } },
+      {
+        $set: {
+          status: "RETRYABLE",
+          resultStatus: result.status,
+          verificationCompletedAt: new Date(),
+          verificationError: "The authoritative judge could not complete verification.",
+        },
+      },
     );
     const error = requestError(
       "The authoritative judge is temporarily unavailable; retry the identical code.",
@@ -618,10 +793,11 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
   const score = Math.round(
     (DAILY_POINTS * (Number(result.passed) || 0) / (Number(result.total) || 1)) * 100,
   ) / 100;
+  const databaseStartedAt = performance.now();
   const finalized = await WeeklySubmission.findOneAndUpdate(
     {
       _id: submission._id,
-      status: "JUDGING",
+      status: "VERIFYING",
       judgeLeaseAt: submission.judgeLeaseAt,
     },
     {
@@ -633,6 +809,8 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
         total: Number(result.total) || cases.length,
         executionTime: Number(result.executionTime) || 0,
         finalizedAt: new Date(),
+        verificationCompletedAt: new Date(),
+        verificationError: "",
       },
     },
     { new: true },
@@ -642,8 +820,129 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
     error.submissionId = String(submission._id);
     throw error;
   }
+  logWeeklyVerification("database_update", {
+    submissionId: String(submission._id),
+    status: "FINALIZED",
+    durationMs: Number((performance.now() - databaseStartedAt).toFixed(3)),
+  });
   await synchronizeRosterScore(roster._id);
+  logWeeklyVerification("verification_completed", {
+    submissionId: String(submission._id),
+    durationMs: Number((performance.now() - startedAt).toFixed(3)),
+  });
   return sanitizedResult(result, score);
+}
+
+async function claimNextWeeklyVerification(now = new Date()) {
+  const staleBefore = new Date(now.getTime() - RETRY_LEASE_MS);
+  return WeeklySubmission.findOneAndUpdate(
+    {
+      $or: [
+        { status: "PENDING_VERIFICATION" },
+        {
+          status: { $in: ["VERIFYING", "JUDGING"] },
+          judgeLeaseAt: { $lte: staleBefore },
+        },
+      ],
+    },
+    {
+      $set: {
+        status: "VERIFYING",
+        judgeLeaseAt: now,
+        verificationStartedAt: now,
+      },
+      $inc: { verificationAttempts: 1 },
+    },
+    { new: true, sort: { createdAt: 1 } },
+  ).select("+sourceHash +sourceCode");
+}
+
+let weeklyWorkerRunning = false;
+
+async function drainWeeklyVerificationQueue() {
+  if (mongoose.connection.readyState !== 1) return;
+  if (weeklyWorkerRunning) return;
+  weeklyWorkerRunning = true;
+  try {
+    let submission;
+    while ((submission = await claimNextWeeklyVerification())) {
+      const id = String(submission._id);
+      try {
+        if (!submission.sourceCode) {
+          await WeeklySubmission.updateOne(
+            { _id: submission._id, status: "VERIFYING", judgeLeaseAt: submission.judgeLeaseAt },
+            {
+              $set: {
+                status: "RETRYABLE",
+                resultStatus: "RECOVERY_REQUIRED",
+                verificationError: "Saved source is unavailable; restore the original source to retry.",
+                verificationCompletedAt: new Date(),
+              },
+            },
+          );
+          continue;
+        }
+        const [cycle, roster] = await Promise.all([
+          WeeklyCycle.findById(submission.cycleId),
+          WeeklyRosterEntry.findOne({
+            _id: submission.rosterEntryId,
+            cycleId: submission.cycleId,
+            candidateId: submission.candidateId,
+            participationStatus: { $ne: "DISQUALIFIED" },
+          }),
+        ]);
+        const assignment = cycle?.questionAssignments.find(
+          (item) =>
+            item.dayIndex === submission.dayIndex &&
+            String(item.challengeId) === String(submission.challengeId),
+        );
+        if (!cycle || !roster || !assignment) {
+          await WeeklySubmission.updateOne(
+            { _id: submission._id, status: "VERIFYING", judgeLeaseAt: submission.judgeLeaseAt },
+            {
+              $set: {
+                status: "RETRYABLE",
+                resultStatus: "RECOVERY_REQUIRED",
+                verificationError: "The saved assessment assignment could not be verified.",
+                verificationCompletedAt: new Date(),
+              },
+            },
+          );
+          continue;
+        }
+        await judgeWeeklySubmission({
+          submission,
+          roster,
+          assignment,
+          code: submission.sourceCode,
+        });
+      } catch (error) {
+        console.error(
+          `[WeeklyAssessment] Verification worker failed for ${id}:`,
+          error.message,
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[WeeklyAssessment] Verification queue polling failed:", error.message);
+  } finally {
+    weeklyWorkerRunning = false;
+  }
+}
+
+export function wakeWeeklyVerificationWorker() {
+  setImmediate(() => {
+    drainWeeklyVerificationQueue().catch((error) => {
+      console.error("[WeeklyAssessment] Verification worker wake failed:", error.message);
+    });
+  });
+}
+
+export function startWeeklyVerificationWorker() {
+  if (weeklyVerificationWorkerStarted) return;
+  weeklyVerificationWorkerStarted = true;
+  cron.schedule("*/5 * * * * *", wakeWeeklyVerificationWorker);
+  wakeWeeklyVerificationWorker();
 }
 
 async function synchronizeRosterScore(rosterEntryId) {
@@ -742,7 +1041,7 @@ export async function submitWeeklyAnswer({ candidateId, code, now = new Date() }
 
   const hash = sourceHash(code);
   let submission = await WeeklySubmission.findOne({ cycleId: cycle._id, candidateId, dayIndex })
-    .select("+sourceHash");
+    .select("+sourceHash +sourceCode");
   if (submission) {
     if (submission.status === "FINALIZED") {
       const error = new Error("Only one finalized submission is allowed per assessment day.");
@@ -751,6 +1050,14 @@ export async function submitWeeklyAnswer({ candidateId, code, now = new Date() }
     }
     if (submission.sourceHash !== hash) {
       throw requestError("Retry must use the identical source submitted for this assessment day.", 409);
+    }
+    if (["PENDING_VERIFICATION", "VERIFYING"].includes(submission.status)) {
+      wakeWeeklyVerificationWorker();
+      return weeklySubmissionAcknowledgement(submission);
+    }
+    if (submission.status === "JUDGING") {
+      wakeWeeklyVerificationWorker();
+      return weeklySubmissionAcknowledgement(submission);
     }
     submission = await claimWeeklySubmission(submission, now);
   } else {
@@ -762,20 +1069,34 @@ export async function submitWeeklyAnswer({ candidateId, code, now = new Date() }
         dayIndex,
         challengeId: assignment.challengeId,
         sourceHash: hash,
-        status: "JUDGING",
+        sourceCode: code,
+        status: "PENDING_VERIFICATION",
         judgeLeaseAt: now,
       });
     } catch (error) {
       if (error?.code === 11000) {
-        const duplicate = new Error("A submission already exists for this assessment day.");
-        duplicate.statusCode = 409;
-        throw duplicate;
+        submission = await WeeklySubmission.findOne({
+          cycleId: cycle._id,
+          candidateId,
+          dayIndex,
+        }).select("+sourceHash +sourceCode");
+        if (!submission || submission.sourceHash !== hash) {
+          throw requestError("A different submission already exists for this assessment day.", 409);
+        }
+        if (submission.status === "FINALIZED") {
+          throw requestError("Only one finalized submission is allowed per assessment day.", 409);
+        }
       }
-      throw error;
+      if (!submission) throw error;
     }
   }
 
-  return judgeWeeklySubmission({ submission, roster, assignment, code });
+  logWeeklyVerification("submission_received", {
+    submissionId: String(submission._id),
+    candidateId: String(candidateId),
+  });
+  wakeWeeklyVerificationWorker();
+  return weeklySubmissionAcknowledgement(submission);
 }
 
 export async function retryWeeklyAnswer({ candidateId, submissionId, code, now = new Date() }) {
@@ -788,13 +1109,21 @@ export async function retryWeeklyAnswer({ candidateId, submissionId, code, now =
   const submission = await WeeklySubmission.findOne({
     _id: submissionId,
     candidateId,
-  }).select("+sourceHash");
+  }).select("+sourceHash +sourceCode");
   if (!submission) throw requestError("Recoverable weekly submission not found.", 404);
   if (submission.status === "FINALIZED") {
     throw requestError("Finalized weekly submissions cannot be replayed.", 409);
   }
   if (submission.sourceHash !== sourceHash(code)) {
     throw requestError("Recovery must use the exact source bound to the original submission.", 409);
+  }
+  if (["PENDING_VERIFICATION", "VERIFYING"].includes(submission.status)) {
+    wakeWeeklyVerificationWorker();
+    return weeklySubmissionAcknowledgement(submission);
+  }
+  if (submission.status === "JUDGING") {
+    wakeWeeklyVerificationWorker();
+    return weeklySubmissionAcknowledgement(submission);
   }
   const cycle = await WeeklyCycle.findOne({
     _id: submission.cycleId,
@@ -818,32 +1147,53 @@ export async function retryWeeklyAnswer({ candidateId, submissionId, code, now =
     throw requestError("Submission no longer matches the saved weekly question assignment.", 409);
   }
   const claimed = await claimWeeklySubmission(submission, now);
-  return judgeWeeklySubmission({ submission: claimed, roster, assignment, code });
+  await WeeklySubmission.updateOne(
+    { _id: claimed._id, status: "PENDING_VERIFICATION" },
+    { $set: { sourceCode: code } },
+  );
+  wakeWeeklyVerificationWorker();
+  return weeklySubmissionAcknowledgement(claimed);
 }
 
 export async function listRecoverableWeeklySubmissions(candidateId, now = new Date()) {
+  const recentFinalizedAfter = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const cycles = await WeeklyCycle.find({
     startAt: { $lte: now },
-    status: "ACTIVE",
     $or: [
-      { recoveryUntilAt: { $gt: now } },
-      { recoveryUntilAt: null, endAt: { $gt: now } },
+      {
+        status: "ACTIVE",
+        $or: [
+          { recoveryUntilAt: { $gt: now } },
+          { recoveryUntilAt: null, endAt: { $gt: now } },
+        ],
+      },
+      {
+        status: "FINALIZED",
+        finalizedAt: { $gte: recentFinalizedAfter },
+      },
     ],
-  }).select("questionAssignments endAt recoveryUntilAt");
+  }).select("questionAssignments endAt recoveryUntilAt finalizedAt");
   if (!cycles.length) return [];
   const submissions = await WeeklySubmission.find({
     cycleId: { $in: cycles.map((cycle) => cycle._id) },
     candidateId,
-    status: { $in: ["RETRYABLE", "JUDGING"] },
-  }).select("cycleId dayIndex status judgeLeaseAt createdAt").sort({ cycleId: 1, dayIndex: 1 });
+    status: {
+      $in: ["PENDING_VERIFICATION", "VERIFYING", "JUDGING", "RETRYABLE", "FINALIZED"],
+    },
+  }).select(
+    "cycleId dayIndex status resultStatus score passed total verificationCompletedAt judgeLeaseAt createdAt",
+  ).sort({ cycleId: 1, dayIndex: 1 });
   const cycleById = new Map(cycles.map((cycle) => [String(cycle._id), cycle]));
   return submissions
-    .filter((submission) =>
-      submission.status === "RETRYABLE" ||
-      now - submission.judgeLeaseAt >= RETRY_LEASE_MS,
-    )
     .map((submission) => {
       const cycle = cycleById.get(String(submission.cycleId));
+      const canRetry =
+        submission.status === "RETRYABLE" ||
+        (["JUDGING", "VERIFYING", "PENDING_VERIFICATION"].includes(
+          submission.status,
+        ) &&
+          now - (submission.judgeLeaseAt || submission.createdAt) >=
+            RETRY_LEASE_MS);
       return {
         id: submission._id,
         cycleId: submission.cycleId,
@@ -856,7 +1206,17 @@ export async function listRecoverableWeeklySubmissions(candidateId, now = new Da
           cycle?.questionAssignments.find((item) => item.dayIndex === submission.dayIndex)
             ?.questionTitleSnapshot || "Weekly question",
         status: submission.status,
+        canRetry,
         createdAt: submission.createdAt,
+        ...(submission.status === "FINALIZED"
+          ? {
+              resultStatus: submission.resultStatus,
+              score: submission.score,
+              passed: submission.passed,
+              total: submission.total,
+              verificationCompletedAt: submission.verificationCompletedAt,
+            }
+          : {}),
       };
     });
 }
@@ -968,8 +1328,11 @@ export async function finalizeWeeklyCycle(cycleId, now = new Date()) {
   if (cycle.status === "FINALIZED") return cycle;
   const inFlight = await WeeklySubmission.exists({
     cycleId: cycle._id,
-    status: "JUDGING",
-    judgeLeaseAt: { $gt: new Date(now.getTime() - RETRY_LEASE_MS) },
+    status: { $in: ["PENDING_VERIFICATION", "VERIFYING", "JUDGING"] },
+    $or: [
+      { status: "PENDING_VERIFICATION" },
+      { judgeLeaseAt: { $gt: new Date(now.getTime() - RETRY_LEASE_MS) } },
+    ],
   });
   if (inFlight) {
     await WeeklyCycle.updateOne(
@@ -981,7 +1344,7 @@ export async function finalizeWeeklyCycle(cycleId, now = new Date()) {
   await WeeklySubmission.updateMany(
     {
       cycleId: cycle._id,
-      status: "JUDGING",
+      status: { $in: ["VERIFYING", "JUDGING"] },
       judgeLeaseAt: { $lte: new Date(now.getTime() - RETRY_LEASE_MS) },
     },
     { $set: { status: "RETRYABLE", resultStatus: "RECOVERY_REQUIRED" } },

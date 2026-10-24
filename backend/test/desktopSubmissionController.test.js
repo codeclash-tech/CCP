@@ -44,7 +44,7 @@ function activeRoom(roomId, questionId) {
   };
 }
 
-test("issues a one-use grant containing only visible cases to a joined candidate", async (t) => {
+test("issues a one-use submission grant without returning test cases", async (t) => {
   const roomId = new mongoose.Types.ObjectId();
   const questionId = new mongoose.Types.ObjectId();
   const userId = new mongoose.Types.ObjectId();
@@ -78,11 +78,7 @@ test("issues a one-use grant containing only visible cases to a joined candidate
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.nonce, nonceValue);
-  assert.equal(res.body.visibleTestCaseCount, 1);
-  assert.deepEqual(res.body.testCases, [{ input: "1", expectedOutput: "1" }]);
-  assert.equal(JSON.stringify(res.body).includes("999"), false);
-  assert.equal(res.body.timeLimit, 5_000);
-  assert.equal(res.body.memoryLimit, 131_072);
+  assert.deepEqual(Object.keys(res.body), ["nonce"]);
   assert.deepEqual(nonceArguments, [
     userId,
     "SUBMIT",
@@ -186,7 +182,7 @@ test("reissues a reconciliation grant for a completed result after the room clos
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.nonce, nonce);
-  assert.deepEqual(res.body.testCases, [{ input: "1", expectedOutput: "1" }]);
+  assert.deepEqual(Object.keys(res.body), ["nonce"]);
   assert.equal(
     grantQuery.resourceId,
     `${roomId}:${submissionId}:${questionId}:${codeHash}`,
@@ -268,7 +264,7 @@ test("does not issue hidden-case grants to a user without a room submission", as
   assert.equal(res.body.error, "You have not joined this battle.");
 });
 
-test("independently executes desktop code on the backend and uses only backend results", async (t) => {
+test("accepts desktop source for asynchronous authoritative verification", async (t) => {
   const roomId = new mongoose.Types.ObjectId();
   const questionId = new mongoose.Types.ObjectId();
   const userId = new mongoose.Types.ObjectId();
@@ -302,6 +298,7 @@ test("independently executes desktop code on the backend and uses only backend r
     ],
   };
   const currentSubmission = {
+    _id: submissionId,
     status: "PENDING",
     totalScore: 50,
     totalPassed: 1,
@@ -310,7 +307,7 @@ test("independently executes desktop code on the backend and uses only backend r
   };
   const code = "public class Main { public static void main(String[] args) {} }";
   const nonce = "a".repeat(64);
-  let executionArguments;
+  let executionCalled = false;
   let persistedQuestionResult;
   let findByIdCalls = 0;
   let grantCompleted = false;
@@ -342,36 +339,8 @@ test("independently executes desktop code on the backend and uses only backend r
     return { state: "COMPLETED" };
   });
   t.mock.method(executionService, "execute", async (...args) => {
-    executionArguments = args;
-    return {
-      status: "WRONG_ANSWER",
-      passed: 1,
-      failed: 1,
-      total: 2,
-      executionTime: 14,
-      memoryUsed: 2_048,
-      output: "3\nnot-1000",
-      results: [
-        {
-          testCase: 1,
-          input: "1 2",
-          status: "PASSED",
-          output: "3",
-          expectedOutput: "3",
-          executionTime: 7,
-          memoryUsed: 1_024,
-        },
-        {
-          testCase: 2,
-          input: "999 1",
-          status: "WRONG_ANSWER",
-          output: "not-1000",
-          expectedOutput: "1000",
-          executionTime: 7,
-          memoryUsed: 2_048,
-        },
-      ],
-    };
+    executionCalled = true;
+    return args;
   });
   t.mock.method(BattleRoomSubmission, "updateOne", async (_query, update) => {
     if (update.$set?.["questionResults.0"]) {
@@ -404,32 +373,18 @@ test("independently executes desktop code on the backend and uses only backend r
     res,
   );
 
-  assert.equal(res.statusCode, 200);
+  assert.equal(res.statusCode, 202);
   assert.equal(grantCompleted, true);
-  assert.equal(executionArguments[0], code);
-  assert.deepEqual(
-    executionArguments[1].map(({ input, expectedOutput }) => ({
-      input,
-      expectedOutput,
-    })),
-    [
-      { input: "1 2", expectedOutput: "3" },
-      { input: "999 1", expectedOutput: "1000" },
-    ],
-  );
-  assert.equal(persistedQuestionResult.status, "WRONG_ANSWER");
+  assert.equal(executionCalled, false);
+  assert.equal(persistedQuestionResult.status, "PROCESSING");
+  assert.equal(persistedQuestionResult.verificationStatus, "PENDING_VERIFICATION");
   assert.equal(persistedQuestionResult.executionGrantNonce, nonce);
-  assert.equal(persistedQuestionResult.passed, 1);
-  assert.equal(persistedQuestionResult.results[1].isHidden, true);
-  assert.equal("input" in persistedQuestionResult.results[1], false);
-  assert.equal("output" in persistedQuestionResult.results[1], false);
-  assert.equal("expectedOutput" in persistedQuestionResult.results[1], false);
-  assert.equal(res.body.questionResult.score, 50);
-  assert.equal(res.body.questionResult.results[1].status, "WRONG_ANSWER");
-  assert.equal("output" in res.body.questionResult.results[1], false);
-  assert.equal("input" in res.body.questionResult.results[1], false);
-  assert.equal("expectedOutput" in res.body.questionResult.results[1], false);
-  assert.equal(JSON.stringify(res.body).includes("not-1000"), false);
+  assert.equal(persistedQuestionResult.score, 0);
+  assert.equal(persistedQuestionResult.verificationTestCases[1].isHidden, true);
+  assert.equal(res.body.questionResult.verificationStatus, "PENDING_VERIFICATION");
+  assert.equal(res.body.questionResult.score, null);
+  assert.equal(res.body.submissionId.toString(), submissionId.toString());
+  assert.equal(JSON.stringify(res.body).includes("999"), false);
 });
 
 test("rejects client-reported local results instead of treating them as score evidence", async (t) => {
@@ -515,7 +470,7 @@ test("rejects a replayed desktop nonce before running the backend judge", async 
   assert.equal(executionCalled, false);
 });
 
-test("retries judge and persistence failures with the same authorization", async (t) => {
+test("does not run the authoritative engine during submission acknowledgement", async (t) => {
   const roomId = new mongoose.Types.ObjectId();
   const questionId = new mongoose.Types.ObjectId();
   const userId = new mongoose.Types.ObjectId();
@@ -551,11 +506,7 @@ test("retries judge and persistence failures with the same authorization", async
     ],
   };
   const claimId = "claim-retry";
-  let attempt = 0;
-  let released = 0;
   let executed = 0;
-  let persisted = 0;
-  let persistenceCalls = 0;
 
   t.mock.method(BattleRoom, "findOne", () => ({ lean: async () => room }));
   t.mock.method(BattleRoomSubmission, "findOne", () => ({
@@ -565,58 +516,34 @@ test("retries judge and persistence failures with the same authorization", async
     lean: async () => submission,
   }));
   t.mock.method(Nonce, "claimDesktopSubmission", async () => {
-    attempt += 1;
     return {
       nonce: { _id: new mongoose.Types.ObjectId(), state: "PROCESSING" },
       claimId,
       claimed: true,
     };
   });
-  t.mock.method(Nonce, "releaseDesktopSubmission", async () => {
-    released += 1;
-    return { state: "RETRYABLE" };
-  });
   t.mock.method(Nonce, "completeDesktopSubmission", async () => ({
     state: "COMPLETED",
   }));
   t.mock.method(executionService, "execute", async () => {
     executed += 1;
-    if (executed === 1) {
-      throw new Error("Engine connection timed out.");
-    }
-    return {
-      status: "ACCEPTED",
-      passed: 1,
-      failed: 0,
-      total: 1,
-      results: [
-        {
-          testCase: 1,
-          input: "1",
-          status: "PASSED",
-          output: "1",
-          expectedOutput: "1",
-        },
-      ],
-    };
+    throw new Error("The request handler must not invoke the engine.");
   });
-  t.mock.method(BattleRoomSubmission, "updateOne", async (_query, update) => {
-    if (update.$set?.["questionResults.0"]) {
-      persistenceCalls += 1;
-      if (persistenceCalls === 1) {
-        throw new Error("Mongo write timed out.");
-      }
-      persisted += 1;
-    }
+  t.mock.method(BattleRoomSubmission, "updateOne", async () => {
     return { matchedCount: 1 };
   });
   t.mock.method(BattleRoomSubmission, "findById", () => ({
     lean: async () => ({
-      status: "COMPLETED",
-      totalScore: 100,
-      totalPassed: 1,
-      totalFailed: 0,
-      questionResults: [{ status: "ACCEPTED" }],
+      ...submission,
+      status: "PROCESSING",
+      questionResults: [
+        {
+          ...submission.questionResults[0],
+          status: "PROCESSING",
+          verificationStatus: "PENDING_VERIFICATION",
+          code,
+        },
+      ],
     }),
   }));
 
@@ -629,27 +556,12 @@ test("retries judge and persistence failures with the same authorization", async
     },
     userId,
   };
-  const firstResponse = responseRecorder();
-  await submitQuestionSolution(request, firstResponse);
-  assert.equal(firstResponse.statusCode, 503);
-  assert.equal(firstResponse.body.retryable, true);
-  assert.equal(released, 1);
-  assert.equal(persisted, 0);
-
-  const persistenceFailureResponse = responseRecorder();
-  await submitQuestionSolution(request, persistenceFailureResponse);
-  assert.equal(persistenceFailureResponse.statusCode, 503);
-  assert.equal(persistenceFailureResponse.body.retryable, true);
-  assert.equal(released, 2);
-  assert.equal(persisted, 0);
-
-  const retryResponse = responseRecorder();
-  await submitQuestionSolution(request, retryResponse);
-  assert.equal(retryResponse.statusCode, 200);
-  assert.equal(attempt, 3);
-  assert.equal(executed, 3);
-  assert.equal(persistenceCalls, 2);
-  assert.equal(persisted, 1);
+  const acknowledgement = responseRecorder();
+  await submitQuestionSolution(request, acknowledgement);
+  assert.equal(acknowledgement.statusCode, 202);
+  assert.equal(acknowledgement.body.questionResult.verificationStatus, "PENDING_VERIFICATION");
+  assert.equal(acknowledgement.body.questionResult.score, null);
+  assert.equal(executed, 0);
 });
 
 test("returns the persisted result when the same authorization is retried", async (t) => {

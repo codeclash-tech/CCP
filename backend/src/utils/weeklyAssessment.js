@@ -61,6 +61,16 @@ export function getRecurringCycleBounds(startAt, date) {
   };
 }
 
+export function takeNextQueuedQuestion(questionIds) {
+  if (!Array.isArray(questionIds) || questionIds.length === 0) {
+    return { questionId: null, remainingQuestionIds: [] };
+  }
+  return {
+    questionId: questionIds[0],
+    remainingQuestionIds: questionIds.slice(1),
+  };
+}
+
 export function getWeeklyDayIndex(date, startAt) {
   const elapsed = date.getTime() - startAt.getTime();
   if (elapsed < 0 || elapsed >= 24 * 60 * 60 * 1000) return -1;

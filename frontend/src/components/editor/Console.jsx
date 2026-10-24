@@ -79,6 +79,7 @@ const CodeDataBox = ({ label, value, isError = false, isSuccess = false }) => (
 
 export default function Console({
   result,
+  resultAuthority = "LOCAL",
   isOpen,
   onToggle,
   height = 320,
@@ -287,7 +288,11 @@ export default function Console({
             }}
           >
             <strong style={{ color: "var(--text-primary)", fontSize: 14 }}>
-              Test Results
+              {resultAuthority === "OFFICIAL"
+                ? "Server-verified official result"
+                : resultAuthority === "VISIBLE"
+                  ? "Visible-case run feedback (not official)"
+                  : "Local run feedback (not official)"}
             </strong>
             {result && (
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>

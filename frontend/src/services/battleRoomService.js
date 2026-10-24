@@ -85,9 +85,10 @@ export const getRoomByCode = (roomCode) =>
 export const joinRoom = (roomCode) =>
   api.post("/battle-rooms/join", { roomCode }).then((r) => r.data);
 
-// Stateless code execution paths. The engine on Render can be slow on cold starts,
-// so these use a longer per-request timeout (120s) rather than the default 30s.
+// Run requests execute code synchronously; submission requests only persist and
+// queue authoritative verification, so they use a short acknowledgement timeout.
 const EXECUTION_TIMEOUT = 120000;
+const SUBMISSION_TIMEOUT = 15000;
 
 export const submitSolution = async ({
   roomCode,
@@ -113,7 +114,7 @@ export const submitSolution = async ({
     .post(
       `/battle-rooms/${roomCode}/submit`,
       { questionId, code, language },
-      { timeout: EXECUTION_TIMEOUT },
+      { timeout: SUBMISSION_TIMEOUT },
     )
     .then((r) => r.data);
 };

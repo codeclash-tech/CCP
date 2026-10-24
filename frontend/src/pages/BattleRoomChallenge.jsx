@@ -137,10 +137,26 @@ function saveRoomEditorCache(roomCode, codeByQuestion, resultByQuestion) {
   }
 }
 
+function toOfficialConsoleResult(result) {
+  return {
+    status: result.status,
+    accepted: result.status === "ACCEPTED",
+    passed: result.passed || 0,
+    failed: result.failed || 0,
+    total: result.total || 0,
+    score: result.score || 0,
+    results: result.results || [],
+    error: result.error || "",
+  };
+}
+
 export default function BattleRoomChallenge() {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(isMobileDevice);
+  const isDesktop =
+    typeof window !== "undefined" &&
+    typeof window.codeClashDesktop?.engine?.execute === "function";
 
   const [room, setRoom] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -151,9 +167,11 @@ export default function BattleRoomChallenge() {
   const [submitting, setSubmitting] = useState(false);
   const [running, setRunning] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [userSubmissionState, setUserSubmissionState] = useState(null);
   const [disqualified, setDisqualified] = useState(false);
   const [questionResults, setQuestionResults] = useState([]);
   const [currentResult, setCurrentResult] = useState(null);
+  const [currentResultAuthority, setCurrentResultAuthority] = useState("LOCAL");
   const [isCreator, setIsCreator] = useState(false);
   const [showStartPrompt, setShowStartPrompt] = useState(false);
   const [proctorEnabled, setProctorEnabled] = useState(false);
@@ -202,10 +220,23 @@ export default function BattleRoomChallenge() {
     try {
       const data = await getRoomByCode(roomCode);
       setRoom(data.room);
+      setUserSubmissionState(data.userSubmission || null);
       setIsCreator(data.isCreator);
       setQuestionsVisible(!!data.questionsVisible);
       setWindowState(data.room?.windowState || null);
       setRoomKey(data.roomKey || "");
+
+      const submittedResults = data.userSubmission?.questionResults || [];
+      const roomQuestions = data.room.questions || [];
+      const serverResults = roomQuestions.length
+        ? roomQuestions.map((question) => {
+        const saved = submittedResults.find(
+          (item) => String(item.questionId) === String(question._id),
+        );
+        return saved || { questionId: question._id, status: "PENDING" };
+          })
+        : submittedResults;
+      setQuestionResults(serverResults);
 
       const isNewRoom = draftRoomCodeRef.current !== roomCode;
       if (isNewRoom) {
@@ -215,27 +246,40 @@ export default function BattleRoomChallenge() {
         resultByQuestionRef.current = savedCache.resultByQuestion;
         activeQuestionIdRef.current = null;
         setCurrentResult(null);
-        setQuestionResults(
-          (data.room.questions || []).map((q) => ({
-            questionId: q._id,
-            status: "PENDING",
-          })),
-        );
         const firstQuestion = data.room.questions?.[0];
         if (firstQuestion) {
           const starter = getQuestionStarter(firstQuestion);
+          const persistedResult = submittedResults.find(
+            (item) => String(item.questionId) === String(firstQuestion._id),
+          );
           const restoredCode =
-            codeByQuestionRef.current[firstQuestion._id] ?? starter;
+            persistedResult?.code ||
+            (codeByQuestionRef.current[firstQuestion._id] ?? starter);
           codeByQuestionRef.current[firstQuestion._id] = restoredCode;
           activeQuestionIdRef.current = firstQuestion._id;
           setCode(restoredCode);
           setCurrentQuestionIndex(0);
           const cachedResult =
             resultByQuestionRef.current[firstQuestion._id];
-          setCurrentResult(
-            cachedResult?.code === restoredCode ? cachedResult.result : null,
-          );
+          if (persistedResult?.verificationStatus === "VERIFIED") {
+            setCurrentResult(toOfficialConsoleResult(persistedResult));
+            setCurrentResultAuthority("OFFICIAL");
+          } else {
+            setCurrentResult(
+              cachedResult?.code === restoredCode ? cachedResult.result : null,
+            );
+            setCurrentResultAuthority("LOCAL");
+          }
         }
+      }
+
+      const activeQuestionId = activeQuestionIdRef.current;
+      const activePersistedResult = submittedResults.find(
+        (item) => String(item.questionId) === String(activeQuestionId),
+      );
+      if (activePersistedResult?.verificationStatus === "VERIFIED") {
+        setCurrentResult(toOfficialConsoleResult(activePersistedResult));
+        setCurrentResultAuthority("OFFICIAL");
       }
 
       const hasScheduledWindow = Boolean(
@@ -305,6 +349,17 @@ export default function BattleRoomChallenge() {
     return () => clearInterval(id);
   }, [windowState, room, isCreator, fetchRoom]);
 
+  useEffect(() => {
+    const verificationPending = questionResults.some((result) =>
+      ["PENDING_VERIFICATION", "VERIFYING"].includes(
+        result.verificationStatus,
+      ),
+    );
+    if (!verificationPending || !room || submitted) return undefined;
+    const intervalId = window.setInterval(fetchRoom, 2000);
+    return () => window.clearInterval(intervalId);
+  }, [questionResults, room, submitted, fetchRoom]);
+
   const handleStartRoom = async () => {
     if (isMobileDevice()) {
       setIsMobile(true);
@@ -323,8 +378,21 @@ export default function BattleRoomChallenge() {
     }
   };
 
-  const handleTimeUp = () => {
-    setSubmitted(true);
+  const handleTimeUp = async () => {
+    setSubmitting(true);
+    try {
+      const result = await endRoomTest(roomCode);
+      if (["COMPLETED", "DISQUALIFIED"].includes(result.status)) {
+        setSubmitted(true);
+      } else {
+        setError("Time is up. Your accepted submissions are still being verified.");
+      }
+      await fetchRoom();
+    } catch (endError) {
+      setError(endError.message || "The test could not be finalized.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const exitChallenge = () => {
@@ -373,13 +441,25 @@ export default function BattleRoomChallenge() {
     const q = room.questions[index];
     if (!q) return;
     activeQuestionIdRef.current = q._id;
-    const restoredCode = codeByQuestionRef.current[q._id] ?? getQuestionStarter(q);
+    const saved = questionResults.find(
+      (result) => String(result.questionId) === String(q._id),
+    );
+    const restoredCode =
+      saved?.code ||
+      codeByQuestionRef.current[q._id] ||
+      getQuestionStarter(q);
     codeByQuestionRef.current[q._id] = restoredCode;
     setCode(restoredCode);
     const cachedResult = resultByQuestionRef.current[q._id];
-    setCurrentResult(
-      cachedResult?.code === restoredCode ? cachedResult.result : null,
-    );
+    if (saved?.verificationStatus === "VERIFIED") {
+      setCurrentResult(toOfficialConsoleResult(saved));
+      setCurrentResultAuthority("OFFICIAL");
+    } else {
+      setCurrentResult(
+        cachedResult?.code === restoredCode ? cachedResult.result : null,
+      );
+      setCurrentResultAuthority("LOCAL");
+    }
     saveRoomEditorCache(
       roomCode,
       codeByQuestionRef.current,
@@ -397,6 +477,7 @@ export default function BattleRoomChallenge() {
     setCurrentResult(
       cachedResult?.code === nextCode ? cachedResult.result : null,
     );
+    setCurrentResultAuthority("LOCAL");
     saveRoomEditorCache(
       roomCode,
       codeByQuestionRef.current,
@@ -425,69 +506,34 @@ export default function BattleRoomChallenge() {
       });
 
       const qr = result.questionResult || {};
-      const submitResult = {
-        status: qr.status || "SUBMITTED",
-        accepted: qr.status === "ACCEPTED",
-        passed: qr.passed || 0,
-        failed: qr.failed || 0,
-        total: qr.total || 0,
-        score: qr.score || 0,
-        output: qr.output ?? "",
-        error: qr.error ?? "",
-        executionTime: qr.executionTime ?? 0,
-        memoryUsed: qr.memoryUsed ?? 0,
-        visiblePassed:
-          qr.visiblePassed ??
-          (qr.results || []).filter((r) => !r.isHidden && ["PASSED", "ACCEPTED"].includes(r.status))
-            .length,
-        visibleFailed:
-          qr.visibleFailed ??
-          (qr.results || []).filter((r) => !r.isHidden && !["PASSED", "ACCEPTED"].includes(r.status))
-            .length,
-        hiddenCount:
-          qr.hiddenCount ?? (qr.results || []).filter((r) => r.isHidden).length,
-        hiddenPassed:
-          qr.hiddenPassed ??
-          (qr.results || []).filter((r) => r.isHidden && ["PASSED", "ACCEPTED"].includes(r.status))
-            .length,
-        hiddenFailed:
-          qr.hiddenFailed ??
-          (qr.results || []).filter((r) => r.isHidden && !["PASSED", "ACCEPTED"].includes(r.status))
-            .length,
-        results: (qr.results || []).map((r) => ({
-          testCaseId: r.testCaseId,
-          testCase: r.testCase,
-          status: r.status,
-          input: r.input ?? "",
-          executionTime: r.executionTime ?? 0,
-          memoryUsed: r.memoryUsed ?? 0,
-          output: r.output ?? r.actualOutput ?? r.stdout ?? "",
-          expectedOutput: r.expectedOutput ?? "",
-          error: r.error ?? "",
-          isHidden: !!r.isHidden,
-        })),
-      };
-
       codeByQuestionRef.current[question._id] = code;
-      resultByQuestionRef.current[question._id] = {
-        code,
-        result: submitResult,
-      };
       saveRoomEditorCache(
         roomCode,
         codeByQuestionRef.current,
         resultByQuestionRef.current,
       );
-      if (activeQuestionIdRef.current === question._id) {
-        setCurrentResult(submitResult);
+      if (qr.verificationStatus === "VERIFIED") {
+        const officialResult = toOfficialConsoleResult(qr);
+        resultByQuestionRef.current[question._id] = {
+          code,
+          result: officialResult,
+        };
+        if (activeQuestionIdRef.current === question._id) {
+          setCurrentResult(officialResult);
+          setCurrentResultAuthority("OFFICIAL");
+        }
       }
-      setConsoleHeight((prev) => prev);
 
       const updated = [...questionResults];
       updated[currentQuestionIndex] = {
         questionId: question._id,
-        status: qr.status || "REJECTED",
-        score: qr.score || 0,
+        status: qr.status || "PROCESSING",
+        verificationStatus:
+          qr.verificationStatus || "PENDING_VERIFICATION",
+        verificationError: qr.verificationError || "",
+        score: qr.verificationStatus === "VERIFIED" ? qr.score : null,
+        passed: qr.verificationStatus === "VERIFIED" ? qr.passed : null,
+        failed: qr.verificationStatus === "VERIFIED" ? qr.failed : null,
       };
       setQuestionResults(updated);
 
@@ -495,29 +541,14 @@ export default function BattleRoomChallenge() {
         setSubmitted(true);
       }
     } catch (err) {
-      const failedResult = {
-        status: "SYSTEM_ERROR",
-        accepted: false,
-        passed: 0,
-        failed: 0,
-        total: 0,
-        output: "",
-        error: err.message || "Failed to submit solution.",
-        executionTime: 0,
-        memoryUsed: 0,
-        results: [],
-      };
       codeByQuestionRef.current[question._id] = code;
-      resultByQuestionRef.current[question._id] = { code, result: failedResult };
       saveRoomEditorCache(
         roomCode,
         codeByQuestionRef.current,
         resultByQuestionRef.current,
       );
-      if (activeQuestionIdRef.current === question._id) {
-        setCurrentResult(failedResult);
-      }
       setError(err.message || "Failed to submit solution.");
+      await fetchRoom();
     } finally {
       submitInFlightRef.current = false;
       setSubmitting(false);
@@ -529,7 +560,7 @@ export default function BattleRoomChallenge() {
     if (submitted) return;
     if (
       !window.confirm(
-        "Are you sure you want to end the test? Your current score will be finalized.",
+        "End the test now? Submitted solutions will continue server verification, and only verified results can be finalized.",
       )
     ) {
       return;
@@ -537,8 +568,15 @@ export default function BattleRoomChallenge() {
     setSubmitting(true);
     setError("");
     try {
-      await endRoomTest(roomCode);
-      setSubmitted(true);
+      const result = await endRoomTest(roomCode);
+      if (["COMPLETED", "DISQUALIFIED"].includes(result.status)) {
+        setSubmitted(true);
+      } else {
+        setError(
+          "Test ended. Your submitted solutions are still being verified.",
+        );
+      }
+      await fetchRoom();
     } catch (err) {
       setError(err.message || "Failed to end the test.");
     } finally {
@@ -622,6 +660,7 @@ export default function BattleRoomChallenge() {
         codeByQuestionRef.current[question._id] === codeSnapshot
       ) {
         setCurrentResult(runResult);
+        setCurrentResultAuthority(isDesktop ? "LOCAL" : "VISIBLE");
       }
       setConsoleHeight((prev) => prev);
     } catch (err) {
@@ -651,6 +690,7 @@ export default function BattleRoomChallenge() {
         codeByQuestionRef.current[question._id] === codeSnapshot
       ) {
         setCurrentResult(failedResult);
+        setCurrentResultAuthority(isDesktop ? "LOCAL" : "VISIBLE");
       }
     } finally {
       setRunning(false);
@@ -1099,6 +1139,17 @@ export default function BattleRoomChallenge() {
           >
             {room.title} — {blockMessage}
           </p>
+          {userSubmissionState?.status === "PROCESSING" && (
+            <p role="status" aria-live="polite">
+              Submission received. CodeClash is still verifying your submitted
+              solution. Refresh to check the official result.
+            </p>
+          )}
+          {userSubmissionState?.status === "COMPLETED" && (
+            <p role="status">
+              Official result: {userSubmissionState.totalScore} points.
+            </p>
+          )}
           {scheduledStart ? (
             <div style={{ marginBottom: 16 }}>
               <p
@@ -1171,8 +1222,23 @@ export default function BattleRoomChallenge() {
   const question = room.questions?.[currentQuestionIndex];
   const currentQResult = questionResults[currentQuestionIndex];
   const isQuestionSubmitted = Boolean(
-    currentQResult?.status && currentQResult.status !== "PENDING",
+    currentQResult?.verificationStatus === "PENDING_VERIFICATION" ||
+      currentQResult?.verificationStatus === "VERIFYING" ||
+      currentQResult?.verificationStatus === "VERIFIED" ||
+      (!currentQResult?.verificationStatus &&
+        currentQResult?.status &&
+        !["PENDING", "PROCESSING", "ERROR"].includes(currentQResult.status)),
   );
+  const isQuestionVerified =
+    currentQResult?.verificationStatus === "VERIFIED" ||
+    (!currentQResult?.verificationStatus &&
+      currentQResult?.status &&
+      !["PENDING", "PROCESSING", "ERROR"].includes(currentQResult.status));
+  const isVerificationPending = [
+    "PENDING_VERIFICATION",
+    "VERIFYING",
+  ].includes(currentQResult?.verificationStatus);
+  const verificationFailed = currentQResult?.verificationStatus === "ERROR";
   const currentLangDef = LANGUAGE_BY_ID.java;
   return (
     <div
@@ -1410,7 +1476,12 @@ export default function BattleRoomChallenge() {
               {room.questions?.map((q, index) => {
                 const qr = questionResults[index];
                 const isActive = index === currentQuestionIndex;
-                const isDone = qr?.status !== "PENDING";
+                const isDone =
+                  qr?.verificationStatus === "VERIFIED" ||
+                  qr?.status === "REJECTED" ||
+                  (!qr?.verificationStatus &&
+                    qr?.status &&
+                    !["PENDING", "PROCESSING", "ERROR"].includes(qr.status));
                 return (
                   <div
                     key={q._id}
@@ -1744,7 +1815,7 @@ export default function BattleRoomChallenge() {
                 {currentQuestionIndex + 1}
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {isQuestionSubmitted && (
+                {isQuestionVerified && (
                   <span
                     style={{
                       color: "var(--color-success)",
@@ -1799,13 +1870,54 @@ export default function BattleRoomChallenge() {
                 >
                   {submitted
                     ? "Completed"
-                    : isQuestionSubmitted
-                      ? "Done"
-                      : submitting
-                        ? "Submitting..."
-                        : "Submit"}
+                    : isVerificationPending
+                      ? "Verifying..."
+                      : isQuestionVerified
+                        ? "Done"
+                        : verificationFailed
+                          ? "Retry verification"
+                          : submitting
+                            ? "Submitting..."
+                            : "Submit"}
                 </button>
               </div>
+            </div>
+
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                padding: "8px 16px",
+                borderBottom: "1px solid var(--border-color)",
+                color: verificationFailed
+                  ? "var(--color-danger)"
+                  : "var(--text-muted)",
+                fontSize: 12,
+              }}
+            >
+              {isVerificationPending ? (
+                <>
+                  <strong>Submission received.</strong>{" "}
+                  Your solution is being verified by CodeClash.
+                </>
+              ) : currentQResult?.verificationStatus === "VERIFIED" ? (
+                <>
+                  <strong>Official result:</strong> {currentQResult.score} points
+                  {" · "}{currentQResult.passed}/{currentQResult.total} tests passed
+                  {" · "}server verified
+                </>
+              ) : verificationFailed ? (
+                <>
+                  <strong>Verification failed.</strong>{" "}
+                  CodeClash could not complete server verification. Retry this
+                  submission to try again.
+                </>
+              ) : (
+                <>
+                  Official result: Not submitted. Run feedback is{" "}
+                  {isDesktop ? "local" : "visible-case"} and is not authoritative.
+                </>
+              )}
             </div>
 
             {/* Editor */}
@@ -1838,6 +1950,7 @@ export default function BattleRoomChallenge() {
             >
               <Console
                 result={currentResult}
+                resultAuthority={currentResultAuthority}
                 isOpen={consoleOpen}
                 onToggle={() => setConsoleOpen(!consoleOpen)}
                 height={consoleOpen ? Math.max(160, consoleHeight) : 40}

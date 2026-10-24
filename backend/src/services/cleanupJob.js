@@ -8,10 +8,15 @@ import {
   finalizeWeeklyCycle,
   freezeWeeklyRoster,
   ensureCurrentGlobalCycle,
+  startWeeklyVerificationWorker,
 } from "./weeklyAssessmentService.js";
 import { closeBattleRoomAndNotify } from "./battleRoomClosureService.js";
+import { startBattleRoomVerificationWorker } from "./battleRoomVerificationService.js";
 
 export function startCleanupJobs() {
+  startBattleRoomVerificationWorker();
+  startWeeklyVerificationWorker();
+
   // Run daily at midnight to update organization metrics
   cron.schedule("0 0 * * *", async () => {
     console.log(

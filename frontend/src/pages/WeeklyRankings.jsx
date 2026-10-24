@@ -17,6 +17,10 @@ function labelDate(value) {
   });
 }
 
+function normalizeOrganizationName(value) {
+  return String(value || "").trim().toLocaleLowerCase();
+}
+
 function roomIsActive(room, now = Date.now()) {
   const status = String(room.status || "").toUpperCase();
   if (["CLOSED", "ENDED", "CANCELLED"].includes(status)) return false;
@@ -41,6 +45,7 @@ export default function WeeklyRankings() {
   const [roomError, setRoomError] = useState("");
   const [history, setHistory] = useState([]);
   const [selectedCycleId, setSelectedCycleId] = useState("");
+  const [globalRankingType, setGlobalRankingType] = useState("individual");
   const [rankings, setRankings] = useState(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [error, setError] = useState("");
@@ -163,6 +168,20 @@ export default function WeeklyRankings() {
   const currentRanking = rankings?.individualRankings?.find(
     (candidate) => String(candidate.candidateId) === userId,
   );
+  const currentOrganizationName = currentRanking?.organizationNameSnapshot;
+  const currentOrganizationRanking = rankings?.organizationRankings?.find(
+    (organization) => {
+      if (currentRanking?.organizationId) {
+        return String(organization.organizationId) ===
+          String(currentRanking.organizationId);
+      }
+      return (
+        normalizeOrganizationName(currentOrganizationName) !== "" &&
+        normalizeOrganizationName(organization.organizationNameSnapshot) ===
+          normalizeOrganizationName(currentOrganizationName)
+      );
+    },
+  );
 
   return (
     <section className="weekly-rankings-page">
@@ -281,53 +300,165 @@ export default function WeeklyRankings() {
             </div>
           ) : (
             <div className="weekly-rankings-layout">
-              <nav className="weekly-history-list" aria-label="Daily challenge cycles">
-                {history.map((item) => (
+              <div className="weekly-ranking-sidebar">
+                <nav className="weekly-global-type-tabs" aria-label="Global Challenge ranking type">
                   <button
                     type="button"
-                    key={item.cycle?.id}
-                    className={String(item.cycle?.id) === selectedCycleId ? "selected" : ""}
-                    onClick={() => setSelectedCycleId(String(item.cycle?.id))}
+                    className={globalRankingType === "individual" ? "selected" : ""}
+                    aria-pressed={globalRankingType === "individual"}
+                    onClick={() => setGlobalRankingType("individual")}
                   >
-                    <strong>{item.cycle?.name || "Global Challenge"}</strong>
-                    <span>{labelDate(item.cycle?.startAt || item.cycle?.cycleKey)}</span>
-                    <span>{item.cycle?.status}</span>
+                    Individual
                   </button>
-                ))}
-              </nav>
+                  <button
+                    type="button"
+                    className={globalRankingType === "organization" ? "selected" : ""}
+                    aria-pressed={globalRankingType === "organization"}
+                    onClick={() => setGlobalRankingType("organization")}
+                  >
+                    Organisation
+                  </button>
+                </nav>
+                <nav className="weekly-history-list" aria-label="Daily challenge cycles">
+                  {history.map((item) => (
+                    <button
+                      type="button"
+                      key={item.cycle?.id}
+                      className={String(item.cycle?.id) === selectedCycleId ? "selected" : ""}
+                      onClick={() => setSelectedCycleId(String(item.cycle?.id))}
+                    >
+                      <strong>{item.cycle?.name || "Global Challenge"}</strong>
+                      <span>{labelDate(item.cycle?.startAt || item.cycle?.cycleKey)}</span>
+                      <span>{item.cycle?.status}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
               <article className="weekly-ranking-detail">
                 {rankings && (
                   <>
                     <h2>{rankings.cycle.name}</h2>
                     <p>{labelDate(rankings.cycle.startAt)} · {rankings.cycle.status} · Live updates every 5 seconds</p>
-                    {currentRanking && (
+                    {globalRankingType === "individual" && currentRanking && (
                       <div className="weekly-own-rank">
-                        <strong>Your rank #{currentRanking.rank}</strong>
+                        <strong>
+                          {currentRanking.candidateNameSnapshot
+                            ? `${currentRanking.candidateNameSnapshot} · `
+                            : "Your rank "}
+                          #{currentRanking.rank}
+                        </strong>
                         <span>{Number(currentRanking.score || 0).toFixed(2)} points</span>
-                        <span>{currentRanking.completedQuestions}/1 question completed</span>
+                        <span>
+                          {currentRanking.completedQuestions > 0
+                            ? `${currentRanking.completedQuestions}/1 question completed`
+                            : "Not attended"}
+                        </span>
                       </div>
                     )}
-                    {rankings.individualRankings?.length ? (
+                    {globalRankingType === "individual" && rankings.individualRankings?.length ? (
                       <div className="weekly-ranking-table-wrap">
                         <table className="weekly-ranking-table">
                           <thead>
                             <tr><th>Rank</th><th>Participant</th><th>Organization</th><th>Score</th><th>Completed</th><th>Status</th></tr>
                           </thead>
                           <tbody>
-                            {rankings.individualRankings.map((candidate) => (
-                              <tr key={candidate.candidateId}>
-                                <td>{candidate.rank}</td>
-                                <td>{candidate.candidateNameSnapshot}{String(candidate.candidateId) === userId ? " (you)" : ""}</td>
-                                <td>{candidate.organizationNameSnapshot || "—"}</td>
-                                <td>{Number(candidate.score || 0).toFixed(2)}</td>
-                                <td>{candidate.completedQuestions}/1</td>
-                                <td>{candidate.status}</td>
-                              </tr>
-                            ))}
+                            {rankings.individualRankings.map((candidate) => {
+                              const isCurrentUser =
+                                String(candidate.candidateId) === userId;
+                              const belongsToCurrentOrganization =
+                                Boolean(currentRanking?.organizationId) &&
+                                String(candidate.organizationId) ===
+                                  String(currentRanking.organizationId);
+                              const hasSameOrganizationName =
+                                normalizeOrganizationName(currentOrganizationName) !== "" &&
+                                normalizeOrganizationName(candidate.organizationNameSnapshot) ===
+                                  normalizeOrganizationName(currentOrganizationName);
+                              return (
+                                <tr
+                                  key={candidate.candidateId}
+                                  className={
+                                    belongsToCurrentOrganization || hasSameOrganizationName
+                                      ? "is-user-organization"
+                                      : ""
+                                  }
+                                >
+                                  <td>{candidate.rank}</td>
+                                  <td>
+                                    {candidate.candidateNameSnapshot ||
+                                      (candidate.completedQuestions > 0 ? "Participant" : "Not attended")}
+                                    {isCurrentUser ? " (you)" : ""}
+                                  </td>
+                                  <td>{candidate.organizationNameSnapshot || "—"}</td>
+                                  <td>{Number(candidate.score || 0).toFixed(2)}</td>
+                                  <td>{candidate.completedQuestions}/1</td>
+                                  <td>{candidate.status}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
-                    ) : <p>No participants are ranked in this cycle yet.</p>}
+                    ) : null}
+                    {globalRankingType === "individual" && !rankings.individualRankings?.length && (
+                      <p>No participants are ranked in this cycle yet.</p>
+                    )}
+                    {globalRankingType === "organization" && currentOrganizationRanking && (
+                      <div className="weekly-own-rank">
+                        <strong>
+                          {currentOrganizationRanking.organizationNameSnapshot ||
+                            currentOrganizationName ||
+                            "Your organization"} · #{currentOrganizationRanking.rank}
+                        </strong>
+                        <span>{Number(currentOrganizationRanking.finalScore || 0).toFixed(2)} points</span>
+                        <span>
+                          {currentOrganizationRanking.completedEligibleCandidates}/
+                          {currentOrganizationRanking.eligibleCandidates} attended
+                        </span>
+                      </div>
+                    )}
+                    {globalRankingType === "organization" && rankings.organizationRankings?.length ? (
+                      <div className="weekly-ranking-table-wrap">
+                        <table className="weekly-ranking-table">
+                          <thead>
+                            <tr><th>Rank</th><th>Organisation</th><th>Score</th><th>Attended</th><th>Completion</th></tr>
+                          </thead>
+                          <tbody>
+                            {rankings.organizationRankings.map((organization) => {
+                              const belongsToCurrentOrganization =
+                                Boolean(currentRanking?.organizationId) &&
+                                String(organization.organizationId) ===
+                                  String(currentRanking.organizationId);
+                              const hasSameOrganizationName =
+                                normalizeOrganizationName(currentOrganizationName) !== "" &&
+                                normalizeOrganizationName(organization.organizationNameSnapshot) ===
+                                  normalizeOrganizationName(currentOrganizationName);
+                              return (
+                                <tr
+                                  key={organization.organizationId}
+                                  className={
+                                    belongsToCurrentOrganization || hasSameOrganizationName
+                                      ? "is-user-organization"
+                                      : ""
+                                  }
+                                >
+                                  <td>{organization.rank}</td>
+                                  <td>{organization.organizationNameSnapshot || "—"}</td>
+                                  <td>{Number(organization.finalScore || 0).toFixed(2)}</td>
+                                  <td>
+                                    {organization.completedEligibleCandidates}/
+                                    {organization.eligibleCandidates}
+                                  </td>
+                                  <td>{Number(organization.completionRate || 0).toFixed(1)}%</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+                    {globalRankingType === "organization" && !rankings.organizationRankings?.length && (
+                      <p>No organization rankings are available for this cycle.</p>
+                    )}
                   </>
                 )}
               </article>
