@@ -1,10 +1,6 @@
-import api, { getFreshAccessTokenForDesktopSubmission } from "./api";
-import {
-  executeVisibleCasesLocally,
-  submitQuestionLocally,
-} from "./localExecutionService";
+import api from "./api";
+import { executeVisibleCasesLocally } from "./localExecutionService";
 import { generateReferenceOutputs } from "./referenceOutputService";
-import { API_BASE_URL } from "../utils/constants";
 
 export const generateStarterCode = (
   functionSignature,
@@ -90,26 +86,12 @@ export const joinRoom = (roomCode) =>
 const EXECUTION_TIMEOUT = 120000;
 const SUBMISSION_TIMEOUT = 15000;
 
-export const submitSolution = async ({
+export const submitSolution = ({
   roomCode,
   questionId,
   code,
   language,
-  question,
 }) => {
-  if (typeof window !== "undefined" && window.codeClashDesktop) {
-    const accessToken = await getFreshAccessTokenForDesktopSubmission();
-    return submitQuestionLocally({
-      apiBaseUrl: API_BASE_URL,
-      accessToken,
-      roomCode,
-      questionId,
-      question,
-      code,
-      language,
-    });
-  }
-
   return api
     .post(
       `/battle-rooms/${roomCode}/submit`,

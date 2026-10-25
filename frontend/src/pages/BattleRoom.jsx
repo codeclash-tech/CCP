@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { joinRoom, getMyRooms, getJoinedRooms, shareKey } from "../services/battleRoomService";
+import { joinRoom, getMyRooms, getJoinedRooms } from "../services/battleRoomService";
 import { formatDate } from "../utils/helpers";
-import RoomKeyModal from "../components/battleRoom/RoomKeyModal";
 import {
   Swords,
   PlusCircle,
@@ -10,12 +9,9 @@ import {
   Trophy,
   KeyRound,
   Loader2,
-  Share2,
   Copy,
   Check,
   Menu,
-  Pencil,
-  UsersRound,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { isMobileDevice } from "../utils/device";
@@ -52,7 +48,7 @@ function writeRoomListCache(kind, userId, rooms) {
 function RoomListSkeleton({ joined = false }) {
   const columns = joined
     ? "100px 1fr 80px 80px 100px"
-    : "100px 1fr 90px 70px 90px 90px";
+    : "100px 1fr 90px 100px 90px";
   return (
     <div role="status" aria-label="Loading rooms" aria-busy="true">
       {Array.from({ length: 4 }, (_, index) => (
@@ -67,7 +63,7 @@ function RoomListSkeleton({ joined = false }) {
             borderBottom: "1px solid var(--border-color)",
           }}
         >
-          {Array.from({ length: joined ? 5 : 6 }, (_, cell) => (
+          {Array.from({ length: 5 }, (_, cell) => (
             <div
               key={cell}
               style={{
@@ -198,9 +194,6 @@ export default function BattleRoom() {
   const [myRoomsError, setMyRoomsError] = useState("");
   const [joinedRoomsError, setJoinedRoomsError] = useState("");
   const [actionError, setActionError] = useState("");
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [shareRoom, setShareRoom] = useState(null);
-  const [shareRoomCode, setShareRoomCode] = useState("");
   const createdRoomRefreshRef = useRef(null);
   const roomListRequestsRef = useRef({ my: null, joined: null });
   const roomListFetchedAtRef = useRef({
@@ -326,19 +319,6 @@ export default function BattleRoom() {
     return () =>
       document.removeEventListener("visibilitychange", refreshStaleRoomList);
   }, [activeTab, loadJoinedRooms, loadMyRooms]);
-
-  const handleShareKey = useCallback(async (e, room) => {
-    e.stopPropagation();
-    setActionError("");
-    try {
-      const data = await shareKey(room.roomCode);
-      setShareRoom(room);
-      setShareRoomCode(data.roomKey || room.roomCode);
-      setShowKeyModal(true);
-    } catch (err) {
-      setActionError(err.message || "Failed to get the room key.");
-    }
-  }, []);
 
   return (
     <div className="battle-room-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
@@ -532,13 +512,12 @@ export default function BattleRoom() {
             </div>
           ) : (
             <div className="room-list-scroll room-list-created">
-              <div className="room-list-row room-list-header" style={{ display: "grid", gridTemplateColumns: "100px 1fr 90px 70px 90px 130px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              <div className="room-list-row room-list-header" style={{ display: "grid", gridTemplateColumns: "100px minmax(0, 1fr) 90px 100px 90px", gap: 12, padding: "8px 16px", borderBottom: "1px solid var(--border-color)", background: "var(--bg-card)", fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
                 <div>Key</div>
                 <div>Title</div>
                 <div>Status</div>
-                <div>Players</div>
+                <div>Participants</div>
                 <div>Created</div>
-                <div>Actions</div>
               </div>
               {myRooms.map((room) => (
                 <div
@@ -551,7 +530,7 @@ export default function BattleRoom() {
                   className="room-list-row"
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "100px 1fr 90px 70px 90px 130px",
+                    gridTemplateColumns: "100px minmax(0, 1fr) 90px 100px 90px",
                     gap: 12,
                     padding: "10px 16px",
                     borderBottom: "1px solid var(--border-color)",
@@ -576,44 +555,6 @@ export default function BattleRoom() {
                   <div style={{ color: "var(--text-muted)", textAlign: "center" }}>{room.participantCount || 0}</div>
                   <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
                     {formatDate(room.createdAt)}
-                  </div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button
-                      onClick={(e) => handleShareKey(e, room)}
-                      title="Share key"
-                      style={{ background: "rgba(210,153,34,0.1)", border: "1px solid rgba(210,153,34,0.3)", color: "var(--color-warning)", borderRadius: 5, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 3, fontSize: 11 }}
-                    >
-                      <Share2 size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        navigate(`/battle-room/${room.roomCode}/edit`);
-                      }}
-                      title="Edit saved room"
-                      aria-label={`Edit ${room.title}`}
-                      disabled={
-                        room.status !== "UPCOMING" ||
-                        new Date(room.startDate || room.startTime || 0) <= new Date() ||
-                        Number(room.participantCount || 0) > 0
-                      }
-                      style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-secondary)", borderRadius: 5, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
-                    >
-                      <Pencil size={11} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        navigate(`/battle-room/${room.roomCode}/participants`);
-                      }}
-                      title="View room participants"
-                      aria-label={`View participants for ${room.title}`}
-                      style={{ background: "var(--bg-card)", border: "1px solid var(--border-color)", color: "var(--text-secondary)", borderRadius: 5, padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}
-                    >
-                      <UsersRound size={11} />
-                    </button>
                   </div>
                 </div>
               ))}
@@ -691,12 +632,6 @@ export default function BattleRoom() {
         </div>
       )}
 
-      <RoomKeyModal
-        isOpen={showKeyModal}
-        onClose={() => setShowKeyModal(false)}
-        roomCode={shareRoomCode}
-        room={shareRoom}
-      />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );

@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
-  BrowserRouter,
   HashRouter,
   Routes,
   Route,
@@ -40,6 +39,7 @@ const GlobalChallengeAdmin = lazy(() => import("../pages/GlobalChallengeAdmin"))
 const WeeklyRankings = lazy(() => import("../pages/WeeklyRankings"));
 const About = lazy(() => import("../pages/About"));
 const Terms = lazy(() => import("../pages/Terms"));
+const PublicLanding = lazy(() => import("../pages/PublicLanding"));
 
 function AppLayout({ children }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -266,10 +266,15 @@ function RouteSkeleton({ fullScreen = false }) {
 }
 
 export default function AppRouter() {
-  const Router =
-    typeof window !== "undefined" && window.codeClashDesktop
-      ? HashRouter
-      : BrowserRouter;
+  if (typeof window === "undefined" || !window.codeClashDesktop) {
+    return (
+      <Suspense fallback={<RouteSkeleton />}>
+        <PublicLanding />
+      </Suspense>
+    );
+  }
+
+  const Router = HashRouter;
 
   return (
     <Router>

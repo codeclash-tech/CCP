@@ -490,7 +490,6 @@ export default function BattleRoomChallenge() {
         questionId: question._id,
         code,
         language: selectedLanguage,
-        question,
       });
 
       if (!result?.questionResult) {
@@ -1972,6 +1971,7 @@ export default function BattleRoomChallenge() {
         assessmentType="BATTLE_ROOM"
         onIntegrityEvent={handleIntegrityEvent}
         enabled={proctorEnabled && !submitted}
+        showIntegrityWarnings={false}
         onExit={exitChallenge}
       />
       <RoomKeyModal
