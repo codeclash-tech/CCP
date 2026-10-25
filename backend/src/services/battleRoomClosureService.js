@@ -9,9 +9,7 @@ import {
   RANKED_SUBMISSION_STATUSES,
   sortRoomSubmissions,
 } from "./battleRoomRanking.js";
-import { sendBattleRoomResultEmail } from "./emailService.js";
-
-const STALE_DELIVERY_MS = 5 * 60 * 1000;
+import { dispatchBattleRoomCompletionEmail } from "./completionNotificationService.js";
 
 async function finalizePendingSubmissions(room) {
   const pendingSubmissions = await BattleRoomSubmission.find({
@@ -47,14 +45,11 @@ async function finalizePendingSubmissions(room) {
   }
 }
 
-async function deliverRoomResults(room) {
+async function saveRoomCertificateSnapshots(room) {
   const submissions = await BattleRoomSubmission.find({
     roomId: room._id,
     status: { $in: RANKED_SUBMISSION_STATUSES },
-  })
-    .populate("userId", "name email")
-    .lean();
-  sortRoomSubmissions(submissions);
+  }).lean();
   const totalTestCases = countRoomTestCases(room.questions);
   const rankedSubmissions = submissions.filter((submission) =>
     isBattleRoomRankedEligible(submission, totalTestCases),
@@ -66,152 +61,34 @@ async function deliverRoomResults(room) {
       index + 1,
     ]),
   );
-  let emailsSent = 0;
-  let emailFailures = 0;
-  let emailsSkipped = 0;
 
-  for (const [index, submission] of submissions.entries()) {
+  for (const submission of submissions) {
     if (submission.status !== "COMPLETED") continue;
-    const user = submission.userId;
-    const recipientEmail = submission.participantEmail || user?.email;
-    const participantName =
-      submission.participantName &&
-      submission.participantName !== "Participant"
-        ? submission.participantName
-        : user?.name;
-    const rankedPosition = rankedById.get(String(submission._id));
-    if (isBattleRoomCertificateEligible(submission, totalTestCases)) {
-      const certificateSnapshot = {
-        roomCode: room.roomCode,
-        roomTitle: room.title,
-        rank: rankedPosition || null,
-        totalParticipants: rankedSubmissions.length,
-        totalTestCases,
-        completedAt: submission.submittedAt,
-      };
-      await BattleRoomSubmission.updateOne(
-        { _id: submission._id, roomId: room._id },
-        { $set: { certificateSnapshot } },
-      );
-    }
-
-    if (!recipientEmail || !participantName) {
-      emailsSkipped += 1;
-      await BattleRoomSubmission.updateOne(
-        { _id: submission._id, roomId: room._id },
-        {
-          $set: {
-            "resultDelivery.status": "SKIPPED",
-            "resultDelivery.error": !recipientEmail
-              ? "No participant email is available."
-              : "No participant name is available.",
-          },
-        },
-      );
-      continue;
-    }
-
-    const attemptedAt = new Date();
-    const staleBefore = new Date(attemptedAt.getTime() - STALE_DELIVERY_MS);
-    const claimed = await BattleRoomSubmission.findOneAndUpdate(
-      {
-        _id: submission._id,
-        roomId: room._id,
-        status: "COMPLETED",
-        $or: [
-          { "resultDelivery.status": { $in: ["PENDING", "FAILED"] } },
-          { "resultDelivery.status": { $exists: false } },
-          {
-            "resultDelivery.status": "SENDING",
-            "resultDelivery.attemptedAt": { $lt: staleBefore },
-          },
-        ],
-      },
-      {
-        $set: {
-          "resultDelivery.status": "SENDING",
-          "resultDelivery.attemptedAt": attemptedAt,
-          "resultDelivery.error": "",
-        },
-        $inc: { "resultDelivery.attempts": 1 },
-      },
-      { new: true },
-    ).lean();
-    if (!claimed) continue;
-
-    let delivery;
-    try {
-      delivery = await sendBattleRoomResultEmail({
-        email: recipientEmail,
-        userName: participantName,
-        roomTitle: room.title,
-        totalScore: submission.totalScore,
-        totalPassed: submission.totalPassed,
-        totalTestCases,
-        rank: rankedPosition || Math.max(1, index + 1),
-        totalParticipants: Math.max(1, rankedSubmissions.length),
-        roomCode: room.roomCode,
-        startTime: room.startDate || room.startTime,
-        endTime: room.endDate || room.endTime,
-        timeZone: room.timezone || "UTC",
-        submissionStatus: submission.status,
-        completedAt: submission.submittedAt,
-      });
-    } catch (error) {
-      delivery = { success: false, error: error.message };
-    }
-
-    if (delivery?.success) {
-      emailsSent += 1;
-      await BattleRoomSubmission.updateOne(
-        {
-          _id: submission._id,
-          "resultDelivery.status": "SENDING",
-          "resultDelivery.attemptedAt": attemptedAt,
-        },
-        {
-          $set: {
-            "resultDelivery.status": "SENT",
-            "resultDelivery.sentAt": new Date(),
-            "resultDelivery.error": "",
-          },
-        },
-      );
-    } else {
-      emailFailures += 1;
-      await BattleRoomSubmission.updateOne(
-        {
-          _id: submission._id,
-          "resultDelivery.status": "SENDING",
-          "resultDelivery.attemptedAt": attemptedAt,
-        },
-        {
-          $set: {
-            "resultDelivery.status": "FAILED",
-            "resultDelivery.error": String(
-              delivery?.error || "Email delivery failed.",
-            ).slice(0, 500),
-          },
-        },
-      );
-    }
+    const certificateSnapshot = isBattleRoomCertificateEligible(
+      submission,
+      totalTestCases,
+    )
+      ? {
+          roomCode: room.roomCode,
+          roomTitle: room.title,
+          rank: rankedById.get(String(submission._id)) || null,
+          totalParticipants: rankedSubmissions.length,
+          totalTestCases,
+          completedAt: submission.submittedAt,
+        }
+      : null;
+    await BattleRoomSubmission.updateOne(
+      { _id: submission._id, roomId: room._id },
+      { $set: { certificateSnapshot } },
+    );
   }
 
-  await BattleRoom.updateOne(
-    { _id: room._id },
-    { $set: { resultEmailsCompletedAt: new Date() } },
-  );
-  return {
-    emailsSent,
-    emailFailures,
-    emailsSkipped,
-    totalParticipants: submissions.length,
-  };
+  return submissions.length;
 }
 
 /**
- * Atomically close a room before finalizing submissions and attempting
- * per-participant result/certificate email delivery.
+ * Closes a room and preserves eligible certificate snapshots without emailing
+ * participants. Completion emails are sent when each participant finishes.
  */
 export async function closeBattleRoomAndNotify(roomId) {
   const attemptedAt = new Date();
@@ -242,12 +119,23 @@ export async function closeBattleRoomAndNotify(roomId) {
   }
 
   await finalizePendingSubmissions(room);
-  const delivery = await deliverRoomResults(room);
-  return { closed: true, ...delivery };
+  const totalParticipants = await saveRoomCertificateSnapshots(room);
+  await BattleRoom.updateOne(
+    { _id: room._id },
+    { $set: { resultEmailsCompletedAt: new Date() } },
+  );
+
+  return {
+    closed: true,
+    emailsSent: 0,
+    emailFailures: 0,
+    emailsSkipped: 0,
+    totalParticipants,
+  };
 }
 
 export async function retryBattleRoomResultDelivery(roomId) {
-  const room = await BattleRoom.findOne({ _id: roomId, status: "CLOSED" });
+  const room = await BattleRoom.findOne({ _id: roomId, status: "CLOSED" }).select("_id");
   if (!room) {
     return {
       retried: false,
@@ -257,7 +145,26 @@ export async function retryBattleRoomResultDelivery(roomId) {
       totalParticipants: 0,
     };
   }
-  await finalizePendingSubmissions(room);
-  const delivery = await deliverRoomResults(room);
-  return { retried: true, ...delivery };
+
+  const pending = await BattleRoomSubmission.find({
+    roomId: room._id,
+    status: "COMPLETED",
+    "completionEmail.eligible": true,
+    "completionEmail.status": "FAILED",
+  })
+    .select("_id")
+    .limit(100)
+    .lean();
+  const results = await Promise.all(
+    pending.map(({ _id }) =>
+      dispatchBattleRoomCompletionEmail(_id, { force: true }),
+    ),
+  );
+  return {
+    retried: true,
+    emailsSent: results.filter(Boolean).length,
+    emailFailures: results.filter((success) => !success).length,
+    emailsSkipped: 0,
+    totalParticipants: pending.length,
+  };
 }

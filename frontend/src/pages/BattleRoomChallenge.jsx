@@ -355,10 +355,20 @@ export default function BattleRoomChallenge() {
         result.verificationStatus,
       ),
     );
-    if (!verificationPending || !room || submitted) return undefined;
+    const roomFinalizationPending =
+      ["PENDING", "PROCESSING"].includes(userSubmissionState?.status) &&
+      questionResults.length > 0 &&
+      questionResults.every(
+        (result) =>
+          result.verificationStatus === "VERIFIED" ||
+          result.status === "REJECTED",
+      );
+    if ((!verificationPending && !roomFinalizationPending) || !room || submitted) {
+      return undefined;
+    }
     const intervalId = window.setInterval(fetchRoom, 2000);
     return () => window.clearInterval(intervalId);
-  }, [questionResults, room, submitted, fetchRoom]);
+  }, [questionResults, room, submitted, userSubmissionState?.status, fetchRoom]);
 
   const handleStartRoom = async () => {
     if (isMobileDevice()) {
@@ -1137,7 +1147,8 @@ export default function BattleRoomChallenge() {
           )}
           {userSubmissionState?.status === "COMPLETED" && (
             <p role="status">
-              Final result: {userSubmissionState.totalScore} points.
+              Your submission has been saved. Visit the leaderboard to see the
+              final standings.
             </p>
           )}
           {scheduledStart ? (
@@ -1907,8 +1918,8 @@ export default function BattleRoomChallenge() {
                 </>
               ) : currentQResult?.verificationStatus === "VERIFIED" ? (
                 <>
-                  <strong>Final result:</strong> {currentQResult.score} points
-                  {" · "}{currentQResult.passed}/{currentQResult.total} tests passed
+                  <strong>Submission verified and saved.</strong>{" "}
+                  Select another question to continue.
                 </>
               ) : verificationFailed ? (
                 <>
@@ -1944,23 +1955,25 @@ export default function BattleRoomChallenge() {
             </div>
 
             {/* Console - fixed at bottom, expandable via toggle + drag resize */}
-            <div
-              style={{
-                height: consoleOpen ? Math.max(160, consoleHeight) : 40,
-                flexShrink: 0,
-                borderTop: "1px solid var(--border-color)",
-                background: "var(--bg-card)",
-              }}
-            >
-              <Console
-                result={currentResult}
-                resultAuthority={currentResultAuthority}
-                isOpen={consoleOpen}
-                onToggle={() => setConsoleOpen(!consoleOpen)}
-                height={consoleOpen ? Math.max(160, consoleHeight) : 40}
-                onHeightChange={setConsoleHeight}
-              />
-            </div>
+            {!isQuestionSubmitted && (
+              <div
+                style={{
+                  height: consoleOpen ? Math.max(160, consoleHeight) : 40,
+                  flexShrink: 0,
+                  borderTop: "1px solid var(--border-color)",
+                  background: "var(--bg-card)",
+                }}
+              >
+                <Console
+                  result={currentResult}
+                  resultAuthority={currentResultAuthority}
+                  isOpen={consoleOpen}
+                  onToggle={() => setConsoleOpen(!consoleOpen)}
+                  height={consoleOpen ? Math.max(160, consoleHeight) : 40}
+                  onHeightChange={setConsoleHeight}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

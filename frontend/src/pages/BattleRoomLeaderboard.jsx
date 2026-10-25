@@ -226,7 +226,7 @@ export default function BattleRoomLeaderboard() {
   const handleCloseRoom = async () => {
     if (
       !window.confirm(
-        "Are you sure you want to close this battle room? This will end the battle and send results via email to all participants.",
+        "Are you sure you want to close this Battle Room? Participants will no longer be able to continue.",
       )
     )
       return;
@@ -462,7 +462,7 @@ export default function BattleRoomLeaderboard() {
               }}
             >
               <XCircle size={13} />
-              {closing ? "Closing..." : "End Battle & Send Results"}
+              {closing ? "Closing..." : "End Battle"}
             </button>
           ) : null}
           {isCreator && room?.status === "CLOSED" ? (
@@ -476,10 +476,9 @@ export default function BattleRoomLeaderboard() {
                   }}
                   aria-live="polite"
                 >
-                  Result/certificate emails:{" "}
+                  Completion emails:{" "}
                   {resultDelivery.counts?.SENT || 0} sent,{" "}
-                  {resultDelivery.counts?.FAILED || 0} failed,{" "}
-                  {resultDelivery.counts?.SKIPPED || 0} skipped.
+                  {resultDelivery.counts?.FAILED || 0} failed.
                 </span>
               ) : null}
               {resultDelivery?.counts?.FAILED > 0 ? (
@@ -494,7 +493,7 @@ export default function BattleRoomLeaderboard() {
                   }}
                 >
                   <RefreshCw size={13} />
-                  {retryingDelivery ? "Retrying..." : "Retry failed emails"}
+                  {retryingDelivery ? "Retrying..." : "Retry failed completion emails"}
                 </button>
               ) : null}
             </>

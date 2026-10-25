@@ -8,7 +8,7 @@ process.env.EMAIL_FROM = "";
 const { sendVerificationEmail } = await import(
   "../src/services/emailDispatchService.js"
 );
-const { sendBattleRoomResultEmail } = await import(
+const { sendChallengeCompletionEmail } = await import(
   "../src/services/emailService.js"
 );
 
@@ -125,7 +125,7 @@ test("uses the creator-verification purpose and expiry in the email", async () =
   }
 });
 
-test("sends battle-result email through Resend", async () => {
+test("sends concise completion email without results or question details", async () => {
   const originalFetch = globalThis.fetch;
   const originalApiKey = process.env.RESEND_API_KEY;
   const originalEmailFrom = process.env.EMAIL_FROM;
@@ -134,7 +134,7 @@ test("sends battle-result email through Resend", async () => {
   globalThis.fetch = async (url, request) => {
     assert.equal(url, "https://api.resend.com/emails");
     requestBody = JSON.parse(request.body);
-    return new Response(JSON.stringify({ id: "result-email-id" }), {
+    return new Response(JSON.stringify({ id: "completion-email-id" }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -143,34 +143,11 @@ test("sends battle-result email through Resend", async () => {
   try {
     process.env.RESEND_API_KEY = "unit-test-key";
     process.env.EMAIL_FROM = "CodeClash <no-reply@example.com>";
-    const result = await sendBattleRoomResultEmail({
+    const result = await sendChallengeCompletionEmail({
       email: "person@example.com",
       userName: "Developer",
-      roomTitle: "Algorithms",
-      totalScore: 90,
-      totalPassed: 9,
-      totalTestCases: 10,
-      questionResults: [
-        {
-          questionTitle: "Two Sum",
-          status: "ACCEPTED",
-          score: 90,
-          passed: 9,
-          total: 10,
-          results: [
-            { status: "PASSED", executionTime: 12, isHidden: false },
-            { status: "FAILED", executionTime: 18, isHidden: true, input: "secret input" },
-          ],
-        },
-      ],
-      rank: 1,
-      totalParticipants: 5,
-      roomCode: "ROOM1",
-      startTime: "2026-01-01T10:00:00.000Z",
-      endTime: "2026-01-01T12:00:00.000Z",
-      timeZone: "UTC",
-      submissionStatus: "COMPLETED",
-      completedAt: "2026-01-01T12:00:00.000Z",
+      challengeName: "Algorithms Room",
+      challengeType: "BATTLE_ROOM",
     });
 
     assert.equal(result.success, true);
@@ -178,27 +155,12 @@ test("sends battle-result email through Resend", async () => {
     assert.deepEqual(requestBody.to, ["person@example.com"]);
     assert.equal(
       requestBody.subject,
-      "Battle complete: Algorithms - Your results",
+      "Battle Room completed",
     );
-    assert.match(requestBody.text, /CONGRATULATIONS, Developer!/);
-    assert.match(requestBody.text, /Final score: 90/);
-    assert.match(requestBody.text, /Battle start: Jan 1, 2026, 10:00 UTC/);
-    assert.match(requestBody.text, /Battle end: Jan 1, 2026, 12:00 UTC/);
-    assert.match(
-      requestBody.text,
-      /Open the CodeClash platform and go to the Battle Room page\.\s+Click the Joined Rooms tab to find your joined battles\.\s+Select the relevant battle room to view the leaderboard\.\s+From the leaderboard, you can download your certificate\.\s+Please download your certificate before the battle room is deleted\./,
-    );
-    assert.doesNotMatch(requestBody.text, /Two Sum|Question results|secret input/);
-    assert.doesNotMatch(requestBody.html, /Two Sum|Question results|secret input/);
-    assert.match(requestBody.html, /href="http:\/\/localhost:5173\/battle-room"/);
-    assert.match(requestBody.html, /Joined Rooms/);
-    assert.match(requestBody.html, /Please download your certificate before the battle room is deleted\./);
-    assert.doesNotMatch(requestBody.html, /<img|certificate-image|Download your certificate<\/a>/);
-    assert.equal("attachments" in requestBody, false);
-    assert.doesNotMatch(requestBody.html, /5 minutes|room will then be deleted/);
-    assert.doesNotMatch(requestBody.html, /CERTIFICATE OF EXCELLENCE|Download PDF Certificate/);
-    assert.doesNotMatch(requestBody.text, /secret input/);
-    assert.doesNotMatch(requestBody.html, /secret input/);
+    assert.match(requestBody.text, /Congratulations, Developer!/);
+    assert.match(requestBody.text, /successfully completed Algorithms Room/);
+    assert.doesNotMatch(requestBody.text, /score|rank|question|test case|result/i);
+    assert.doesNotMatch(requestBody.html, /score|rank|question|test case|result/i);
   } finally {
     globalThis.fetch = originalFetch;
     process.env.RESEND_API_KEY = originalApiKey;
@@ -206,7 +168,7 @@ test("sends battle-result email through Resend", async () => {
   }
 });
 
-test("does not fabricate missing participant data for result emails", async () => {
+test("does not send completion emails without a valid challenge name", async () => {
   const originalFetch = globalThis.fetch;
   let fetchCalled = false;
   globalThis.fetch = async () => {
@@ -215,25 +177,54 @@ test("does not fabricate missing participant data for result emails", async () =
   };
 
   try {
-    const result = await sendBattleRoomResultEmail({
+    const result = await sendChallengeCompletionEmail({
       email: "person@example.com",
-      userName: "",
-      roomTitle: "Algorithms",
-      totalScore: 90,
-      totalPassed: 9,
-      totalTestCases: 10,
-      rank: 1,
-      totalParticipants: 5,
-      roomCode: "ROOM1",
-      submissionStatus: "COMPLETED",
-      completedAt: "2026-01-01T12:00:00.000Z",
+      userName: "Developer",
+      challengeName: "",
+      challengeType: "BATTLE_ROOM",
     });
 
     assert.equal(result.success, false);
-    assert.match(result.error, /userName is required/);
+    assert.match(result.error, /completed challenge/);
     assert.equal(fetchCalled, false);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("identifies a daily challenge without exposing its problem or result", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.RESEND_API_KEY;
+  const originalEmailFrom = process.env.EMAIL_FROM;
+  let requestBody;
+
+  globalThis.fetch = async (_url, request) => {
+    requestBody = JSON.parse(request.body);
+    return new Response(JSON.stringify({ id: "daily-completion-email-id" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  try {
+    process.env.RESEND_API_KEY = "unit-test-key";
+    process.env.EMAIL_FROM = "CodeClash <no-reply@example.com>";
+    const result = await sendChallengeCompletionEmail({
+      email: "person@example.com",
+      userName: "Developer",
+      challengeName: "Daily Challenge",
+      challengeType: "DAILY_CHALLENGE",
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(requestBody.subject, "Daily Challenge completed");
+    assert.match(requestBody.text, /successfully completed Daily Challenge/);
+    assert.doesNotMatch(requestBody.text, /score|rank|question|test case|result/i);
+    assert.doesNotMatch(requestBody.html, /score|rank|question|test case|result/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.RESEND_API_KEY = originalApiKey;
+    process.env.EMAIL_FROM = originalEmailFrom;
   }
 });
 

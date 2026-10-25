@@ -139,14 +139,6 @@ function buildParticipantSubmissionResponse(
           hiddenCount,
           Math.max(0, (questionResult.passed || 0) - visiblePassed),
         );
-  const allCompleted = currentSubmission.questionResults.every(
-    (result) =>
-      result.verificationStatus === "VERIFIED" ||
-      (!result.verificationStatus &&
-        !["PENDING", "PROCESSING", "ERROR"].includes(result.status)) ||
-      result.status === "REJECTED",
-  );
-
   return {
     message: verified ? "Solution verified." : "Submission received.",
     submissionId: currentSubmission._id,
@@ -196,7 +188,7 @@ function buildParticipantSubmissionResponse(
     totalPassed: officialSubmissionFinal ? currentSubmission.totalPassed : null,
     totalFailed: officialSubmissionFinal ? currentSubmission.totalFailed : null,
     submissionStatus: currentSubmission.status,
-    allCompleted,
+    allCompleted: officialSubmissionFinal,
   };
 }
 
@@ -3043,9 +3035,7 @@ export async function closeRoom(req, res) {
 
     return res.status(200).json({
       message:
-        result.emailFailures > 0
-          ? "Battle room closed. Some result emails could not be delivered."
-          : "Battle room closed! Results have been sent to participants via email.",
+        "Battle Room closed. Participants receive a confirmation email after they complete their challenge.",
       totalParticipants: result.totalParticipants,
       emailsSent: result.emailsSent,
       emailFailures: result.emailFailures,
@@ -3071,17 +3061,18 @@ export async function getRoomResultDelivery(req, res) {
     const submissions = await BattleRoomSubmission.find({
       roomId: room._id,
       status: "COMPLETED",
+      "completionEmail.eligible": true,
     })
-      .select("participantName resultDelivery.status resultDelivery.attempts resultDelivery.attemptedAt resultDelivery.sentAt resultDelivery.error")
+      .select("participantName completionEmail.status completionEmail.attempts completionEmail.attemptedAt completionEmail.sentAt completionEmail.error")
       .sort({ totalScore: -1, totalPassed: -1, submittedAt: 1, _id: 1 })
       .lean();
     const participants = submissions.map((submission) => ({
       name: submission.participantName,
-      status: submission.resultDelivery?.status || "PENDING",
-      attempts: submission.resultDelivery?.attempts || 0,
-      attemptedAt: submission.resultDelivery?.attemptedAt || null,
-      sentAt: submission.resultDelivery?.sentAt || null,
-      error: submission.resultDelivery?.error || "",
+      status: submission.completionEmail?.status || "PENDING",
+      attempts: submission.completionEmail?.attempts || 0,
+      attemptedAt: submission.completionEmail?.attemptedAt || null,
+      sentAt: submission.completionEmail?.sentAt || null,
+      error: submission.completionEmail?.error || "",
     }));
     const counts = participants.reduce(
       (summary, participant) => {
@@ -3124,8 +3115,8 @@ export async function retryRoomResultDelivery(req, res) {
     return res.status(200).json({
       message:
         result.emailFailures > 0
-          ? "Delivery retry finished; some participant emails still failed."
-          : "Delivery retry finished.",
+          ? "Completion email retry finished; some messages could not be delivered."
+          : "Completion email retry finished.",
       ...result,
     });
   } catch (error) {

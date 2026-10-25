@@ -10,6 +10,7 @@ import {
   sanitizeParticipantExecutionError,
   sanitizeParticipantTestResult,
 } from "./participantExecutionSerialization.js";
+import { dispatchBattleRoomCompletionEmail } from "./completionNotificationService.js";
 
 const VERIFICATION_LEASE_MS = 10 * 60 * 1000;
 const enabled = () => process.env.BATTLE_ROOM_PERF_LOGS === "true";
@@ -132,7 +133,7 @@ export async function finalizeBattleRoomSubmission(submissionId) {
     },
   };
 
-  await BattleRoomSubmission.updateOne(
+  const finalized = await BattleRoomSubmission.updateOne(
     filter,
     {
       $set: {
@@ -154,6 +155,14 @@ export async function finalizeBattleRoomSubmission(submissionId) {
         }
       : undefined,
   );
+  if (finalized.modifiedCount) {
+    void dispatchBattleRoomCompletionEmail(current._id).catch((error) => {
+      console.error("[CompletionEmail] Battle Room notification failed:", {
+        submissionId: String(current._id),
+        error: error.message,
+      });
+    });
+  }
 }
 
 async function saveVerificationResult(job, result, error = null) {

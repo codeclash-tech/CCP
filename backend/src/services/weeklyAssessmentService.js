@@ -33,6 +33,7 @@ import {
   LOCAL_EXECUTION_PROTOCOL_VERSION,
   validateLocalExecutionTranscript,
 } from "./localExecutionProtocol.js";
+import { dispatchWeeklyCompletionEmail } from "./completionNotificationService.js";
 
 const RETRY_LEASE_MS = 6 * 60 * 1000;
 const DAILY_POINTS = 100;
@@ -1221,6 +1222,12 @@ export async function finalizeWeeklyLocalExecution({
       });
     }
     await synchronizeRosterScore(roster._id);
+    void dispatchWeeklyCompletionEmail(finalizedSubmission._id).catch((error) => {
+      console.error("[CompletionEmail] Daily Challenge notification failed:", {
+        submissionId: String(finalizedSubmission._id),
+        error: error.message,
+      });
+    });
     return {
       submissionId: String(finalizedSubmission._id),
       status: "FINALIZED",
@@ -1404,6 +1411,12 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
     durationMs: Number((performance.now() - databaseStartedAt).toFixed(3)),
   });
   await synchronizeRosterScore(roster._id);
+  void dispatchWeeklyCompletionEmail(finalized._id).catch((error) => {
+    console.error("[CompletionEmail] Daily Challenge notification failed:", {
+      submissionId: String(finalized._id),
+      error: error.message,
+    });
+  });
   logWeeklyVerification("verification_completed", {
     submissionId: String(submission._id),
     durationMs: Number((performance.now() - startedAt).toFixed(3)),

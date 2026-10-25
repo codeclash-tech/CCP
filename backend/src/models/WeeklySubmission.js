@@ -55,6 +55,18 @@ const weeklySubmissionSchema = new mongoose.Schema(
     verificationStartedAt: { type: Date, default: null },
     verificationCompletedAt: { type: Date, default: null },
     verificationError: { type: String, default: "" },
+    completionEmail: {
+      eligible: { type: Boolean, default: false },
+      status: {
+        type: String,
+        enum: ["PENDING", "SENDING", "SENT", "FAILED"],
+        default: "PENDING",
+      },
+      attempts: { type: Number, default: 0 },
+      attemptedAt: { type: Date, default: null },
+      sentAt: { type: Date, default: null },
+      error: { type: String, default: "" },
+    },
     score: { type: Number, default: 0 },
     passed: { type: Number, default: 0 },
     total: { type: Number, default: 0 },

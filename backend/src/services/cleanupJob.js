@@ -12,10 +12,19 @@ import {
 } from "./weeklyAssessmentService.js";
 import { closeBattleRoomAndNotify } from "./battleRoomClosureService.js";
 import { startBattleRoomVerificationWorker } from "./battleRoomVerificationService.js";
+import { retryPendingCompletionEmails } from "./completionNotificationService.js";
 
 export function startCleanupJobs() {
   startBattleRoomVerificationWorker();
   startWeeklyVerificationWorker();
+
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      await retryPendingCompletionEmails();
+    } catch (error) {
+      console.error("[CleanupJob] Completion email retry failed:", error.message);
+    }
+  });
 
   // Run daily at midnight to update organization metrics
   cron.schedule("0 0 * * *", async () => {
@@ -62,7 +71,7 @@ export function startCleanupJobs() {
         if (!result.closed) continue;
 
         console.log(
-          `[CleanupJob] Closed battle room ${room.roomCode} with ${result.totalParticipants} participants; sent ${result.emailsSent} result emails and encountered ${result.emailFailures} email failures.`,
+          `[CleanupJob] Closed battle room ${room.roomCode} with ${result.totalParticipants} submissions.`,
         );
       }
     } catch (error) {
