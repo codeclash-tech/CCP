@@ -590,12 +590,12 @@ export function getCurrentDayIndex(cycle, now = new Date()) {
   return getWeeklyDayIndex(now, cycle.startAt);
 }
 
-async function reserveQuestionForCycle(globalChallenge, bounds, existingCycle = null) {
+export async function reserveQuestionForCycle(globalChallenge, bounds, existingCycle = null) {
   const scheduledForDay = await GlobalChallenge.findOne({
     key: "global",
     lastScheduledCycleKey: bounds.cycleKey,
   }).select("activeQuestionId").lean();
-  if (scheduledForDay) return scheduledForDay.activeQuestionId;
+  if (scheduledForDay?.activeQuestionId) return scheduledForDay.activeQuestionId;
 
   let queue = globalChallenge.questionIds || [];
   let nextQuestionId;
@@ -618,7 +618,13 @@ async function reserveQuestionForCycle(globalChallenge, bounds, existingCycle = 
     const reserved = await GlobalChallenge.findOneAndUpdate(
       {
         key: "global",
-        lastScheduledCycleKey: { $ne: bounds.cycleKey },
+        $or: [
+          { lastScheduledCycleKey: { $ne: bounds.cycleKey } },
+          {
+            lastScheduledCycleKey: bounds.cycleKey,
+            activeQuestionId: null,
+          },
+        ],
         questionIds: queue,
       },
       {

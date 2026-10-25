@@ -17,6 +17,7 @@ import {
   getWeeklyCertificateCategory,
   publishGlobalChallengeConfiguration,
   resolveDailyQuestion,
+  reserveQuestionForCycle,
   saveGlobalChallengeConfiguration,
 } from "../src/services/weeklyAssessmentService.js";
 
@@ -208,6 +209,53 @@ test("publishing a draft updates only future rotation while retaining the active
   assert.deepEqual(update.$unset, { draft: "" });
   assert.equal("activeQuestionId" in update.$set, false);
   assert.equal(existing.activeQuestionId, activeQuestionId);
+});
+
+test("a newly published question can fill today's previously empty queue reservation", async (t) => {
+  const questionId = new mongoose.Types.ObjectId();
+  const cycleKey = "2026-10-25";
+  const bounds = { cycleKey };
+  let reservationFilter;
+  let reserved = false;
+
+  t.mock.method(GlobalChallenge, "findOne", (query) => ({
+    select() {
+      return {
+        lean: async () => query.lastScheduledCycleKey === cycleKey
+          ? { activeQuestionId: null }
+          : null,
+      };
+    },
+  }));
+  t.mock.method(GlobalChallenge, "findOneAndUpdate", (query) => {
+    reservationFilter = query;
+    return {
+      select() {
+        return {
+          lean: async () => {
+            reserved = true;
+            return { activeQuestionId: questionId };
+          },
+        };
+      },
+    };
+  });
+
+  const selectedQuestion = await reserveQuestionForCycle(
+    { questionIds: [questionId] },
+    bounds,
+  );
+
+  assert.equal(String(selectedQuestion), String(questionId));
+  assert.equal(reserved, true);
+  assert.ok(
+    reservationFilter.$or.some(
+      (condition) =>
+        condition.lastScheduledCycleKey === cycleKey &&
+        condition.activeQuestionId === null,
+    ),
+  );
+  assert.deepEqual(reservationFilter.questionIds, [questionId]);
 });
 
 test("weekly recovery deadline is 24 hours after close and delays finalization only for recoverable submissions", () => {
