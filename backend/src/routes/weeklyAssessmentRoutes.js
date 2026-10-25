@@ -29,6 +29,7 @@ import {
   listRecoverableWeeklySubmissionsHandler,
   submitCurrentWeeklyAnswer,
   saveAdminGlobalChallenge,
+  publishAdminGlobalChallenge,
   retryWeeklyAnswerHandler,
   removeCandidateOrganizationHandler,
   updateAdminCandidateStatus,
@@ -78,6 +79,7 @@ router.put("/organization/profile", ...organizationUser, updateOwnOrganizationPr
 router.post("/admin/cycles", ...admin, createWeeklyCycleHandler);
 router.get("/admin/global-challenge", ...admin, getAdminGlobalChallenge);
 router.put("/admin/global-challenge", ...admin, saveAdminGlobalChallenge);
+router.post("/admin/global-challenge/publish", ...admin, publishAdminGlobalChallenge);
 router.get("/admin/cycles", ...admin, listAdminWeeklyCycles);
 router.put("/admin/cycles/:cycleId/questions", ...admin, updateWeeklyQuestions);
 router.get("/admin/cycles/:cycleId/roster", ...admin, getAdminWeeklyRoster);

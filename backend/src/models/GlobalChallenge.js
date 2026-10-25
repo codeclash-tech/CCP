@@ -1,5 +1,23 @@
 import mongoose from "mongoose";
 
+const draftConfigurationSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, maxlength: 160, default: "" },
+    timezone: {
+      type: String,
+      enum: ["Asia/Kolkata"],
+      default: "Asia/Kolkata",
+    },
+    startAt: { type: Date, default: null },
+    questionIds: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Challenge" }],
+      default: [],
+    },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const globalChallengeSchema = new mongoose.Schema(
   {
     key: {
@@ -9,17 +27,23 @@ const globalChallengeSchema = new mongoose.Schema(
       default: "global",
       immutable: true,
     },
-    name: { type: String, required: true, trim: true, maxlength: 160 },
+    name: { type: String, trim: true, maxlength: 160 },
     timezone: {
       type: String,
       required: true,
       enum: ["Asia/Kolkata"],
       default: "Asia/Kolkata",
     },
-    startAt: { type: Date, required: true },
+    startAt: { type: Date, default: null },
     questionIds: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Challenge" }],
-      required: true,
+      default: [],
+    },
+    draft: { type: draftConfigurationSchema, default: null },
+    status: {
+      type: String,
+      enum: ["DRAFT", "SCHEDULED", "ACTIVE", "COMPLETED"],
+      default: null,
     },
     lastScheduledCycleKey: { type: String, default: null },
     activeQuestionId: {

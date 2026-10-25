@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   BrowserRouter,
   HashRouter,
@@ -42,21 +42,36 @@ const Terms = lazy(() => import("../pages/Terms"));
 
 function AppLayout({ children }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(
+    () => typeof document !== "undefined" && Boolean(document.fullscreenElement),
+  );
   const { user } = useAuth();
   const isDesktop =
     typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   const closeNavigation = () => setNavigationOpen(false);
 
+  useEffect(() => {
+    const updateFullscreenState = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+    };
+  }, []);
+
   return (
-    <div className={`app-shell${isDesktop ? " desktop-app-shell" : ""}`}>
-      {!isDesktop && (
+    <div
+      className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
+    >
+      {!isFullscreen && !isDesktop && (
         <Navbar
           navigationOpen={navigationOpen}
           onToggleNavigation={() => setNavigationOpen((open) => !open)}
         />
       )}
       <div className="app-shell-body">
-        {user && (
+        {!isFullscreen && user && (
           <RoleNavigation
             open={navigationOpen}
             onNavigate={closeNavigation}
@@ -67,7 +82,7 @@ function AppLayout({ children }) {
           <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
         </main>
       </div>
-      {!isDesktop && <Footer />}
+      {!isFullscreen && !isDesktop && <Footer />}
     </div>
   );
 }
@@ -295,7 +310,7 @@ export default function AppRouter() {
           <Route
             path="/weekly-assessment"
             element={
-              <ProtectedLayout fullScreen>
+              <ProtectedLayout>
                 <WeeklyAssessment />
               </ProtectedLayout>
             }

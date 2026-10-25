@@ -1839,6 +1839,10 @@ canvas {
   overflow: hidden;
 }
 
+.desktop-app-shell.fullscreen-app-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .desktop-app-shell .app-shell-body {
   display: contents;
 }

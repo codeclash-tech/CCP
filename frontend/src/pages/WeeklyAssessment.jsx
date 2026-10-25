@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   CheckCircle2,
@@ -82,7 +81,6 @@ function GlobalChallengeTimer({ endAt }) {
 }
 
 export default function WeeklyAssessment() {
-  const navigate = useNavigate();
   const [assessment, setAssessment] = useState(null);
   const [code, setCode] = useState("");
   const [localResult, setLocalResult] = useState(null);
@@ -213,19 +211,19 @@ export default function WeeklyAssessment() {
   };
 
   const exitChallengeMode = async () => {
+    setChallengeStarted(false);
+    setStartedCycleId("");
+    try {
+      sessionStorage.removeItem(STARTED_CYCLE_STORAGE_KEY);
+    } catch (storageError) {
+      console.warn("Unable to clear global challenge session state:", storageError.message);
+    }
     if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
       await window.codeClashDesktop.window.setChallengeMode(false);
     }
     if (document.fullscreenElement && document.exitFullscreen) {
       await document.exitFullscreen();
     }
-    try {
-      sessionStorage.removeItem(STARTED_CYCLE_STORAGE_KEY);
-    } catch (storageError) {
-      console.warn("Unable to clear global challenge session state:", storageError.message);
-    }
-    setChallengeStarted(false);
-    setStartedCycleId("");
   };
 
   const endChallenge = async () => {
@@ -234,7 +232,6 @@ export default function WeeklyAssessment() {
     }
     try {
       await exitChallengeMode();
-      navigate("/", { replace: true });
     } catch (exitError) {
       setError(exitError.message || "Could not exit the challenge workspace.");
     }
@@ -465,11 +462,18 @@ export default function WeeklyAssessment() {
     showInstructions ? (
       <main className="weekly-instructions-page">
         <section className="weekly-instructions-card" aria-labelledby="weekly-instructions-title">
+          <div className="weekly-instructions-start">
+            <button type="button" className="btn-primary" onClick={enterChallenge}>
+              <Maximize2 size={16} /> I am ready for challenge
+            </button>
+          </div>
           <div className="weekly-instructions-icon"><ShieldAlert size={28} /></div>
           <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
           <h1 id="weekly-instructions-title">Before you begin</h1>
           <p className="weekly-instructions-intro">
-            Read and follow these rules for the full challenge session.
+            Take on a new coding problem each day, run your solution, and submit
+            it for your daily score. Read and follow these rules for the full
+            challenge session.
           </p>
 
           <ul className="weekly-rules-list">
@@ -483,12 +487,6 @@ export default function WeeklyAssessment() {
           {error && <p className="weekly-error" role="alert"><AlertCircle size={16} />{error}</p>}
           {fullscreenError && <p className="weekly-error" role="alert"><AlertCircle size={16} />{fullscreenError}</p>}
         </section>
-        <footer className="weekly-instructions-footer">
-          <span>Review the rules before entering the timed challenge workspace.</span>
-          <button type="button" className="btn-primary" onClick={enterChallenge}>
-            <Maximize2 size={16} /> I am ready for the challenge
-          </button>
-        </footer>
       </main>
     ) : (
       <main className="weekly-coding-page">
@@ -669,7 +667,7 @@ export default function WeeklyAssessment() {
               !isVerifying &&
               !serverDisqualified,
           )}
-          onExit={() => navigate("/", { replace: true })}
+          onExit={endChallenge}
         />
       </main>
     )

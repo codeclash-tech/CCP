@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import mongoose from "mongoose";
+import Challenge from "../src/models/Challenge.js";
+import GlobalChallenge from "../src/models/GlobalChallenge.js";
 import weeklyAssessmentRoutes from "../src/routes/weeklyAssessmentRoutes.js";
 import {
   calculateWeeklyRankings,
@@ -10,7 +13,23 @@ import {
   shouldWaitForWeeklyRecovery,
   takeNextQueuedQuestion,
 } from "../src/utils/weeklyAssessment.js";
-import { getWeeklyCertificateCategory } from "../src/services/weeklyAssessmentService.js";
+import {
+  getWeeklyCertificateCategory,
+  publishGlobalChallengeConfiguration,
+  resolveDailyQuestion,
+  saveGlobalChallengeConfiguration,
+} from "../src/services/weeklyAssessmentService.js";
+
+function populatedQuery(value) {
+  return {
+    populate() {
+      return this;
+    },
+    then(resolve, reject) {
+      return Promise.resolve(value).then(resolve, reject);
+    },
+  };
+}
 
 test("Asia/Kolkata daily boundaries transition at local midnight", () => {
   const midnight = new Date("2024-01-07T18:30:00.000Z");
@@ -73,6 +92,122 @@ test("daily global challenge queue consumes questions once in FIFO order and nev
     questionId: null,
     remainingQuestionIds: [],
   });
+});
+
+test("participant question resolution returns the assigned snapshot and excludes hidden tests", () => {
+  const question = resolveDailyQuestion({
+    challengeId: "507f1f77bcf86cd799439011",
+    questionSnapshot: {
+      title: "Two Sum",
+      description: "Return indices of two values that sum to the target.",
+      difficulty: "EASY",
+      category: "Arrays",
+      constraints: "2 <= nums.length <= 10^4",
+      examples: [{ input: "[2,7], 9", output: "[0,1]" }],
+      starterCodes: { java: "class Solution {}" },
+      visibleTestCases: [{ input: "2 7 9", expectedOutput: "0 1" }],
+      hiddenTestCases: [{ input: "hidden", expectedOutput: "hidden" }],
+      testCases: [{ input: "hidden", expectedOutput: "hidden" }],
+    },
+  });
+
+  assert.equal(question.id, "507f1f77bcf86cd799439011");
+  assert.equal(question.title, "Two Sum");
+  assert.match(question.description, /two values/);
+  assert.equal(question.constraints, "2 <= nums.length <= 10^4");
+  assert.equal(question.examples.length, 1);
+  assert.equal(question.starterCodes.java, "class Solution {}");
+  assert.equal(question.visibleTestCases.length, 1);
+  assert.equal("hiddenTestCases" in question, false);
+  assert.equal("testCases" in question, false);
+});
+
+test("participant question resolution rejects missing or incomplete cycle snapshots", () => {
+  assert.throws(
+    () => resolveDailyQuestion({ challengeId: "question-id" }),
+    /snapshot is unavailable/,
+  );
+  assert.throws(
+    () => resolveDailyQuestion({
+      challengeId: "question-id",
+      questionSnapshot: { title: "Question without body" },
+    }),
+    /snapshot is incomplete/,
+  );
+});
+
+test("saving an admin draft does not change the published question or schedule", async (t) => {
+  const activeQuestionId = new mongoose.Types.ObjectId();
+  const upcomingQuestionId = new mongoose.Types.ObjectId();
+  const startAt = new Date(Date.now() - 60 * 60 * 1000);
+  const existing = {
+    name: "Published Challenge",
+    startAt,
+    questionIds: [],
+    activeQuestionId,
+    lastScheduledCycleKey: "2026-10-25",
+  };
+  t.mock.method(GlobalChallenge, "findOne", async () => existing);
+  t.mock.method(Challenge, "find", () => ({
+    select: async () => [{ _id: upcomingQuestionId }],
+  }));
+  let update;
+  t.mock.method(GlobalChallenge, "findOneAndUpdate", (_filter, changes) => {
+    update = changes;
+    return populatedQuery(existing);
+  });
+
+  await saveGlobalChallengeConfiguration({
+    name: "Edited Challenge",
+    startAt: startAt.toISOString(),
+    questionIds: [String(upcomingQuestionId)],
+  });
+
+  assert.deepEqual(Object.keys(update.$set), ["draft"]);
+  assert.equal(update.$set.draft.name, "Edited Challenge");
+  assert.deepEqual(update.$set.draft.questionIds, [String(upcomingQuestionId)]);
+  assert.equal(update.$set.draft.timezone, "Asia/Kolkata");
+});
+
+test("publishing a draft updates only future rotation while retaining the active cycle lock", async (t) => {
+  const activeQuestionId = new mongoose.Types.ObjectId();
+  const upcomingQuestionId = new mongoose.Types.ObjectId();
+  const startAt = new Date(Date.now() - 60 * 60 * 1000);
+  const existing = {
+    name: "Published Challenge",
+    startAt,
+    questionIds: [],
+    activeQuestionId,
+    lastScheduledCycleKey: "2026-10-25",
+    draft: {
+      name: "Edited Challenge",
+      startAt,
+      questionIds: [upcomingQuestionId],
+      updatedAt: new Date(),
+    },
+  };
+  t.mock.method(GlobalChallenge, "findOne", async () => existing);
+  t.mock.method(Challenge, "find", () => ({
+    select: async () => [{ _id: upcomingQuestionId }],
+  }));
+  let filter;
+  let update;
+  t.mock.method(GlobalChallenge, "findOneAndUpdate", (query, changes) => {
+    filter = query;
+    update = changes;
+    return populatedQuery({ ...existing, ...changes.$set });
+  });
+
+  await publishGlobalChallengeConfiguration();
+
+  assert.equal(filter["draft.updatedAt"], existing.draft.updatedAt);
+  assert.equal(filter.lastScheduledCycleKey, existing.lastScheduledCycleKey);
+  assert.equal(String(filter.activeQuestionId), String(activeQuestionId));
+  assert.deepEqual(update.$set.questionIds, [String(upcomingQuestionId)]);
+  assert.equal(update.$set.status, "ACTIVE");
+  assert.deepEqual(update.$unset, { draft: "" });
+  assert.equal("activeQuestionId" in update.$set, false);
+  assert.equal(existing.activeQuestionId, activeQuestionId);
 });
 
 test("weekly recovery deadline is 24 hours after close and delays finalization only for recoverable submissions", () => {
@@ -272,6 +407,7 @@ test("global challenge setup APIs require Super Admin authorization", () => {
   for (const [path, method] of [
     ["/admin/global-challenge", "get"],
     ["/admin/global-challenge", "put"],
+    ["/admin/global-challenge/publish", "post"],
   ]) {
     const route = weeklyAssessmentRoutes.stack.find(
       (layer) => layer.route?.path === path && layer.route.methods[method],

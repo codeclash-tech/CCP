@@ -25,6 +25,7 @@ import {
   createWeeklyLocalExecutionGrant,
   finalizeWeeklyLocalExecution,
   saveGlobalChallengeConfiguration,
+  publishGlobalChallengeConfiguration,
 } from "../services/weeklyAssessmentService.js";
 import { streamWeeklyCertificate } from "../services/weeklyCertificateService.js";
 import { calculateIntegrityRisk } from "../services/assessmentIntegrityService.js";
@@ -302,13 +303,34 @@ export async function saveAdminGlobalChallenge(req, res) {
   }
 }
 
+export async function publishAdminGlobalChallenge(req, res) {
+  try {
+    const globalChallenge = await publishGlobalChallengeConfiguration();
+    return res.json({ globalChallenge });
+  } catch (error) {
+    return sendFailure(res, error, "Could not publish the global challenge.");
+  }
+}
+
 export async function listAdminWeeklyCycles(req, res) {
   try {
-    const cycles = await WeeklyCycle.find({})
+    const cycles = await WeeklyCycle.find({
+      $or: [
+        { isGlobalChallenge: true },
+        {
+          isGlobalChallenge: { $exists: false },
+          name: {
+            $regex: "^(?:.+ · \\d{4}-\\d{2}-\\d{2}|Global Challenge \\d{4}-\\d{2}-\\d{2})$",
+          },
+        },
+      ],
+    })
       .sort({ startAt: -1 })
-      .select("cycleKey name startAt endAt recoveryUntilAt status rosterFrozenAt finalizedAt questionAssignments")
+      .select("cycleKey name startAt endAt recoveryUntilAt status rosterFrozenAt finalizedAt isGlobalChallenge questionAssignments")
       .lean();
-    return res.json({ cycles });
+    return res.json({
+      cycles: cycles.map((cycle) => ({ ...cycle, isGlobalChallenge: true })),
+    });
   } catch (error) {
     return sendFailure(res, error, "Could not load weekly cycles.");
   }

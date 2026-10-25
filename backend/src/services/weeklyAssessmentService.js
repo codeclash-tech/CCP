@@ -261,6 +261,20 @@ export function createQuestionAssignment(challenge, dayIndex) {
   };
 }
 
+export function resolveDailyQuestion(assignment) {
+  if (!assignment?.questionSnapshot || !assignment.challengeId) {
+    throw requestError("The assigned daily question snapshot is unavailable.", 503);
+  }
+  const question = { ...assignment.questionSnapshot };
+  if (!question.title || !question.description) {
+    throw requestError("The assigned daily question snapshot is incomplete.", 503);
+  }
+  question.id = String(assignment.challengeId);
+  delete question.hiddenTestCases;
+  delete question.testCases;
+  return question;
+}
+
 export async function createWeeklyCycle({ cycleKey, name, questionIds }) {
   const bounds = dailyBoundsFromKey(cycleKey);
   if (bounds.endAt <= new Date()) {
@@ -284,6 +298,7 @@ export async function createWeeklyCycle({ cycleKey, name, questionIds }) {
   return WeeklyCycle.create({
     cycleKey,
     name: String(name || "").trim() || `Global Challenge ${cycleKey}`,
+    isGlobalChallenge: true,
     startAt: bounds.startAt,
     endAt: bounds.endAt,
     recoveryUntilAt: getWeeklyRecoveryDeadline(bounds.endAt),
@@ -293,10 +308,21 @@ export async function createWeeklyCycle({ cycleKey, name, questionIds }) {
 }
 
 export async function getGlobalChallengeConfiguration() {
-  return GlobalChallenge.findOne({ key: "global" })
+  const configuration = await GlobalChallenge.findOne({ key: "global" })
     .populate("questionIds", "title difficulty isActive")
     .populate("activeQuestionId", "title difficulty isActive")
+    .populate("draft.questionIds", "title difficulty isActive")
     .lean();
+  if (!configuration) return null;
+  const published = Boolean(configuration.name && configuration.startAt);
+  const status = !published
+    ? "DRAFT"
+    : configuration.status === "COMPLETED"
+      ? "COMPLETED"
+      : new Date(configuration.startAt) > new Date()
+        ? "SCHEDULED"
+        : "ACTIVE";
+  return { ...configuration, published, status };
 }
 
 export async function saveGlobalChallengeConfiguration({
@@ -306,55 +332,154 @@ export async function saveGlobalChallengeConfiguration({
   now = new Date(),
 }) {
   const existing = await GlobalChallenge.findOne({ key: "global" });
-  const parsedStartAt = new Date(startAt);
-  if (!Number.isFinite(parsedStartAt.getTime())) {
+  const hasPublishedConfiguration = Boolean(existing?.name && existing?.startAt);
+  const parsedStartAt = startAt ? new Date(startAt) : null;
+  if (startAt && !Number.isFinite(parsedStartAt.getTime())) {
     throw requestError("Choose a valid global challenge start date and time.");
   }
-  if (!Array.isArray(questionIds) || (!existing && questionIds.length === 0)) {
-    throw requestError("Select at least one question for the global challenge.");
+  if (!Array.isArray(questionIds)) {
+    throw requestError("The question rotation must be a list of saved question IDs.");
   }
   const normalizedIds = questionIds.map(String);
   if (new Set(normalizedIds).size !== normalizedIds.length ||
     normalizedIds.some((id) => !mongoose.Types.ObjectId.isValid(id))) {
     throw requestError("Global challenge questions must be unique saved question IDs.");
   }
-  if (!existing && parsedStartAt <= now) {
-    throw requestError("The initial global challenge start must be in the future.", 409);
-  }
   if (
-    existing &&
+    hasPublishedConfiguration &&
     existing.startAt <= now &&
+    parsedStartAt &&
     parsedStartAt.getTime() !== existing.startAt.getTime()
   ) {
     throw requestError("The global challenge start time cannot be changed after it begins.", 409);
   }
-  if (parsedStartAt <= now && (!existing || existing.startAt > now)) {
+  if (
+    !hasPublishedConfiguration &&
+    parsedStartAt &&
+    parsedStartAt <= now
+  ) {
+    throw requestError("The initial global challenge start must be in the future.", 409);
+  }
+  if (
+    hasPublishedConfiguration &&
+    existing.startAt > now &&
+    parsedStartAt &&
+    parsedStartAt <= now
+  ) {
     throw requestError("The global challenge start must be in the future.", 409);
   }
-
-  const questions = await Challenge.find({
-    _id: { $in: normalizedIds },
-    isActive: true,
-  }).select("_id");
-  if (questions.length !== normalizedIds.length) {
-    throw requestError("Every selected question must be an active saved challenge.");
+  if (normalizedIds.length) {
+    const questions = await Challenge.find({
+      _id: { $in: normalizedIds },
+      isActive: true,
+    }).select("_id");
+    if (questions.length !== normalizedIds.length) {
+      throw requestError("Every selected question must be an active saved challenge.");
+    }
   }
 
+  const draft = {
+    name: String(name || "").trim(),
+    timezone: "Asia/Kolkata",
+    startAt: parsedStartAt,
+    questionIds: normalizedIds,
+    updatedAt: now,
+  };
   return GlobalChallenge.findOneAndUpdate(
     { key: "global" },
     {
       $set: {
-        name: String(name || "").trim() || "Global Challenge",
-        timezone: "Asia/Kolkata",
-        startAt: parsedStartAt,
-        questionIds: normalizedIds,
+        draft,
+        ...(!hasPublishedConfiguration ? { status: "DRAFT" } : {}),
       },
       $setOnInsert: { key: "global" },
     },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
   )
     .populate("questionIds", "title difficulty isActive")
+    .populate("activeQuestionId", "title difficulty isActive")
+    .populate("draft.questionIds", "title difficulty isActive");
+}
+
+export async function publishGlobalChallengeConfiguration({ now = new Date() } = {}) {
+  const existing = await GlobalChallenge.findOne({ key: "global" });
+  const draft = existing?.draft;
+  if (!draft) {
+    throw requestError("Save a draft before publishing the global challenge.", 409);
+  }
+  const name = String(draft.name || "").trim();
+  if (!name) throw requestError("Enter a challenge name before publishing.");
+  if (!draft.startAt || !Number.isFinite(new Date(draft.startAt).getTime())) {
+    throw requestError("Choose a valid global challenge start date and time.");
+  }
+  if (!Array.isArray(draft.questionIds) || draft.questionIds.length === 0) {
+    throw requestError("Add at least one active question before publishing.");
+  }
+  const questionIds = draft.questionIds.map(String);
+  if (
+    new Set(questionIds).size !== questionIds.length ||
+    questionIds.some((id) => !mongoose.Types.ObjectId.isValid(id))
+  ) {
+    throw requestError("The question rotation must contain unique saved question IDs.");
+  }
+  const questions = await Challenge.find({
+    _id: { $in: questionIds },
+    isActive: true,
+  }).select("_id");
+  if (questions.length !== questionIds.length) {
+    throw requestError("Every selected question must still be active before publishing.");
+  }
+
+  const hasPublishedConfiguration = Boolean(existing.name && existing.startAt);
+  const startAt = new Date(draft.startAt);
+  if (!hasPublishedConfiguration && startAt <= now) {
+    throw requestError("The initial global challenge start must be in the future.", 409);
+  }
+  if (
+    hasPublishedConfiguration &&
+    existing.startAt <= now &&
+    startAt.getTime() !== existing.startAt.getTime()
+  ) {
+    throw requestError("The global challenge start time cannot be changed after it begins.", 409);
+  }
+  if (hasPublishedConfiguration && existing.startAt > now && startAt <= now) {
+    throw requestError("The global challenge start must be in the future.", 409);
+  }
+  if (
+    hasPublishedConfiguration &&
+    existing.startAt <= now &&
+    existing.activeQuestionId &&
+    questionIds.includes(String(existing.activeQuestionId))
+  ) {
+    throw requestError("The current question cannot be added back into the upcoming rotation.", 409);
+  }
+
+  const updated = await GlobalChallenge.findOneAndUpdate(
+    {
+      key: "global",
+      "draft.updatedAt": draft.updatedAt,
+      lastScheduledCycleKey: existing.lastScheduledCycleKey ?? null,
+      activeQuestionId: existing.activeQuestionId ?? null,
+    },
+    {
+      $set: {
+        name,
+        timezone: "Asia/Kolkata",
+        startAt,
+        questionIds,
+        status: startAt > now ? "SCHEDULED" : "ACTIVE",
+      },
+      $unset: { draft: "" },
+      $setOnInsert: { key: "global" },
+    },
+    { new: true, runValidators: true },
+  )
+    .populate("questionIds", "title difficulty isActive")
     .populate("activeQuestionId", "title difficulty isActive");
+  if (!updated) {
+    throw requestError("The saved draft changed before publishing. Reload and try again.", 409);
+  }
+  return updated;
 }
 
 export async function freezeWeeklyRoster(cycleId) {
@@ -465,30 +590,6 @@ export function getCurrentDayIndex(cycle, now = new Date()) {
   return getWeeklyDayIndex(now, cycle.startAt);
 }
 
-async function removeExpiredGlobalCycleData(globalChallenge, currentStartAt) {
-  const escapedName = String(globalChallenge.name || "Global Challenge")
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const expiredCycles = await WeeklyCycle.find({
-    startAt: { $gte: globalChallenge.startAt, $lt: currentStartAt },
-    $or: [
-      { isGlobalChallenge: true },
-      {
-        isGlobalChallenge: { $exists: false },
-        name: { $regex: `^${escapedName} · ` },
-      },
-    ],
-  }).select("_id");
-  if (expiredCycles.length === 0) return;
-
-  const cycleIds = expiredCycles.map((cycle) => cycle._id);
-  await Promise.all([
-    WeeklySubmission.deleteMany({ cycleId: { $in: cycleIds } }),
-    WeeklyRosterEntry.deleteMany({ cycleId: { $in: cycleIds } }),
-    WeeklyCertificate.deleteMany({ cycleId: { $in: cycleIds } }),
-  ]);
-  await WeeklyCycle.deleteMany({ _id: { $in: cycleIds } });
-}
-
 async function reserveQuestionForCycle(globalChallenge, bounds, existingCycle = null) {
   const scheduledForDay = await GlobalChallenge.findOne({
     key: "global",
@@ -560,26 +661,65 @@ async function reserveQuestionForCycle(globalChallenge, bounds, existingCycle = 
   throw requestError("Could not reserve the next daily challenge question; retry shortly.", 503);
 }
 
+function findGlobalCycleForDay(cycleKey, challengeName) {
+  const legacyNames = [
+    `${challengeName} · ${cycleKey}`,
+    `Global Challenge ${cycleKey}`,
+  ];
+  return WeeklyCycle.findOne({
+    cycleKey,
+    $or: [
+      { isGlobalChallenge: true },
+      {
+        isGlobalChallenge: { $exists: false },
+        $or: [
+          { name: { $in: legacyNames } },
+          { name: { $regex: ` · ${cycleKey}$` } },
+        ],
+      },
+    ],
+  });
+}
+
 async function getOrCreateCurrentDailyCycle(now) {
   let globalChallenge = await GlobalChallenge.findOne({ key: "global" }).lean();
-  if (!globalChallenge || now < globalChallenge.startAt) return null;
+  if (
+    !globalChallenge?.startAt ||
+    !globalChallenge.name ||
+    (globalChallenge.status && globalChallenge.status === "DRAFT") ||
+    now < globalChallenge.startAt
+  ) return null;
 
   const bounds = getRecurringCycleBounds(globalChallenge.startAt, now);
-  await removeExpiredGlobalCycleData(globalChallenge, bounds.startAt);
-  const existing = await WeeklyCycle.findOne({ cycleKey: bounds.cycleKey });
+  const existing = await findGlobalCycleForDay(bounds.cycleKey, globalChallenge.name);
   if (existing) {
     await reserveQuestionForCycle(globalChallenge, bounds, existing);
     return existing;
   }
+  const conflictingCycle = await WeeklyCycle.findOne({
+    cycleKey: bounds.cycleKey,
+  });
+  if (conflictingCycle) {
+    throw requestError(
+      "A different daily cycle already uses the configured global challenge date.",
+      503,
+    );
+  }
 
   const questionId = await reserveQuestionForCycle(globalChallenge, bounds);
-  if (!questionId) return null;
+  if (!questionId) {
+    await GlobalChallenge.updateOne(
+      { key: "global", lastScheduledCycleKey: bounds.cycleKey },
+      { $set: { status: "COMPLETED" } },
+    );
+    return null;
+  }
   const question = await Challenge.findOne({ _id: questionId, isActive: true });
   if (!question) {
     throw requestError("A scheduled global challenge question is no longer active.", 503);
   }
   try {
-    return await WeeklyCycle.create({
+    const cycle = await WeeklyCycle.create({
       cycleKey: bounds.cycleKey,
       name: `${globalChallenge.name} · ${bounds.cycleKey}`,
       isGlobalChallenge: true,
@@ -590,9 +730,22 @@ async function getOrCreateCurrentDailyCycle(now) {
       questionAssignments: [createQuestionAssignment(question, 0)],
       shrinkageK: WEEKLY_SHRINKAGE_K,
     });
+    await GlobalChallenge.updateOne(
+      { key: "global", lastScheduledCycleKey: bounds.cycleKey },
+      { $set: { status: "ACTIVE" } },
+    );
+    return cycle;
   } catch (error) {
     if (error?.code !== 11000) throw error;
-    return WeeklyCycle.findOne({ cycleKey: bounds.cycleKey });
+    const concurrentGlobalCycle = await findGlobalCycleForDay(
+      bounds.cycleKey,
+      globalChallenge.name,
+    );
+    if (concurrentGlobalCycle) return concurrentGlobalCycle;
+    throw requestError(
+      "A different daily cycle already uses the configured global challenge date.",
+      503,
+    );
   }
 }
 
@@ -601,13 +754,20 @@ export async function ensureCurrentGlobalCycle(now = new Date()) {
 }
 
 export async function getCandidateWeeklyState(candidateId, now = new Date()) {
-  const globalCycle = await getOrCreateCurrentDailyCycle(now);
-  let cycle = globalCycle;
-  if (!cycle) {
-    const globalChallenge = await GlobalChallenge.findOne({ key: "global" })
-      .select("startAt")
-      .lean();
-    if (globalChallenge && now >= globalChallenge.startAt) return null;
+  const globalConfiguration = await GlobalChallenge.findOne({ key: "global" })
+    .select("name startAt status")
+    .lean();
+  let cycle;
+  if (globalConfiguration) {
+    if (
+      !globalConfiguration.name ||
+      !globalConfiguration.startAt ||
+      globalConfiguration.status === "DRAFT"
+    ) {
+      return null;
+    }
+    cycle = await getOrCreateCurrentDailyCycle(now);
+  } else {
     cycle = await WeeklyCycle.findOne({
       startAt: { $lte: now },
       endAt: { $gt: now },
@@ -628,11 +788,7 @@ export async function getCandidateWeeklyState(candidateId, now = new Date()) {
   const [submission] = await Promise.all([
     WeeklySubmission.findOne({ cycleId: cycle._id, candidateId, dayIndex }),
   ]);
-  if (!assignment.questionSnapshot) throw requestError("Assigned weekly question snapshot is unavailable.", 503);
-  const question = { ...assignment.questionSnapshot };
-  question.id = String(assignment.challengeId);
-  delete question.hiddenTestCases;
-  delete question.testCases;
+  const question = resolveDailyQuestion(assignment);
   return {
     cycle: {
       id: cycle._id,
@@ -735,12 +891,26 @@ function weeklyLocalGrantResource({
 }
 
 async function getCurrentDailyExecutionContext(candidateId, now) {
-  let cycle = await WeeklyCycle.findOne({
-    startAt: { $lte: now },
-    endAt: { $gt: now },
-    status: { $in: ["SCHEDULED", "ACTIVE"] },
-  }).sort({ startAt: -1 });
-  if (!cycle) cycle = await getOrCreateCurrentDailyCycle(now);
+  const globalConfiguration = await GlobalChallenge.findOne({ key: "global" })
+    .select("name startAt status")
+    .lean();
+  let cycle;
+  if (globalConfiguration) {
+    if (
+      !globalConfiguration.name ||
+      !globalConfiguration.startAt ||
+      globalConfiguration.status === "DRAFT"
+    ) {
+      throw requestError("No open daily challenge submission window.", 403);
+    }
+    cycle = await getOrCreateCurrentDailyCycle(now);
+  } else {
+    cycle = await WeeklyCycle.findOne({
+      startAt: { $lte: now },
+      endAt: { $gt: now },
+      status: { $in: ["SCHEDULED", "ACTIVE"] },
+    }).sort({ startAt: -1 });
+  }
   if (!cycle) throw requestError("No open daily challenge submission window.", 403);
   if (!cycle.rosterFrozenAt) await freezeWeeklyRoster(cycle._id);
   const roster = await ensureDailyRosterEntry(cycle, candidateId, now);

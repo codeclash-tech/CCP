@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import mongoose from "mongoose";
+import GlobalChallenge from "../src/models/GlobalChallenge.js";
 import Nonce from "../src/models/Nonce.js";
 import WeeklyCycle from "../src/models/WeeklyCycle.js";
 import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
@@ -35,6 +36,9 @@ function setupActiveDailyCycle(t, candidateId) {
   };
   t.mock.method(WeeklyCycle, "findOne", () => ({
     sort: async () => cycle,
+  }));
+  t.mock.method(GlobalChallenge, "findOne", () => ({
+    select: () => ({ lean: async () => null }),
   }));
   t.mock.method(WeeklyRosterEntry, "findOne", () => roster);
   return { cycle, challengeId, candidateId };
