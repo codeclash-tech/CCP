@@ -44,8 +44,8 @@ export default function ValidationPanel({ question }) {
         </label>
         <p style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-ui)", margin: "0 0 8px" }}>
           The backend verifies every requirement (title, description, constraints,
-          difficulty, signature, starter code, wrapper, visible examples, hidden
-          test cases, reference-solution pass, no duplicates). Fix any errors
+          difficulty, signature, starter code, wrapper, examples, test cases,
+          reference-solution pass, no duplicates). Fix any errors
           below before creating the room.
         </p>
         <button
@@ -106,4 +106,3 @@ export default function ValidationPanel({ question }) {
     </div>
   );
 }
-

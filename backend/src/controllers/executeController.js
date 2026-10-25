@@ -8,7 +8,7 @@ import AuditLog from "../models/AuditLog.js";
 import { composeProgram } from "../services/wrapperGenerator.js";
 import { getStoredSignature } from "../services/signatureParser.js";
 import { executionService } from "../services/executionService.js";
-import { getChallengeTestCaseGroups } from "../services/challengeTestCases.js";
+import { getChallengeTestCases } from "../services/challengeTestCases.js";
 
 function isJavaLanguage(language) {
   return !language || String(language).toLowerCase() === "java";
@@ -51,9 +51,7 @@ export async function runCode(req, res) {
         .json({ error: "This challenge is no longer active." });
     }
 
-    const { visible: visibleChallengeCases } =
-      getChallengeTestCaseGroups(challenge);
-    const visibleTestCases = visibleChallengeCases
+    const testCases = getChallengeTestCases(challenge)
       .map((tc) => ({
         ...(tc._id ? { _id: tc._id } : {}),
         input: tc.input,
@@ -61,7 +59,7 @@ export async function runCode(req, res) {
         description: tc.description || "",
       }));
 
-    if (visibleTestCases.length === 0) {
+    if (testCases.length === 0) {
       return res.status(200).json({
         status: "SYSTEM_ERROR",
         passed: 0,
@@ -69,19 +67,18 @@ export async function runCode(req, res) {
         total: 0,
         executionTime: 0,
         memoryUsed: 0,
-        error: "No public test cases are available for this challenge.",
+        error: "No test cases are available for this challenge.",
         results: [],
-        message: "No public test cases available for this challenge.",
+        message: "No test cases are available for this challenge.",
       });
     }
 
-    // Run visible test cases for the run (test) action.
+    // Run the complete challenge test set for the run action.
     const localResult = await executeAgainstChallenge(
       code,
       challenge,
-      visibleTestCases,
+      testCases,
       "java",
-      false,
     );
 
     AuditLog.create({
@@ -96,17 +93,17 @@ export async function runCode(req, res) {
       requestId: req.requestId,
     }).catch(() => {});
 
-    const visiblePassedFromCases = (localResult.results || []).filter(
+    const passedFromCases = (localResult.results || []).filter(
       (r) => r.status === "PASSED" || r.status === "ACCEPTED",
     ).length;
-    const visiblePassed = localResult.results?.length
-      ? visiblePassedFromCases
-      : Math.min(visibleTestCases.length, localResult.passed);
-    const visibleFailed = localResult.results?.length
+    const passed = localResult.results?.length
+      ? passedFromCases
+      : Math.min(testCases.length, localResult.passed);
+    const failed = localResult.results?.length
       ? (localResult.results || []).filter(
       (r) => r.status !== "PASSED" && r.status !== "ACCEPTED",
         ).length
-      : Math.min(visibleTestCases.length - visiblePassed, localResult.failed);
+      : Math.min(testCases.length - passed, localResult.failed);
 
     return res.status(200).json({
       status: localResult.status,
@@ -117,8 +114,8 @@ export async function runCode(req, res) {
       error: localResult.error,
       executionTime: localResult.executionTime,
       memoryUsed: localResult.memoryUsed,
-      visiblePassed,
-      visibleFailed,
+      passed,
+      failed,
       results: localResult.results.map((r) => ({
         ...(r.testCaseId ? { testCaseId: r.testCaseId } : {}),
         testCase: r.testCase,
@@ -129,7 +126,6 @@ export async function runCode(req, res) {
         output: r.output,
         expectedOutput: r.expectedOutput,
         error: r.error,
-        isHidden: false,
       })),
     });
   } catch (error) {
@@ -144,7 +140,7 @@ export async function runCode(req, res) {
 /**
  * Submit solution (single, final submission).
  * Only one submission allowed per challenge per user.
- * Runs ALL test cases (including hidden ones).
+ * Runs every configured test case.
  */
 export async function submitCode(req, res) {
   try {
@@ -207,23 +203,17 @@ export async function submitCode(req, res) {
       timeToSolve || 0,
     );
 
-    const testCaseGroups = getChallengeTestCaseGroups(challenge);
-    const allTestCases = [
-      ...testCaseGroups.visible,
-      ...testCaseGroups.hidden,
-    ].map((tc) => ({
+    const testCases = getChallengeTestCases(challenge).map((tc) => ({
       ...(tc._id ? { _id: tc._id } : {}),
       input: tc.input,
       expectedOutput: tc.expectedOutput,
       description: tc.description || "",
-      isHidden: !!tc.isHidden,
     }));
     const executionResult = await executeAgainstChallenge(
       code,
       challenge,
-      allTestCases,
+      testCases,
       "java",
-      true,
     );
 
     const result = await processSubmissionResult(
@@ -231,8 +221,6 @@ export async function submitCode(req, res) {
       executionResult,
     );
 
-    const hiddenCount = testCaseGroups.hidden.length;
-    const publicCount = testCaseGroups.visible.length;
 
     AuditLog.create({
       userId,
@@ -248,52 +236,15 @@ export async function submitCode(req, res) {
       requestId: req.requestId,
     }).catch(() => {});
 
-    const visibleResults = result.results.slice(0, publicCount).map((r) => ({
+    const publicResults = result.results.map((r) => ({
       ...r,
-      isHidden: false,
-    }));
-    const hiddenResults = result.results.slice(publicCount).map((r) => ({
-      testCase: r.testCase,
-      status: r.status,
-      executionTime: r.executionTime,
-      memoryUsed: r.memoryUsed,
-      isHidden: true,
-    }));
 
-    const visiblePassed = visibleResults.length
-      ? visibleResults.filter(
-      (r) => r.status === "PASSED" || r.status === "ACCEPTED",
-        ).length
-      : Math.min(publicCount, result.passed);
-    const visibleFailed = visibleResults.length
-      ? visibleResults.filter(
-      (r) => r.status !== "PASSED" && r.status !== "ACCEPTED",
-        ).length
-      : Math.min(publicCount - visiblePassed, result.failed);
-    const hiddenPassed = hiddenResults.length
-      ? hiddenResults.filter(
-      (r) => r.status === "PASSED" || r.status === "ACCEPTED",
-        ).length
-      : Math.min(hiddenCount, Math.max(0, result.passed - visiblePassed));
-    const hiddenFailed = hiddenResults.length
-      ? hiddenResults.filter(
-      (r) => r.status !== "PASSED" && r.status !== "ACCEPTED",
-        ).length
-      : Math.min(hiddenCount, Math.max(0, result.failed - visibleFailed));
+    }));
 
     return res.status(201).json({
       ...result,
-      output: hiddenCount > 0 ? "" : result.output,
-      results: [...visibleResults, ...hiddenResults],
-      visiblePassed,
-      visibleFailed,
-      hiddenPassed,
-      hiddenFailed,
-      hiddenTestCases: hiddenCount > 0 ? hiddenCount : undefined,
-      message:
-        hiddenCount > 0
-          ? `Solution evaluated. ${result.passed} of ${result.total} tests passed (${hiddenCount} hidden).`
-          : `Solution evaluated. ${result.passed} of ${result.total} tests passed.`,
+      results: publicResults,
+      message: `Solution evaluated. ${result.passed} of ${result.total} tests passed.`,
     });
   } catch (error) {
     const message =
@@ -321,7 +272,6 @@ async function executeAgainstChallenge(
   challenge,
   testCases,
   language,
-  includeHidden,
 ) {
   const normalizedLanguage = (language || "java").toLowerCase();
 

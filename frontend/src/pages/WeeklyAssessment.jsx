@@ -15,7 +15,7 @@ import {
 import api from "../services/api";
 import { getFreshAccessTokenForDesktopSubmission } from "../services/api";
 import {
-  executeVisibleCasesLocally,
+  executeQuestionTestCasesLocally,
   submitDailyChallengeLocally,
 } from "../services/localExecutionService";
 import { runSolution as runOnWeb } from "../services/submissionService";
@@ -279,7 +279,7 @@ export default function WeeklyAssessment() {
     setError("");
     try {
       const result = isDesktop
-        ? await executeVisibleCasesLocally({
+        ? await executeQuestionTestCasesLocally({
             question: assessment.question,
             code,
             language: "java",

@@ -63,8 +63,25 @@ function hashVersion(value) {
   return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
 }
 
+function getRoomQuestionTestCases(question) {
+  const canonical = Array.isArray(question?.testCases) ? question.testCases : [];
+  const cases = canonical.length
+    ? [...canonical, ...(question.hiddenTestCases || [])]
+    : [
+        ...(question.visibleTestCases || []),
+        ...(question.hiddenTestCases || []),
+      ];
+  const seen = new Set();
+  return cases.filter((testCase) => {
+    const key = `${testCase?.input ?? ""}\u0000${testCase?.expectedOutput ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getQuestionExecutionVersions(question) {
-  const visibleTestCases = (question.visibleTestCases || []).map((testCase) => ({
+  const testCases = getRoomQuestionTestCases(question).map((testCase) => ({
     input: testCase.input,
     expectedOutput: testCase.expectedOutput ?? "",
   }));
@@ -74,10 +91,10 @@ function getQuestionExecutionVersions(question) {
       description: question.description,
       signature: question.signature || null,
       points: Number(question.points) || 0,
-      visibleTestCases,
+      testCases,
     }),
-    testSetVersion: hashVersion(visibleTestCases),
-    visibleTestCases,
+    testSetVersion: hashVersion(testCases),
+    testCases,
   };
 }
 
@@ -111,8 +128,7 @@ function isValidLanguage(lang) {
 function buildParticipantSubmissionResponse(
   questionResult,
   currentSubmission,
-  visibleCount,
-  hiddenCount,
+  testCaseCount,
 ) {
   const officialSubmissionFinal =
     currentSubmission.status === "COMPLETED" ||
@@ -122,23 +138,12 @@ function buildParticipantSubmissionResponse(
     (!questionResult.verificationStatus &&
       !["PENDING", "PROCESSING", "ERROR"].includes(questionResult.status));
   const results = verified
-    ? (questionResult.results || []).map(sanitizeParticipantTestResult)
+    ? (questionResult.results || []).map((result) =>
+        sanitizeParticipantTestResult(result),
+      )
     : [];
-  const visibleResults = results.slice(0, visibleCount);
-  const hiddenResults = results.slice(visibleCount);
-  const isPassed = (result) =>
-    result.status === "PASSED" || result.status === "ACCEPTED";
-  const visiblePassed =
-    visibleResults.length > 0
-      ? visibleResults.filter(isPassed).length
-      : Math.min(visibleCount, questionResult.passed || 0);
-  const hiddenPassed =
-    hiddenResults.length > 0
-      ? hiddenResults.filter(isPassed).length
-      : Math.min(
-          hiddenCount,
-          Math.max(0, (questionResult.passed || 0) - visiblePassed),
-        );
+  const passed = Math.min(testCaseCount, questionResult.passed || 0);
+  const failed = testCaseCount - passed;
   return {
     message: verified ? "Solution verified." : "Submission received.",
     submissionId: currentSubmission._id,
@@ -166,11 +171,8 @@ function buildParticipantSubmissionResponse(
         questionResult.status,
         questionResult.error,
       ),
-      visiblePassed: verified ? visiblePassed : null,
-      visibleFailed: verified ? visibleCount - visiblePassed : null,
-      hiddenCount,
-      hiddenPassed: verified ? hiddenPassed : null,
-      hiddenFailed: verified ? hiddenCount - hiddenPassed : null,
+      passed: verified ? passed : null,
+      failed: verified ? failed : null,
       results,
     },
     status: questionResult.status,
@@ -182,8 +184,6 @@ function buildParticipantSubmissionResponse(
     total: questionResult.total,
     executionTime: questionResult.executionTime,
     memoryUsed: questionResult.memoryUsed,
-    hiddenPassed,
-    hiddenFailed: hiddenCount - hiddenPassed,
     totalScore: officialSubmissionFinal ? currentSubmission.totalScore : null,
     totalPassed: officialSubmissionFinal ? currentSubmission.totalPassed : null,
     totalFailed: officialSubmissionFinal ? currentSubmission.totalFailed : null,
@@ -246,7 +246,7 @@ export async function finalizeDesktopLocalSubmission(req, res) {
       });
     }
 
-    const { challengeVersion, testSetVersion, visibleTestCases } =
+    const { challengeVersion, testSetVersion, testCases } =
       getQuestionExecutionVersions(question);
     const sourceHash = transcript.sourceHash;
     const nonceResource =
@@ -280,7 +280,7 @@ export async function finalizeDesktopLocalSubmission(req, res) {
         clientVersion: DESKTOP_CLIENT_VERSION,
         engineVersion: DESKTOP_ENGINE_VERSION,
         testSetVersion,
-        testCount: visibleTestCases.length,
+        testCount: testCases.length,
         allowedClientVersion: DESKTOP_CLIENT_VERSION,
         allowedEngineVersion: DESKTOP_ENGINE_VERSION,
       },
@@ -304,7 +304,6 @@ export async function finalizeDesktopLocalSubmission(req, res) {
       status: result.status,
       executionTime: result.executionTime,
       memoryUsed: result.memoryUsed,
-      isHidden: false,
     }));
     const passed = validation.passed;
     const total = validation.total;
@@ -432,8 +431,7 @@ export async function finalizeDesktopLocalSubmission(req, res) {
       buildParticipantSubmissionResponse(
         result,
         currentSubmission,
-        visibleTestCases.length,
-        0,
+        testCases.length,
       ),
     );
   } catch (error) {
@@ -719,17 +717,13 @@ export async function createRoom(req, res) {
           error: `Question ${i + 1} must have a title and description.`,
         });
       }
-      if (!Array.isArray(q.visibleTestCases) || q.visibleTestCases.length < 3) {
+      const testCases = getRoomQuestionTestCases(q);
+      if (testCases.length === 0 || testCases.length > 50) {
         return res.status(400).json({
-          error: `Question ${i + 1} must have at least three visible test cases.`,
+          error: `Question ${i + 1} must have between one and 50 test cases.`,
         });
       }
-      if (!Array.isArray(q.hiddenTestCases) || q.hiddenTestCases.length === 0) {
-        return res.status(400).json({
-          error: `Question ${i + 1} must have at least one hidden test case.`,
-        });
-      }
-      for (const tc of q.visibleTestCases) {
+      for (const tc of testCases) {
         if (
           !tc ||
           typeof tc.input !== "string" ||
@@ -737,19 +731,7 @@ export async function createRoom(req, res) {
           tc.expectedOutput === null
         ) {
           return res.status(400).json({
-            error: `Question ${i + 1} has invalid visible test case format.`,
-          });
-        }
-      }
-      for (const tc of q.hiddenTestCases) {
-        if (
-          !tc ||
-          typeof tc.input !== "string" ||
-          tc.expectedOutput === undefined ||
-          tc.expectedOutput === null
-        ) {
-          return res.status(400).json({
-            error: `Question ${i + 1} has invalid hidden test case format.`,
+            error: `Question ${i + 1} has invalid test case format.`,
           });
         }
       }
@@ -801,6 +783,12 @@ export async function createRoom(req, res) {
         starterCodeByLanguage = {}; // Fresh starters will be generated on room read
       }
 
+      const testCases = getRoomQuestionTestCases(q).map((tc) => ({
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        description: tc.description || "",
+        parameterValues: tc.parameterValues || null,
+      }));
       processedQuestions.push({
         title: q.title.trim(),
         description: q.description.trim(),
@@ -817,17 +805,7 @@ export async function createRoom(req, res) {
           starterCodeByLanguage["java"] ||
           "",
         starterCodeByLanguage, // Will be populated on read with fresh starters
-        visibleTestCases: q.visibleTestCases.map((tc) => ({
-          input: tc.input,
-          expectedOutput: tc.expectedOutput,
-          description: tc.description || "",
-          parameterValues: tc.parameterValues || null,
-        })),
-        hiddenTestCases: q.hiddenTestCases.map((tc) => ({
-          input: tc.input,
-          expectedOutput: tc.expectedOutput,
-          parameterValues: tc.parameterValues || null,
-        })),
+        testCases,
         points: q.points || 100,
         problemType: q.problemType || "array",
         functionSignature: q.functionSignature || "",
@@ -1059,7 +1037,7 @@ export async function startRoom(req, res) {
           score: 0,
           passed: 0,
           failed: 0,
-          total: q.visibleTestCases.length + q.hiddenTestCases.length,
+          total: getRoomQuestionTestCases(q).length,
         })),
         totalQuestions: room.questions.length,
         status: "PENDING",
@@ -1179,22 +1157,21 @@ export async function updateRoom(req, res) {
     const processedQuestions = [];
     for (let index = 0; index < questions.length; index += 1) {
       const question = questions[index];
+      const testCases = getRoomQuestionTestCases(question);
       if (
         !question ||
         typeof question.title !== "string" ||
         !question.title.trim() ||
         typeof question.description !== "string" ||
         !question.description.trim() ||
-        !Array.isArray(question.visibleTestCases) ||
-        question.visibleTestCases.length < 3 ||
-        !Array.isArray(question.hiddenTestCases) ||
-        question.hiddenTestCases.length < 1
+        testCases.length === 0 ||
+        testCases.length > 50
       ) {
         return res.status(400).json({
-          error: `Question ${index + 1} needs a title, description, at least three visible cases, and one hidden case.`,
+          error: `Question ${index + 1} needs a title, description, and between one and 50 test cases.`,
         });
       }
-      for (const testCase of [...question.visibleTestCases, ...question.hiddenTestCases]) {
+      for (const testCase of testCases) {
         if (
           !testCase ||
           typeof testCase.input !== "string" ||
@@ -1219,6 +1196,12 @@ export async function updateRoom(req, res) {
         functionName = signature.name;
         starterCodeByLanguage = {};
       }
+      const normalizedTestCases = testCases.map((testCase) => ({
+        input: testCase.input,
+        expectedOutput: testCase.expectedOutput,
+        description: testCase.description || "",
+        parameterValues: testCase.parameterValues || null,
+      }));
       processedQuestions.push({
         title: question.title.trim(),
         description: question.description.trim(),
@@ -1232,17 +1215,7 @@ export async function updateRoom(req, res) {
         signature,
         starterCode: question.starterCode || starterCodeByLanguage.java || "",
         starterCodeByLanguage,
-        visibleTestCases: question.visibleTestCases.map((testCase) => ({
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          description: testCase.description || "",
-          parameterValues: testCase.parameterValues || null,
-        })),
-        hiddenTestCases: question.hiddenTestCases.map((testCase) => ({
-          input: testCase.input,
-          expectedOutput: testCase.expectedOutput,
-          parameterValues: testCase.parameterValues || null,
-        })),
+        testCases: normalizedTestCases,
         points: question.points || 100,
         problemType: question.problemType || "array",
         functionSignature: question.functionSignature || "",
@@ -1633,16 +1606,7 @@ export async function getRoomByCode(req, res) {
       isParticipant,
       questionsVisible: isCreator || windowState.state === ROOM_WINDOW_STATE.ACTIVE,
       roomKey: isCreator ? room.roomCode : undefined,
-      userSubmission: userSubmission
-        ? userSubmission.toPublicJSON({
-            visibleTestCaseCounts: Object.fromEntries(
-              room.questions.map((question) => [
-                String(question._id),
-                question.visibleTestCases.length,
-              ]),
-            ),
-          })
-        : null,
+      userSubmission: userSubmission ? userSubmission.toPublicJSON() : null,
       timeRemaining: room.endTime
         ? Math.max(0, Math.floor((room.endTime - new Date()) / 1000))
         : null,
@@ -1770,7 +1734,7 @@ export async function joinRoom(req, res) {
           score: 0,
           passed: 0,
           failed: 0,
-          total: q.visibleTestCases.length + q.hiddenTestCases.length,
+          total: getRoomQuestionTestCases(q).length,
         })),
         totalQuestions: room.questions.length,
         status: "PENDING",
@@ -1904,20 +1868,15 @@ export async function prepareDesktopSubmission(req, res) {
       });
     }
 
-    const { challengeVersion, testSetVersion, visibleTestCases } =
+    const { challengeVersion, testSetVersion, testCases } =
       getQuestionExecutionVersions(question);
-    const hiddenTestCases = (question.hiddenTestCases || []).map((testCase) => ({
-      input: testCase.input,
-      expectedOutput: testCase.expectedOutput ?? "",
-    }));
-    const allTestCases = [...visibleTestCases, ...hiddenTestCases];
-    if (visibleTestCases.length === 0 || allTestCases.length > 50) {
+    if (testCases.length === 0 || testCases.length > 50) {
       return res.status(400).json({
-        error: "Desktop execution requires at least one visible case and no more than 50 total cases.",
+        error: "Execution requires at least one and no more than 50 test cases.",
       });
     }
     let caseDataCharacters = 0;
-    for (const testCase of allTestCases) {
+    for (const testCase of testCases) {
       if (
         typeof testCase.input !== "string" ||
         testCase.input.length > 5_000 ||
@@ -1984,7 +1943,7 @@ export async function prepareDesktopSubmission(req, res) {
       clientVersion,
       engineVersion,
       executionProtocolVersion: LOCAL_EXECUTION_PROTOCOL_VERSION,
-      testCount: visibleTestCases.length,
+      testCount: testCases.length,
       expiresAt: grant?.authorizationExpiresAt || null,
     });
   } catch (error) {
@@ -1997,7 +1956,7 @@ export async function prepareDesktopSubmission(req, res) {
  * STATELESS RUN
  * POST /api/battle-rooms/:roomCode/run
  * - Read-only wrt the database (uses .lean() everywhere).
- * - Fetches visible test cases, calls the engine, returns results.
+ * - Fetches the question's test cases, calls the engine, returns results.
  * - Persists NOTHING.
  */
 export async function runQuestionSolution(req, res) {
@@ -2079,7 +2038,7 @@ export async function runQuestionSolution(req, res) {
         .json({ error: "Question not found in this room." });
     }
 
-    const visibleTestCases = (question.visibleTestCases || [])
+    const testCases = getRoomQuestionTestCases(question)
       .filter((tc) => tc.input !== undefined && tc.input !== null)
       .map((tc) => ({
         ...(tc._id ? { _id: tc._id } : {}),
@@ -2088,10 +2047,10 @@ export async function runQuestionSolution(req, res) {
         description: tc.description || "",
       }));
 
-    if (visibleTestCases.length === 0) {
+    if (testCases.length === 0) {
       return res
         .status(400)
-        .json({ error: "No visible test cases available for this question." });
+        .json({ error: "No test cases are available for this question." });
     }
 
     let executionResult;
@@ -2100,12 +2059,12 @@ export async function runQuestionSolution(req, res) {
         question,
         code,
         lang,
-        visibleTestCases,
+        testCases,
       );
     } else {
       executionResult = await executionService.execute(
         code,
-        visibleTestCases,
+        testCases,
         lang,
         {
           timeLimit: 5000,
@@ -2126,37 +2085,34 @@ export async function runQuestionSolution(req, res) {
     const runResults = (executionResult.results || []).map((r, index) => ({
       ...(r.testCaseId ? { testCaseId: r.testCaseId } : {}),
       testCase: r.testCase ?? index + 1,
-      input: r.input ?? visibleTestCases[index]?.input ?? "",
+      input: r.input ?? testCases[index]?.input ?? "",
       status: r.status,
       executionTime: r.executionTime ?? 0,
       memoryUsed: r.memoryUsed ?? 0,
       output: r.output ?? "",
       expectedOutput: r.expectedOutput ?? "",
       error: r.error ?? "",
-      isHidden: false,
     }));
-    const visiblePassed = runResults.length
+    const passed = runResults.length
       ? runResults.filter(
       (r) => r.status === "PASSED" || r.status === "ACCEPTED",
         ).length
-      : Math.min(visibleTestCases.length, executionResult.passed || 0);
-    const visibleFailed = runResults.length
+      : Math.min(testCases.length, executionResult.passed || 0);
+    const failed = runResults.length
       ? runResults.filter(
       (r) => r.status !== "PASSED" && r.status !== "ACCEPTED",
         ).length
-      : Math.min(visibleTestCases.length - visiblePassed, executionResult.failed || 0);
+      : Math.min(testCases.length - passed, executionResult.failed || 0);
 
     return res.status(200).json({
       status: executionResult.status,
-      passed: executionResult.passed || 0,
-      failed: executionResult.failed || 0,
-      total: executionResult.total || visibleTestCases.length,
+      passed,
+      failed,
+      total: executionResult.total || testCases.length,
       output: executionResult.output ?? "",
       error: executionResult.error ?? "",
       executionTime: executionResult.executionTime ?? 0,
       memoryUsed: executionResult.memoryUsed ?? 0,
-      visiblePassed,
-      visibleFailed,
       results: runResults,
     });
   } catch (error) {
@@ -2293,8 +2249,7 @@ export async function submitQuestionSolution(req, res) {
         buildParticipantSubmissionResponse(
           existingQuestionResult,
           submission,
-          question.visibleTestCases.length,
-          question.hiddenTestCases.length,
+          getRoomQuestionTestCases(question).length,
         ),
       );
     }
@@ -2307,24 +2262,15 @@ export async function submitQuestionSolution(req, res) {
 
     const timeToSolve = Math.floor((new Date() - submission.startTime) / 1000);
 
-    const visibleTestCases = (question.visibleTestCases || []).map((tc) => ({
+    const testCases = getRoomQuestionTestCases(question).map((tc) => ({
       ...(tc._id ? { _id: tc._id } : {}),
       input: tc.input,
       expectedOutput: tc.expectedOutput ?? "",
     }));
-    const hiddenTestCases = (question.hiddenTestCases || []).map((tc) => ({
-      ...(tc._id ? { _id: tc._id } : {}),
-      input: tc.input,
-      expectedOutput: tc.expectedOutput ?? "",
-    }));
-    const allTestCases = [
-      ...visibleTestCases,
-      ...hiddenTestCases,
-    ];
     if (
-      allTestCases.length === 0 ||
-      allTestCases.length > 50 ||
-      allTestCases.some(
+      testCases.length === 0 ||
+      testCases.length > 50 ||
+      testCases.some(
         (testCase) =>
           typeof testCase.input !== "string" ||
           testCase.input.length > 5_000 ||
@@ -2371,8 +2317,7 @@ export async function submitQuestionSolution(req, res) {
             buildParticipantSubmissionResponse(
               existingQuestionResult,
               submission,
-              question.visibleTestCases.length,
-              question.hiddenTestCases.length,
+              testCases.length,
             ),
           );
         }
@@ -2438,8 +2383,7 @@ export async function submitQuestionSolution(req, res) {
             buildParticipantSubmissionResponse(
               persistedQuestionResult,
               currentSubmission,
-              visibleTestCases.length,
-              hiddenTestCases.length,
+              testCases.length,
             ),
           );
       }
@@ -2483,9 +2427,7 @@ export async function submitQuestionSolution(req, res) {
       });
     }
 
-    const visibleCount = question.visibleTestCases.length;
-    const hiddenCount = question.hiddenTestCases.length;
-    const totalCount = visibleCount + hiddenCount;
+    const totalCount = testCases.length;
     const previousQuestionResult = submission.questionResults[qrIndex];
     const submittedAt = new Date();
     const qr = {
@@ -2504,11 +2446,10 @@ export async function submitQuestionSolution(req, res) {
       verificationLeaseId: null,
       verificationAttempts: 0,
       verificationError: "",
-      verificationTestCases: allTestCases.map((testCase, index) => ({
+      verificationTestCases: testCases.map((testCase, index) => ({
         testCaseId: testCase._id ? String(testCase._id) : "",
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
-        isHidden: index >= visibleCount,
       })),
       verificationSignature: question.signature || null,
       verificationPoints: Number(question.points) || 0,
@@ -2577,8 +2518,7 @@ export async function submitQuestionSolution(req, res) {
           buildParticipantSubmissionResponse(
             currentQuestionResult,
             current,
-            visibleCount,
-            hiddenCount,
+            testCases.length,
           ),
         );
       }
@@ -2620,8 +2560,7 @@ export async function submitQuestionSolution(req, res) {
       buildParticipantSubmissionResponse(
         qr,
         currentSubmission,
-        visibleCount,
-        hiddenCount,
+        testCases.length,
       ),
     );
   } catch (error) {
@@ -2696,7 +2635,7 @@ export async function disqualifyRoomSubmission(req, res) {
           score: 0,
           passed: 0,
           failed: 0,
-          total: q.visibleTestCases.length + q.hiddenTestCases.length,
+          total: getRoomQuestionTestCases(q).length,
         })),
         totalQuestions: room.questions.length,
         status: "PENDING",
@@ -2976,13 +2915,6 @@ export async function getUserResult(req, res) {
       rankedSubmissions.findIndex(
         (s) => s.userId.toString() === userId.toString(),
       );
-    const visibleTestCaseCounts = Object.fromEntries(
-      room.questions.map((question) => [
-        question._id.toString(),
-        (question.visibleTestCases || []).length,
-      ]),
-    );
-
     return res.status(200).json({
       room: {
         title: room.title,
@@ -2994,7 +2926,7 @@ export async function getUserResult(req, res) {
         timeLimitUnit: room.timeLimitUnit,
         questionCount: room.questions.length,
       },
-      submission: submission.toPublicJSON({ visibleTestCaseCounts }),
+      submission: submission.toPublicJSON(),
       rank: rank < 0 ? null : rank + 1,
       totalParticipants: rankedSubmissions.length,
     });

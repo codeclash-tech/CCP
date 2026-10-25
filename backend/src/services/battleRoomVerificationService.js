@@ -211,7 +211,6 @@ async function saveVerificationResult(job, result, error = null) {
   }
 
   const testCases = questionResult.verificationTestCases || [];
-  const visibleCount = testCases.filter((testCase) => !testCase.isHidden).length;
   const normalizedResults = (result.results || []).map((item, index) =>
     sanitizeParticipantTestResult({
       ...(item.testCaseId ? { testCaseId: item.testCaseId } : {}),
@@ -221,12 +220,8 @@ async function saveVerificationResult(job, result, error = null) {
       executionTime: item.executionTime ?? 0,
       memoryUsed: item.memoryUsed ?? 0,
       output: item.output ?? "",
-      expectedOutput:
-        index < visibleCount
-          ? item.expectedOutput ?? testCases[index]?.expectedOutput ?? ""
-          : "",
+      expectedOutput: item.expectedOutput ?? testCases[index]?.expectedOutput ?? "",
       error: item.error ?? "",
-      isHidden: index >= visibleCount,
     }),
   );
   const passed = normalizedResults.filter((item) =>
@@ -248,7 +243,6 @@ async function saveVerificationResult(job, result, error = null) {
     executionTime: Number(result.executionTime) || 0,
     memoryUsed: Number(result.memoryUsed) || 0,
     output: normalizedResults
-      .slice(0, visibleCount)
       .map((item) => item.output || "")
       .join("\n"),
     error: sanitizeParticipantExecutionError(result.status, result.error),

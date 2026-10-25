@@ -12,7 +12,7 @@ import WeeklyCycle from "../models/WeeklyCycle.js";
 import WeeklyRosterEntry from "../models/WeeklyRosterEntry.js";
 import WeeklySubmission from "../models/WeeklySubmission.js";
 import Nonce from "../models/Nonce.js";
-import { getChallengeTestCaseGroups } from "./challengeTestCases.js";
+import { getChallengeTestCases } from "./challengeTestCases.js";
 import { convertParameterValuesToInput } from "./parameterConverter.js";
 import { executionService } from "./executionService.js";
 import { composeProgram } from "./wrapperGenerator.js";
@@ -234,7 +234,7 @@ function dailyBoundsFromKey(cycleKey) {
 }
 
 export function createQuestionAssignment(challenge, dayIndex) {
-  const { visible, hidden } = getChallengeTestCaseGroups(challenge);
+  const testCases = getChallengeTestCases(challenge);
   const source = challenge.toObject ? challenge.toObject() : challenge;
   const toPlainMap = (value) => value instanceof Map
     ? Object.fromEntries(value)
@@ -257,9 +257,7 @@ export function createQuestionAssignment(challenge, dayIndex) {
       starterCodes: challenge.signature?.name
         ? generateStarterCodeForChallenge(challenge)
         : toPlainMap(source.starterCodes),
-      visibleTestCases: visible,
-      hiddenTestCases: hidden,
-      testCases: visible,
+      testCases,
     },
   };
 }
@@ -273,8 +271,9 @@ export function resolveDailyQuestion(assignment) {
     throw requestError("The assigned daily question snapshot is incomplete.", 503);
   }
   question.id = String(assignment.challengeId);
+  question.testCases = getChallengeTestCases(question);
+  delete question.visibleTestCases;
   delete question.hiddenTestCases;
-  delete question.testCases;
   return question;
 }
 
@@ -875,8 +874,7 @@ function hashVersion(value) {
 function weeklyLocalExecutionVersions(cycle, assignment) {
   const question = assignment?.questionSnapshot;
   if (!question) throw requestError("The assigned daily question is unavailable.", 503);
-  const { visible } = getChallengeTestCaseGroups(question);
-  const visibleTestCases = visible.map((testCase) => ({
+  const testCases = getChallengeTestCases(question).map((testCase) => ({
     input: String(
       testCase.parameterValues &&
         typeof testCase.parameterValues === "object" &&
@@ -887,8 +885,8 @@ function weeklyLocalExecutionVersions(cycle, assignment) {
     expectedOutput: String(testCase.expectedOutput ?? ""),
   }));
   return {
-    visibleTestCases,
-    testSetVersion: hashVersion(visibleTestCases),
+    testCases,
+    testSetVersion: hashVersion(testCases),
     challengeVersion: hashVersion({
       cycleId: String(cycle._id),
       challengeId: String(assignment.challengeId),
@@ -897,7 +895,7 @@ function weeklyLocalExecutionVersions(cycle, assignment) {
       description: question.description || "",
       signature: question.signature || null,
       points: Number(question.points) || 0,
-      testSetVersion: hashVersion(visibleTestCases),
+      testSetVersion: hashVersion(testCases),
     }),
   };
 }
@@ -1003,10 +1001,10 @@ export async function createWeeklyLocalExecutionGrant({
   }
   const versions = weeklyLocalExecutionVersions(cycle, assignment);
   if (
-    versions.visibleTestCases.length === 0 ||
-    versions.visibleTestCases.length > 50
+    versions.testCases.length === 0 ||
+    versions.testCases.length > 50
   ) {
-    throw requestError("The assigned question has an invalid visible test set.", 503);
+    throw requestError("The assigned question has an invalid test-case set.", 503);
   }
 
   const existingSubmission = await WeeklySubmission.findOne({
@@ -1099,7 +1097,7 @@ export async function createWeeklyLocalExecutionGrant({
     clientVersion,
     engineVersion,
     executionProtocolVersion: LOCAL_EXECUTION_PROTOCOL_VERSION,
-    testCount: versions.visibleTestCases.length,
+    testCount: versions.testCases.length,
     expiresAt: savedGrant?.authorizationExpiresAt || null,
   };
 }
@@ -1133,7 +1131,7 @@ export async function finalizeWeeklyLocalExecution({
       clientVersion: DESKTOP_CLIENT_VERSION,
       engineVersion: DESKTOP_ENGINE_VERSION,
       testSetVersion: versions.testSetVersion,
-      testCount: versions.visibleTestCases.length,
+      testCount: versions.testCases.length,
       allowedClientVersion: DESKTOP_CLIENT_VERSION,
       allowedEngineVersion: DESKTOP_ENGINE_VERSION,
     },
@@ -1303,8 +1301,7 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
   );
   const challenge = assignment?.questionSnapshot;
   if (!challenge) throw requestError("The assigned daily question is unavailable.", 503);
-  const { visible, hidden } = getChallengeTestCaseGroups(challenge);
-  const cases = [...visible, ...hidden];
+  const cases = getChallengeTestCases(challenge);
   if (!cases.length || cases.length > 50) {
     await WeeklySubmission.updateOne(
       {

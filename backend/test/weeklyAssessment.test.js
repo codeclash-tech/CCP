@@ -159,7 +159,7 @@ test("daily global challenge queue consumes questions once in FIFO order and nev
   });
 });
 
-test("participant question resolution returns the assigned snapshot and excludes hidden tests", () => {
+test("participant question resolution returns one test case list from legacy snapshots", () => {
   const question = resolveDailyQuestion({
     challengeId: "507f1f77bcf86cd799439011",
     questionSnapshot: {
@@ -172,7 +172,6 @@ test("participant question resolution returns the assigned snapshot and excludes
       starterCodes: { java: "class Solution {}" },
       visibleTestCases: [{ input: "2 7 9", expectedOutput: "0 1" }],
       hiddenTestCases: [{ input: "hidden", expectedOutput: "hidden" }],
-      testCases: [{ input: "hidden", expectedOutput: "hidden" }],
     },
   });
 
@@ -182,9 +181,12 @@ test("participant question resolution returns the assigned snapshot and excludes
   assert.equal(question.constraints, "2 <= nums.length <= 10^4");
   assert.equal(question.examples.length, 1);
   assert.equal(question.starterCodes.java, "class Solution {}");
-  assert.equal(question.visibleTestCases.length, 1);
+  assert.deepEqual(
+    question.testCases.map((testCase) => testCase.input),
+    ["2 7 9", "hidden"],
+  );
+  assert.equal("visibleTestCases" in question, false);
   assert.equal("hiddenTestCases" in question, false);
-  assert.equal("testCases" in question, false);
 });
 
 test("participant question resolution rejects missing or incomplete cycle snapshots", () => {

@@ -6,7 +6,6 @@ import {
 } from "../services/submissionService.js";
 import Challenge from "../models/Challenge.js";
 import Submission from "../models/Submission.js";
-import { getChallengeTestCaseGroups } from "../services/challengeTestCases.js";
 
 export async function submitSolution(req, res) {
   try {
@@ -97,26 +96,13 @@ export async function getSubmissionResult(req, res) {
       return res.status(404).json({ error: "No submission found for this challenge." });
     }
 
-    const challenge = await Challenge.findById(challengeId).select(
-      "visibleTestCases testCases",
-    );
-    const { visible, hidden } = getChallengeTestCaseGroups(challenge);
-    const visibleCount = visible.length;
     const publicResult = submission.toPublicJSON({
       includeTestCaseDetails: true,
     });
-    if (hidden.length > 0) publicResult.output = "";
-    publicResult.results = publicResult.results.map((result, index) =>
-      index < visibleCount
-        ? { ...result, isHidden: false }
-        : {
-            testCase: result.testCase,
-            status: result.status,
-            executionTime: result.executionTime,
-            memoryUsed: result.memoryUsed,
-            isHidden: true,
-          },
-    );
+    publicResult.results = publicResult.results.map((result) => {
+      const { isHidden: _legacyHiddenFlag, ...testResult } = result;
+      return testResult;
+    });
 
     return res.status(200).json(publicResult);
   } catch (error) {

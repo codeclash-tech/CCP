@@ -17,10 +17,6 @@ const testCaseSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    isHidden: {
-      type: Boolean,
-      default: false,
-    },
     description: {
       type: String,
       default: "",
@@ -123,6 +119,30 @@ const challengeSchema = new mongoose.Schema(
 
 challengeSchema.index({ activeDate: -1, isActive: 1 });
 
+function challengeCases(challenge) {
+  const cases = challenge.testCases?.length
+    ? [
+        ...challenge.testCases,
+        ...(challenge.hiddenTestCases || []),
+      ]
+    : [
+        ...(challenge.visibleTestCases || []),
+        ...(challenge.hiddenTestCases || []),
+      ];
+  const seen = new Set();
+  return cases.filter((testCase) => {
+    const key = `${testCase.input ?? ""}\u0000${testCase.expectedOutput ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map(({ input, expectedOutput, description, parameterValues }) => ({
+    input,
+    expectedOutput,
+    ...(description ? { description } : {}),
+    ...(parameterValues ? { parameterValues } : {}),
+  }));
+}
+
 challengeSchema.methods.toAdminJSON = function () {
   return {
     id: this._id,
@@ -137,13 +157,7 @@ challengeSchema.methods.toAdminJSON = function () {
     functionSignatures: toPlainObjectMap(this.functionSignatures),
     starterCodes: toPlainObjectMap(this.starterCodes),
     referenceSolutions: toPlainObjectMap(this.referenceSolutions),
-    visibleTestCases: this.visibleTestCases?.length
-      ? this.visibleTestCases
-      : this.testCases || [],
-    hiddenTestCases: this.hiddenTestCases || [],
-    testCases: this.testCases?.length
-      ? this.testCases
-      : this.visibleTestCases || [],
+    testCases: challengeCases(this),
     activeDate: this.activeDate,
     isActive: this.isActive,
     totalSubmissions: this.totalSubmissions,
@@ -164,11 +178,7 @@ challengeSchema.methods.toUserJSON = function () {
     signature: this.signature,
     functionSignatures: toPlainObjectMap(this.functionSignatures),
     starterCodes: toPlainObjectMap(this.starterCodes),
-    visibleTestCases: (
-      this.visibleTestCases?.length
-        ? this.visibleTestCases
-        : this.testCases || []
-    ).filter((testCase) => !testCase.isHidden),
+    testCases: challengeCases(this),
     activeDate: this.activeDate,
     totalSubmissions: this.totalSubmissions,
     totalAccepted: this.totalAccepted,

@@ -2,6 +2,7 @@ import { parseSignature, validateSignature, getStoredSignature } from './signatu
 import { composeProgram } from './wrapperGenerator.js';
 import { executionService } from './executionService.js';
 import { generateStarterCode, composeStarterFile } from './languageTemplates.js';
+import { getChallengeTestCases } from './challengeTestCases.js';
 
 const CATEGORY_VALUES = [
   'Array', 'String', 'Matrix', 'Linked List', 'Binary Tree', 'Graph', 'Stack', 'Queue', 'Heap', 'HashMap', 'Sorting', 'Searching', 'Dynamic Programming', 'Greedy', 'Backtracking', 'Bit Manipulation', 'Math', 'Custom'
@@ -31,7 +32,6 @@ function normalizeTestCases(testCases) {
       input: String(tc.input || '').trim(),
       expectedOutput: String(tc.expectedOutput || '').trim(),
       description: tc.description || '',
-      isHidden: Boolean(tc.isHidden),
     }));
 }
 
@@ -68,11 +68,16 @@ export function normalizeChallengePayload(payload) {
     referenceSolutions: javaReferenceSolution
       ? { java: String(javaReferenceSolution) }
       : {},
-    visibleTestCases: normalizeTestCases(source.visibleTestCases || source.testCases || []),
-    hiddenTestCases: normalizeTestCases(source.hiddenTestCases || []),
+    testCases: normalizeTestCases(
+      getChallengeTestCases(source).length > 0
+        ? getChallengeTestCases(source)
+        : [
+            ...(source.visibleTestCases || []),
+            ...(source.hiddenTestCases || []),
+          ],
+    ),
     createdBy: source.createdBy || null,
   };
-
   // Parse and store structured signature metadata from the first available signature.
   const sigEntries = Object.entries(normalized.functionSignatures);
   if (sigEntries.length > 0) {
@@ -101,15 +106,15 @@ export function validateChallengePayload(challenge) {
   if (!payload.difficulty) errors.push('Difficulty is required.');
   if (!payload.category) errors.push('Category is required.');
 
-  if (!payload.visibleTestCases || payload.visibleTestCases.length === 0) {
-    errors.push('At least one visible test case is required.');
+  if (!payload.testCases || payload.testCases.length === 0) {
+    errors.push('At least one test case is required.');
   }
   const sampleCases = [
     ...(payload.examples || []).map((example) => ({
       input: example.input,
       output: example.output,
     })),
-    ...(payload.visibleTestCases || []).map((testCase) => ({
+    ...(payload.testCases || []).map((testCase) => ({
       input: testCase.input,
       output: testCase.expectedOutput,
     })),
@@ -121,9 +126,6 @@ export function validateChallengePayload(challenge) {
   );
   if (uniqueSampleCases.size < 3) {
     errors.push('At least three distinct sample test cases are required.');
-  }
-  if (!payload.hiddenTestCases || payload.hiddenTestCases.length === 0) {
-    errors.push('At least one hidden test case is required.');
   }
 
   const signatureEntries = Object.entries(payload.functionSignatures || {});
@@ -158,7 +160,7 @@ export async function previewChallengeExecution(challenge) {
 
   // Use stored structured signature if available, otherwise parse the raw string.
   const parsed = payload.signature?.name ? getStoredSignature(payload.signature) : parseSignature(signature);
-  const testCases = [...(payload.visibleTestCases || []), ...(payload.hiddenTestCases || [])];
+  const testCases = payload.testCases || [];
   const program = composeProgram({ signature: parsed }, refSolution, "java", { isFullProgram: true, forReferenceSolution: true });
   const result = await executionService.execute(program, testCases, "java", { timeLimit: 2000, memoryLimit: 65536 });
   return result;

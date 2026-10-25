@@ -267,26 +267,23 @@ export function normalizeQuestion(rawQuestion) {
   }
 
   // Bulk inputs -> test cases (legacy flow).
-  const visibleBulk = splitBulkTestCases(q.bulkVisibleTestCases || q.visibleBulkInputs || "");
-  const hiddenBulk = splitBulkTestCases(q.bulkHiddenTestCases || q.hiddenBulkInputs || "");
+  const legacyCases = [
+    ...(Array.isArray(q.visibleTestCases) ? q.visibleTestCases : []),
+    ...(Array.isArray(q.hiddenTestCases) ? q.hiddenTestCases : []),
+  ];
+  const sourceCases = Array.isArray(q.testCases) && q.testCases.length > 0
+    ? q.testCases
+    : legacyCases.length
+      ? legacyCases
+      : [
+          ...splitBulkTestCases(q.bulkVisibleTestCases || q.visibleBulkInputs || ""),
+          ...splitBulkTestCases(q.bulkHiddenTestCases || q.hiddenBulkInputs || ""),
+        ].map((input) => ({ input, expectedOutput: "", description: "" }));
+  const testCases = deduplicateTestCases(
+    normalizeTestCases(sourceCases, resolved.signature),
+  );
 
-  // Test cases: parameter-based first, else legacy raw inputs.
-  let visibleSource = Array.isArray(q.visibleTestCases) && q.visibleTestCases.length > 0
-    ? q.visibleTestCases
-    : visibleBulk.map((input) => ({ input, expectedOutput: "", description: "" }));
-
-  let hiddenSource = Array.isArray(q.hiddenTestCases) && q.hiddenTestCases.length > 0
-    ? q.hiddenTestCases
-    : hiddenBulk.map((input) => ({ input, expectedOutput: "" }));
-
-  let visibleTestCases = normalizeTestCases(visibleSource, resolved.signature);
-  let hiddenTestCases = normalizeTestCases(hiddenSource, resolved.signature);
-
-  visibleTestCases = deduplicateTestCases(visibleTestCases);
-  hiddenTestCases = deduplicateTestCases(hiddenTestCases);
-
-  normalized.visibleTestCases = visibleTestCases;
-  normalized.hiddenTestCases = hiddenTestCases;
+  normalized.testCases = testCases;
 
   normalized.referenceSolution = q.referenceSolution || "";
   normalized.referenceSolutionLanguage = q.referenceSolutionLanguage || "java";
@@ -317,7 +314,7 @@ export function generateJavaStarterCode(question) {
 }
 
 /**
- * Generate expected outputs for all visible + hidden test cases using the
+ * Generate expected outputs for all test cases using the
  * reference solution. Mutates and returns the question object.
  * On failure the reference solution service throws with the message:
  * "Reference solution failed. Fix the solution before publishing."
@@ -335,13 +332,7 @@ export async function generateExpectedOutputsForQuestion(question) {
   ) {
     throw new Error("Only Java reference solutions are supported.");
   }
-  // Execute visible and hidden cases together so authoring makes one engine
-  // request instead of paying the remote engine's startup latency twice.
-  const visibleCount = question.visibleTestCases.length;
-  const allTestCases = [
-    ...question.visibleTestCases,
-    ...question.hiddenTestCases,
-  ];
+  const allTestCases = question.testCases || [];
   const generated = await generateExpectedOutputs(
     question,
     question.referenceSolution,
@@ -349,8 +340,7 @@ export async function generateExpectedOutputsForQuestion(question) {
     allTestCases
   );
 
-  question.visibleTestCases = generated.slice(0, visibleCount);
-  question.hiddenTestCases = generated.slice(visibleCount);
+  question.testCases = generated;
   question.expectedOutputSource = "reference";
   return question;
 }
@@ -403,36 +393,22 @@ export function validateQuestion(question) {
   // Parameter-based test cases: validate the parameter values are complete
   // and well-formed for the declared signature.
   if (question.signature && question.signature.name) {
-    const visibleParamErrors = validateParameterTestCases(question.signature, question.visibleTestCases);
-    const hiddenParamErrors = validateParameterTestCases(question.signature, question.hiddenTestCases);
-    errors.push(...visibleParamErrors, ...hiddenParamErrors);
+    errors.push(...validateParameterTestCases(question.signature, question.testCases));
   }
 
-  if (!question.visibleTestCases || question.visibleTestCases.length === 0) {
-    errors.push("At least one visible example/test case is required.");
+  if (!question.testCases || question.testCases.length === 0) {
+    errors.push("At least one test case is required.");
   } else {
-    const withMissingInput = question.visibleTestCases.filter((tc) => !tc.input || String(tc.input).trim() === "" || Object.keys(tc.parameterValues || {}).length === 0);
-    if (withMissingInput.length > 0) errors.push("Some visible test cases are missing parameter values.");
-  }
-  if (!question.hiddenTestCases || question.hiddenTestCases.length === 0) {
-    errors.push("At least one hidden test case is required.");
-  } else {
-    const withMissingInput = question.hiddenTestCases.filter((tc) => !tc.input || String(tc.input).trim() === "" || Object.keys(tc.parameterValues || {}).length === 0);
-    if (withMissingInput.length > 0) errors.push("Some hidden test cases are missing parameter values.");
+    const withMissingInput = question.testCases.filter((tc) => !tc.input || String(tc.input).trim() === "" || Object.keys(tc.parameterValues || {}).length === 0);
+    if (withMissingInput.length > 0) errors.push("Some test cases are missing input values.");
   }
 
-  const missing = [
-    ...(question.visibleTestCases || []),
-    ...(question.hiddenTestCases || []),
-  ].filter((tc) => tc.expectedOutput === undefined || tc.expectedOutput === null || String(tc.expectedOutput).trim() === "");
+  const missing = (question.testCases || []).filter((tc) => tc.expectedOutput === undefined || tc.expectedOutput === null || String(tc.expectedOutput).trim() === "");
   if (missing.length > 0) {
     errors.push("Expected outputs are missing for " + missing.length + " test case(s). Re-run reference solution generation.");
   }
 
-  const allInputs = [
-    ...(question.visibleTestCases || []),
-    ...(question.hiddenTestCases || []),
-  ].map((tc) => String(tc.input || "").trim());
+  const allInputs = (question.testCases || []).map((tc) => String(tc.input || "").trim());
   const uniqueInputs = new Set(allInputs);
   if (uniqueInputs.size !== allInputs.length) {
     errors.push("Duplicate test case inputs detected. Remove duplicates before publishing.");

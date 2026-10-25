@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Split, PlusCircle, X, ListOrdered, Eye, EyeOff } from "lucide-react";
+import { Split, PlusCircle, X, ListOrdered } from "lucide-react";
 import { TEST_CASE_SEPARATOR } from "../../../utils/constants";
 
 const inputStyle = {
@@ -49,7 +49,6 @@ export default function BulkTestCaseEditor({
   cases,
   onChange,
   onSplitPreview,
-  hidden = false,
   placeholder = `[2,7,11,15]\n9\n${TEST_CASE_SEPARATOR}\n[3,2,4]\n6\n${TEST_CASE_SEPARATOR}\n[3,3]\n6`,
 }) {
   const [bulkText, setBulkText] = useState("");
@@ -99,13 +98,8 @@ export default function BulkTestCaseEditor({
   return (
     <div style={{ border: "1px solid var(--border-color)", borderRadius: 10, padding: 16, background: "var(--bg-card)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        {hidden ? (
-          <EyeOff size={14} color="var(--color-warning)" />
-        ) : (
-          <Eye size={14} color="var(--color-success)" />
-        )}
         <span style={{ color: "var(--text-primary)", fontSize: 13, fontFamily: "var(--font-ui)", fontWeight: 600 }}>
-          {hidden ? "Hidden Test Cases" : "Visible Test Cases"}
+          Test Cases
         </span>
         <span style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-ui)", marginLeft: "auto" }}>
           {cases?.length || 0} case(s)

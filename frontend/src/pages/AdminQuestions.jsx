@@ -26,8 +26,7 @@ const EMPTY_QUESTION = {
   signaturePreview: {},
   referenceSolution: "",
   referenceSolutionLanguage: "java",
-  visibleTestCases: [],
-  hiddenTestCases: [],
+  testCases: [],
 };
 const QUESTION_DRAFT_KEY = "ccp_super_admin_question_in_progress";
 
@@ -88,7 +87,17 @@ export default function AdminQuestions() {
         if (!parsedDraft || typeof parsedDraft !== "object" || Array.isArray(parsedDraft)) {
           throw new Error("Saved question data has an invalid format.");
         }
-        setForm({ ...EMPTY_QUESTION, ...parsedDraft });
+        setForm({
+          ...EMPTY_QUESTION,
+          ...parsedDraft,
+          testCases:
+            parsedDraft.testCases?.length
+              ? parsedDraft.testCases
+              : [
+              ...(parsedDraft.visibleTestCases || []),
+              ...(parsedDraft.hiddenTestCases || []),
+                ],
+        });
         setNotice("Your in-progress question was restored.");
       }
     } catch (restoreError) {
@@ -135,17 +144,10 @@ export default function AdminQuestions() {
       const localEngineAvailable =
         typeof window !== "undefined" &&
         typeof window.codeClashDesktop?.engine?.execute === "function";
-      let visibleTestCases = prepareCases(
-        form.visibleTestCases,
+      let testCases = prepareCases(
+        form.testCases,
         form.signature,
-        "Visible test cases",
-        3,
-        { requireExpectedOutput: !localEngineAvailable },
-      );
-      let hiddenTestCases = prepareCases(
-        form.hiddenTestCases,
-        form.signature,
-        "Hidden test cases",
+        "Test cases",
         1,
         { requireExpectedOutput: !localEngineAvailable },
       );
@@ -158,19 +160,12 @@ export default function AdminQuestions() {
           signature: form.signature,
           referenceSolution: form.referenceSolution,
           referenceSolutionLanguage: form.referenceSolutionLanguage || "java",
-          visibleTestCases,
-          hiddenTestCases,
+          testCases,
         });
-        visibleTestCases = prepareCases(
-          generated.visibleTestCases,
+        testCases = prepareCases(
+          generated.testCases,
           form.signature,
-          "Visible test cases",
-          3,
-        );
-        hiddenTestCases = prepareCases(
-          generated.hiddenTestCases,
-          form.signature,
-          "Hidden test cases",
+          "Test cases",
           1,
         );
       }
@@ -184,13 +179,12 @@ export default function AdminQuestions() {
         signature: form.signature,
         functionSignatures: { java: form.signaturePreview.java },
         referenceSolutions: { java: form.referenceSolution },
-        examples: visibleTestCases.map((testCase) => ({
+        examples: testCases.slice(0, 3).map((testCase) => ({
           input: testCase.input,
           output: testCase.expectedOutput,
           explanation: testCase.description || "",
         })),
-        visibleTestCases,
-        hiddenTestCases,
+        testCases,
         ...(localEngineAvailable
           ? { referenceSolutionValidatedLocally: true }
           : {}),
@@ -308,8 +302,7 @@ export default function AdminQuestions() {
             ...fields,
             signature: null,
             signaturePreview: {},
-            visibleTestCases: [],
-            hiddenTestCases: [],
+            testCases: [],
           })}
           onSignatureGenerated={(data) => updateQuestion({
             functionName: data.functionName,
@@ -317,23 +310,16 @@ export default function AdminQuestions() {
             parameters: data.parameters,
             signature: data.signature,
             signaturePreview: data.signaturePreview,
-            visibleTestCases: [],
-            hiddenTestCases: [],
+            testCases: [],
           })}
         />
 
         <h2>3. Test cases</h2>
         <div className="weekly-question-test-cases">
           <ParameterTestCaseEditor
-            cases={form.visibleTestCases}
-            onChange={(visibleTestCases) => updateQuestion({ visibleTestCases })}
+            cases={form.testCases}
+            onChange={(testCases) => updateQuestion({ testCases })}
             signature={form.signature}
-          />
-          <ParameterTestCaseEditor
-            cases={form.hiddenTestCases}
-            onChange={(hiddenTestCases) => updateQuestion({ hiddenTestCases })}
-            signature={form.signature}
-            hidden
           />
         </div>
 
@@ -344,15 +330,12 @@ export default function AdminQuestions() {
           onChange={(updated) => updateQuestion({
             referenceSolution: updated.referenceSolution,
             referenceSolutionLanguage: updated.referenceSolutionLanguage,
-            visibleTestCases: updated.visibleTestCases || form.visibleTestCases,
-            hiddenTestCases: updated.hiddenTestCases || form.hiddenTestCases,
+            testCases: updated.testCases || form.testCases,
           })}
         />
         <p className="weekly-question-reference-note">
-          Add at least three visible and one hidden test case, then generate
-          expected outputs before saving. In the desktop app, outputs are
-          regenerated when saving. The reference solution and hidden
-          cases are never shown to participants.
+          Add test cases, then generate expected outputs before saving. In the
+          desktop app, outputs are regenerated when saving.
         </p>
 
         <div className="weekly-question-submit">

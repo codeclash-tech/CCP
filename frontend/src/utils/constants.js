@@ -47,7 +47,7 @@ export const RENDER_AWAKE_MESSAGES = [
   "Waking up server containers from deep sleep...",
   "Allocating memory blocks and warming up compiler...",
   "Teaching the backend that 0 == '0'...",
-  "Executing hidden edge cases in sandbox container...",
+  "Executing all test cases in the sandbox...",
   "Verifying AST structures and heap allocation...",
   "Convincing the garbage collector to cooperate...",
   "Spinning up virtual machines in the background...",

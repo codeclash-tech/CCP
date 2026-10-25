@@ -78,6 +78,15 @@ const questionSchema = new mongoose.Schema(
         _id: false,
       },
     ],
+    testCases: [
+      {
+        input: { type: String, required: true },
+        expectedOutput: { type: String, required: true },
+        description: { type: String, default: "" },
+        parameterValues: { type: Object, default: null },
+        _id: false,
+      },
+    ],
     points: {
       type: Number,
       default: 100,
@@ -307,6 +316,25 @@ battleRoomSchema.methods.getDurationMinutes = function () {
   return (this.timeLimit || 60) * (unitMultiplier[this.timeLimitUnit] || 1);
 };
 
+function roomQuestionCases(q) {
+  const canonical = Array.isArray(q.testCases) ? q.testCases : [];
+  const cases = canonical.length
+    ? [...canonical, ...(q.hiddenTestCases || [])]
+    : [...(q.visibleTestCases || []), ...(q.hiddenTestCases || [])];
+  const seen = new Set();
+  return cases.filter((testCase) => {
+    const key = `${testCase.input ?? ""}\u0000${testCase.expectedOutput ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).map((testCase) => ({
+    input: testCase.input,
+    expectedOutput: testCase.expectedOutput,
+    description: testCase.description || "",
+    parameterValues: testCase.parameterValues || null,
+  }));
+}
+
 function publicQuestionJSON(q) {
   return {
     _id: q._id,
@@ -322,20 +350,14 @@ function publicQuestionJSON(q) {
     signature: q.signature,
     starterCode: q.starterCode,
     starterCodeByLanguage: q.starterCodeByLanguage || {},
-    visibleTestCases: (q.visibleTestCases || []).map((testCase) => ({
-      input: testCase.input,
-      expectedOutput: testCase.expectedOutput,
-      description: testCase.description || "",
-      parameterValues: testCase.parameterValues || null,
-    })),
+    testCases: roomQuestionCases(q),
     problemType: q.problemType || "array",
-    hiddenTestCases: undefined,
     points: q.points,
   };
 }
 
 /**
- * Serializer used by the room creator. Includes hidden test cases and the
+ * Serializer used by the room creator. Includes all test cases and the
  * per-parameter authoring values so the creator can review/edit them.
  * Expected outputs are still internal (kept from edit UI but present for
  * judging).
@@ -355,8 +377,7 @@ function creatorQuestionJSON(q) {
     signature: q.signature,
     starterCode: q.starterCode,
     starterCodeByLanguage: q.starterCodeByLanguage || {},
-    visibleTestCases: q.visibleTestCases || [],
-    hiddenTestCases: q.hiddenTestCases || [],
+    testCases: roomQuestionCases(q),
     points: q.points,
     problemType: q.problemType || "array",
     functionSignature: q.functionSignature || "",
@@ -402,8 +423,7 @@ battleRoomSchema.methods.toEditJSON = function () {
         : null,
       starterCode: q.starterCode,
       starterCodeByLanguage: q.starterCodeByLanguage || {},
-      visibleTestCases: q.visibleTestCases || [],
-      hiddenTestCases: q.hiddenTestCases || [],
+      testCases: roomQuestionCases(q),
       points: q.points,
       problemType: q.problemType || "array",
       functionSignature: q.functionSignature || "",

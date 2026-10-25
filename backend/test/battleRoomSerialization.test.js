@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import BattleRoom from "../src/models/BattleRoom.js";
 
-test("public room serialization includes visible cases but omits protected authoring data", () => {
+test("public room serialization includes all test cases but omits protected authoring data", () => {
   const room = new BattleRoom({
     roomCode: "PUBLIC1",
     title: "Serialization test",
@@ -23,18 +23,19 @@ test("public room serialization includes visible cases but omits protected autho
   });
 
   const publicQuestion = JSON.parse(JSON.stringify(room.toPublicJSON())).questions[0];
-  assert.equal(publicQuestion.visibleTestCases.length, 1);
-  assert.deepEqual(publicQuestion.visibleTestCases[0], {
+  assert.equal(publicQuestion.testCases.length, 2);
+  assert.deepEqual(publicQuestion.testCases[0], {
     input: "1\n2",
     expectedOutput: "3",
     description: "",
     parameterValues: null,
   });
+  assert.equal("visibleTestCases" in publicQuestion, false);
   assert.equal("hiddenTestCases" in publicQuestion, false);
   assert.equal("referenceSolution" in publicQuestion, false);
 });
 
-test("creator serialization still retains hidden cases and reference solution", () => {
+test("creator serialization retains unified test cases and reference solution", () => {
   const room = new BattleRoom({
     roomCode: "OWNER01",
     title: "Creator serialization test",
@@ -50,6 +51,8 @@ test("creator serialization still retains hidden cases and reference solution", 
   });
 
   const creatorQuestion = room.toCreatorJSON().questions[0];
-  assert.equal(creatorQuestion.hiddenTestCases.length, 1);
+  assert.equal(creatorQuestion.testCases.length, 1);
+  assert.equal("visibleTestCases" in creatorQuestion, false);
+  assert.equal("hiddenTestCases" in creatorQuestion, false);
   assert.equal(creatorQuestion.referenceSolution, "public class Solution {}");
 });

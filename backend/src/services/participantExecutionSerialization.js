@@ -18,16 +18,6 @@ export function sanitizeParticipantExecutionError(status, error) {
 }
 
 export function sanitizeParticipantTestResult(result) {
-  if (result.isHidden !== false) {
-    return {
-      testCase: result.testCase,
-      status: result.status,
-      executionTime: result.executionTime,
-      memoryUsed: result.memoryUsed,
-      isHidden: true,
-    };
-  }
-
   return {
     ...(result.testCaseId ? { testCaseId: result.testCaseId } : {}),
     testCase: result.testCase,
@@ -41,13 +31,11 @@ export function sanitizeParticipantTestResult(result) {
         : "",
     expectedOutput: result.expectedOutput ?? "",
     error: sanitizeParticipantExecutionError(result.status, result.error),
-    isHidden: false,
   };
 }
 
-export function getVisibleExecutionOutput(results) {
+export function getParticipantExecutionOutput(results) {
   return results
-    .filter((result) => result.isHidden === false)
     .map((result) => result.output || "")
     .join("\n");
 }

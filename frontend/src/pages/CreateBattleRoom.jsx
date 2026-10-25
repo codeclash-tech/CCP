@@ -61,8 +61,7 @@ const emptyQuestion = {
   referenceSolution: "",
   referenceSolutionLanguage: "java",
   // Step 5 — parameter-based test cases
-  visibleTestCases: [],
-  hiddenTestCases: [],
+  testCases: [],
 };
 
 function toLocalDateTime(value) {
@@ -179,8 +178,12 @@ export default function CreateBattleRoom() {
             returnType: question.returnType || signature?.returnType || "",
             parameters: question.parameters || signature?.params || [],
             signaturePreview: {},
-            visibleTestCases: question.visibleTestCases || [],
-            hiddenTestCases: question.hiddenTestCases || [],
+            testCases: question.testCases?.length
+              ? question.testCases
+              : [
+                  ...(question.visibleTestCases || []),
+                  ...(question.hiddenTestCases || []),
+                ],
           };
         }));
       })
@@ -358,10 +361,7 @@ export default function CreateBattleRoom() {
           (q.signature.params || []).length > 0
         );
       case "cases":
-        return (
-          (q.visibleTestCases || []).length >= 3 &&
-          (q.hiddenTestCases || []).length > 0
-        );
+        return (q.testCases || []).length > 0;
       case "reference":
         return (q.referenceSolution || "").trim() !== "";
       default:
@@ -406,17 +406,7 @@ export default function CreateBattleRoom() {
         description: description.trim(),
         questions: questions.map((q) => {
           const signature = q.signature || null;
-          const visibleTestCases = (q.visibleTestCases || [])
-            .filter((tc) =>
-              tc.parameterValues &&
-              Object.values(tc.parameterValues).some((v) => v !== undefined && v !== null && String(v).trim() !== "")
-            )
-            .map((tc) => ({
-              ...tc,
-              input: tc.input || "",
-              expectedOutput: tc.expectedOutput || "",
-            }));
-          const hiddenTestCases = (q.hiddenTestCases || [])
+          const testCases = (q.testCases || [])
             .filter((tc) =>
               tc.parameterValues &&
               Object.values(tc.parameterValues).some((v) => v !== undefined && v !== null && String(v).trim() !== "")
@@ -431,8 +421,7 @@ export default function CreateBattleRoom() {
             signature,
             returnType: signature?.returnType || q.returnType || "",
             parameters: signature?.params || q.parameters || [],
-            visibleTestCases,
-            hiddenTestCases,
+            testCases,
             expectedOutputSource: "reference",
           };
         }),
@@ -917,16 +906,9 @@ export default function CreateBattleRoom() {
           />
           <div style={{ marginTop: 16, display: "grid", gap: 16 }}>
             <ParameterTestCaseEditor
-              cases={currentQuestion.visibleTestCases || []}
-              onChange={(tcs) => updateCurrentQuestion({ ...currentQuestion, visibleTestCases: tcs })}
+              cases={currentQuestion.testCases || []}
+              onChange={(tcs) => updateCurrentQuestion({ ...currentQuestion, testCases: tcs })}
               signature={currentQuestion.signature}
-              hidden={false}
-            />
-            <ParameterTestCaseEditor
-              cases={currentQuestion.hiddenTestCases || []}
-              onChange={(tcs) => updateCurrentQuestion({ ...currentQuestion, hiddenTestCases: tcs })}
-              signature={currentQuestion.signature}
-              hidden={true}
             />
             <div style={{ fontSize: 11, fontFamily: "var(--font-code)", color: "var(--text-muted)", border: "1px dashed var(--border-strong)", borderRadius: 6, padding: "8px 12px" }}>
               <strong style={{ color: "var(--text-secondary)" }}>How it works:</strong> every parameter in the signature becomes its own input field.
@@ -998,7 +980,7 @@ export default function CreateBattleRoom() {
                 {"  ·  "}
                 <strong style={{ color: "var(--text-secondary)" }}>Params:</strong> {(q.parameters || []).map((p) => `${p.name}:${p.type}`).join(", ") || "—"}
                 {"  ·  "}
-                <strong style={{ color: "var(--text-secondary)" }}>Test cases:</strong> visible {q.visibleTestCases?.length || 0} (minimum 3) / hidden {q.hiddenTestCases?.length || 0}
+                <strong style={{ color: "var(--text-secondary)" }}>Test cases:</strong> {q.testCases?.length || 0}
               </div>
             </div>
           ))}
@@ -1012,7 +994,7 @@ export default function CreateBattleRoom() {
               {questions.map((q, i) => (
                 <div key={i}>
                   <strong style={{ color: "var(--text-secondary)" }}>Q{i + 1} · {q.category || q.problemType}:</strong>{" "}
-                  {q.title || "Untitled"} — {formatTestCasesForPreview(q.visibleTestCases, q.parameters || [], 2)}
+                  {q.title || "Untitled"} — {formatTestCasesForPreview(q.testCases, q.parameters || [], 2)}
                 </div>
               ))}
             </div>

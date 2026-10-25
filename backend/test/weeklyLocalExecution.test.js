@@ -64,6 +64,10 @@ function setupActiveDailyCycle(t, candidateId) {
         description: "Example challenge",
         points: 100,
         signature: null,
+        testCases: [
+          { input: "visible", expectedOutput: "ok" },
+          { input: "secret", expectedOutput: "secret-output" },
+        ],
         visibleTestCases: [{ input: "visible", expectedOutput: "ok" }],
         hiddenTestCases: [{ input: "secret", expectedOutput: "secret-output" }],
       },
@@ -92,7 +96,7 @@ function grantRequest(context, sourceHash = "a".repeat(64), executionId = "0a10b
   };
 }
 
-test("Daily Challenge grants bind the active question and expose only visible-case count", async (t) => {
+test("Daily Challenge grants bind the active question and count every test case", async (t) => {
   const candidateId = new mongoose.Types.ObjectId();
   const context = setupActiveDailyCycle(t, candidateId);
   let reservation;
@@ -111,7 +115,7 @@ test("Daily Challenge grants bind the active question and expose only visible-ca
   t.mock.method(Nonce, "generate", async () => "b".repeat(64));
 
   const grant = await createWeeklyLocalExecutionGrant(grantRequest(context));
-  assert.equal(grant.testCount, 1);
+  assert.equal(grant.testCount, 2);
   assert.equal(grant.challengeId, String(context.challengeId));
   assert.equal(grant.submissionId, String(reservation._id));
   assert.equal(grant.nonce, "b".repeat(64));

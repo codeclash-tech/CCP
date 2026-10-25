@@ -6,7 +6,7 @@
  * The admin uploads ONE correct Java reference solution. The backend:
  *   1. Composes a judge wrapper around it using the same templates
  *      participants will get.
- *   2. Executes it against ALL visible + hidden test-case inputs in a
+ *   2. Executes it against every test-case input in a
  *      SINGLE engine call (batch mode).
  *   3. Reads the stdout from each test case result (actualOutput) and
  *      stores it as the expected output.

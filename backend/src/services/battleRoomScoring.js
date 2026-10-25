@@ -1,11 +1,13 @@
 export function countRoomTestCases(questions = []) {
-  return questions.reduce(
-    (total, question) =>
-      total +
-      (question.visibleTestCases || []).length +
-      (question.hiddenTestCases || []).length,
-    0,
-  );
+  return questions.reduce((total, question) => {
+    const cases = Array.isArray(question.testCases) && question.testCases.length
+      ? question.testCases
+      : [
+          ...(question.visibleTestCases || []),
+          ...(question.hiddenTestCases || []),
+        ];
+    return total + cases.length;
+  }, 0);
 }
 
 export function calculateQuestionScore(points, passedTestCases, totalTestCases) {

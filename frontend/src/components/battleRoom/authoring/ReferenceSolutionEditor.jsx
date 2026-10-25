@@ -30,8 +30,7 @@ const labelStyle = {
  * Reference Solution Editor.
  *
  * The author provides one correct reference solution. Expected outputs are
- * generated for all visible and hidden cases, while the solution stays out of
- * contest data.
+ * generated for all test cases, while the solution stays out of contest data.
  */
 export default function ReferenceSolutionEditor({
   question,
@@ -60,10 +59,9 @@ export default function ReferenceSolutionEditor({
       tc.parameterValues &&
       Object.keys(tc.parameterValues || {}).length > 0 &&
       Object.values(tc.parameterValues || {}).some((v) => v !== undefined && v !== null && String(v).trim() !== "");
-    const hasVisible = (question.visibleTestCases || []).some((tc) => hasParams(tc) || (tc.input && tc.input.trim()));
-    const hasHidden = (question.hiddenTestCases || []).some((tc) => hasParams(tc) || (tc.input && tc.input.trim()));
-    if (!hasVisible || !hasHidden) {
-      setError("Add at least one visible and one hidden test case (parameter values) before generating outputs.");
+    const hasCases = (question.testCases || []).some((tc) => hasParams(tc) || (tc.input && tc.input.trim()));
+    if (!hasCases) {
+      setError("Add at least one test case before generating outputs.");
       return;
     }
 
@@ -80,20 +78,14 @@ export default function ReferenceSolutionEditor({
       const data = await generateExpectedOutputs(payload);
 
       setResult({
-        visibleCount: data.visibleTestCases?.length || question.visibleTestCases?.length || 0,
-        hiddenCount: data.hiddenTestCases?.length || question.hiddenTestCases?.length || 0,
+        testCaseCount: data.testCases?.length || question.testCases?.length || 0,
         accepted: data.accepted,
         message: data.message,
       });
 
       // Merge the generated expected outputs into the question.
       const merged = { ...question, referenceSolution: code, referenceSolutionLanguage: language };
-      if (data.visibleTestCases) {
-        merged.visibleTestCases = data.visibleTestCases;
-      }
-      if (data.hiddenTestCases) {
-        merged.hiddenTestCases = data.hiddenTestCases;
-      }
+      if (data.testCases) merged.testCases = data.testCases;
       if (onChange) onChange(merged);
       if (onOutputsGenerated) onOutputsGenerated(data);
     } catch (err) {
@@ -111,7 +103,7 @@ export default function ReferenceSolutionEditor({
           Reference Solution (correct answer)
         </label>
         <p style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-ui)", margin: "0 0 6px" }}>
-          Provide a correct Java solution. CodeClash checks it against visible and hidden cases; only the generated outputs are saved.
+          Provide a correct Java solution. CodeClash checks it against all test cases; only the generated outputs are saved.
         </p>
 
         <textarea
@@ -149,7 +141,7 @@ export default function ReferenceSolutionEditor({
             <div>
               <strong>{result.message || (result.accepted ? "Expected outputs generated" : "Reference solution failed some test cases")}</strong>
               <div style={{ color: "var(--text-muted)", fontSize: 11 }}>
-                Visible: {result.visibleCount} • Hidden: {result.hiddenCount}
+                Test cases: {result.testCaseCount}
               </div>
             </div>
           </div>

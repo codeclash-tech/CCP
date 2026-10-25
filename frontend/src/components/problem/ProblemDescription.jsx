@@ -89,9 +89,7 @@ export default function ProblemDescription({ challenge }) {
     { key: "submissions", label: "Submissions", icon: BarChart3 },
   ];
 
-  const testCases = challenge.visibleTestCases?.length
-    ? challenge.visibleTestCases
-    : challenge.testCases || [];
+  const testCases = challenge.testCases || challenge.visibleTestCases || [];
   const sampleCases = [
     ...(challenge.examples || []).map((example) => ({
       input: example.input,

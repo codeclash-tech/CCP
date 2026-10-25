@@ -3,7 +3,7 @@ import test from "node:test";
 import mongoose from "mongoose";
 import Challenge from "../src/models/Challenge.js";
 
-test("participant challenge data omits reference solutions and hidden test cases", () => {
+test("participant challenge data exposes unified test cases but omits reference solutions", () => {
   const challenge = new Challenge({
     title: "Reference output protection",
     slug: "reference-output-protection",
@@ -26,14 +26,16 @@ test("participant challenge data omits reference solutions and hidden test cases
   const participantJson = JSON.stringify(participantData);
   assert.equal("referenceSolutions" in participantData, false);
   assert.equal(participantJson.includes("public class Solution"), false);
-  assert.equal(participantJson.includes("secret"), false);
+  assert.equal(participantJson.includes("secret"), true);
+  assert.equal("visibleTestCases" in participantData, false);
+  assert.equal("hiddenTestCases" in participantData, false);
   assert.deepEqual(
-    participantData.visibleTestCases.map((testCase) => testCase.expectedOutput),
-    ["42"],
+    participantData.testCases.map((testCase) => testCase.expectedOutput),
+    ["42", "private"],
   );
 });
 
-test("admin challenge serialization retains reference solutions and hidden cases", () => {
+test("admin challenge serialization returns a unified test case collection", () => {
   const challenge = new Challenge({
     title: "Admin authoring data",
     slug: "admin-authoring-data",
@@ -46,5 +48,7 @@ test("admin challenge serialization retains reference solutions and hidden cases
 
   const adminData = challenge.toAdminJSON();
   assert.deepEqual(adminData.referenceSolutions, { java: "class Solution {}" });
-  assert.equal(adminData.hiddenTestCases.length, 1);
+  assert.deepEqual(adminData.testCases.map((testCase) => testCase.expectedOutput), ["1", "2"]);
+  assert.equal("visibleTestCases" in adminData, false);
+  assert.equal("hiddenTestCases" in adminData, false);
 });

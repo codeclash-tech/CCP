@@ -7,6 +7,7 @@ import {
   previewChallengeExecution,
   generateStarterCodeForChallenge,
 } from "../services/challengeAuthoringService.js";
+import { getChallengeTestCases } from "../services/challengeTestCases.js";
 import {
   getCurrentWindow,
   getNextWindowStart,
@@ -37,8 +38,6 @@ const ALLOWED_UPDATE_FIELDS = [
   "functionSignatures",
   "starterCodes",
   "referenceSolutions",
-  "visibleTestCases",
-  "hiddenTestCases",
   "signature",
 ];
 
@@ -143,9 +142,7 @@ export async function createChallenge(req, res) {
       starterCodes: freshStarters,
       functionSignatures: normalized.functionSignatures,
       referenceSolutions: normalized.referenceSolutions,
-      visibleTestCases: normalized.visibleTestCases,
-      hiddenTestCases: normalized.hiddenTestCases,
-      testCases: normalized.visibleTestCases,
+      testCases: normalized.testCases,
       createdBy: req.userId,
       activeDate,
       isActive: req.body.isActive !== undefined ? req.body.isActive : true,
@@ -191,8 +188,7 @@ export async function updateChallenge(req, res) {
     if (
       updates.functionSignatures ||
       updates.referenceSolutions ||
-      updates.visibleTestCases ||
-      updates.hiddenTestCases
+      updates.testCases
     ) {
       const existing = await Challenge.findById(id);
       const normalized = normalizeChallengePayload({
@@ -210,8 +206,7 @@ export async function updateChallenge(req, res) {
       updates.functionSignatures = normalized.functionSignatures;
       updates.signature = normalized.signature || null;
       updates.referenceSolutions = normalized.referenceSolutions;
-      updates.visibleTestCases = normalized.visibleTestCases;
-      updates.hiddenTestCases = normalized.hiddenTestCases;
+      updates.testCases = normalized.testCases;
       // Remove persisted starterCodes when signature changes — they'll be regenerated
       delete updates.starterCodes;
     }
@@ -501,9 +496,7 @@ export async function duplicateChallenge(req, res) {
       functionSignatures: original.functionSignatures,
       starterCodes: original.starterCodes,
       referenceSolutions: original.referenceSolutions,
-      visibleTestCases: original.visibleTestCases || original.testCases || [],
-      hiddenTestCases: original.hiddenTestCases || [],
-      testCases: original.testCases || original.visibleTestCases || [],
+      testCases: getChallengeTestCases(original),
       activeDate: new Date(),
       isActive: false,
       createdBy: req.userId,

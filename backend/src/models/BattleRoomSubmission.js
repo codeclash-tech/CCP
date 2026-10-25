@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import {
-  getVisibleExecutionOutput,
+  getParticipantExecutionOutput,
   sanitizeParticipantExecutionError,
   sanitizeParticipantTestResult,
 } from "../services/participantExecutionSerialization.js";
@@ -114,7 +114,6 @@ const questionResultSchema = new mongoose.Schema(
           testCaseId: { type: String, default: "" },
           input: { type: String, required: true },
           expectedOutput: { type: String, required: true },
-          isHidden: { type: Boolean, default: false },
           _id: false,
         },
       ],
@@ -196,7 +195,6 @@ const questionResultSchema = new mongoose.Schema(
         output: { type: String, default: "" },
         expectedOutput: { type: String, default: "" },
         error: { type: String, default: "" },
-        isHidden: { type: Boolean, default: false },
         _id: false,
       },
     ],
@@ -312,9 +310,7 @@ battleRoomSubmissionSchema.index({ roomId: 1, totalScore: -1 });
 battleRoomSubmissionSchema.index({ userId: 1 });
 battleRoomSubmissionSchema.index({ userId: 1, "certificateSnapshot.roomCode": 1 });
 
-battleRoomSubmissionSchema.methods.toPublicJSON = function ({
-  visibleTestCaseCounts = {},
-} = {}) {
+battleRoomSubmissionSchema.methods.toPublicJSON = function () {
   return {
     id: this._id,
     roomId: this.roomId,
@@ -341,17 +337,10 @@ battleRoomSubmissionSchema.methods.toPublicJSON = function ({
     startTime: this.startTime,
     submittedAt: this.submittedAt,
     questionResults: this.questionResults.map((qr) => {
-      const visibleTestCaseCount =
-        visibleTestCaseCounts[qr.questionId?.toString()];
-      const results = (qr.results || []).map((result, index) => {
+      const results = (qr.results || []).map((result) => {
         const resultData =
           typeof result.toObject === "function" ? result.toObject() : result;
-        return sanitizeParticipantTestResult({
-          ...resultData,
-          isHidden: Number.isInteger(visibleTestCaseCount)
-            ? index >= visibleTestCaseCount
-            : true,
-        });
+        return sanitizeParticipantTestResult(resultData);
       });
       return {
         questionId: qr.questionId,
@@ -384,7 +373,7 @@ battleRoomSubmissionSchema.methods.toPublicJSON = function ({
         memoryUsed:
           qr.verificationStatus === "VERIFIED" ? qr.memoryUsed : null,
         timeToSolve: qr.timeToSolve,
-        output: getVisibleExecutionOutput(results),
+        output: getParticipantExecutionOutput(results),
         error: sanitizeParticipantExecutionError(qr.status, qr.error),
         results,
       };

@@ -109,11 +109,8 @@ export async function generateOutputs(req, res) {
     if (!normalized.referenceSolution || !normalized.referenceSolution.trim()) {
       errors.push("Reference solution is required.");
     }
-    if (!normalized.visibleTestCases || normalized.visibleTestCases.length === 0) {
-      errors.push("At least one visible test case is required.");
-    }
-    if (!normalized.hiddenTestCases || normalized.hiddenTestCases.length === 0) {
-      errors.push("At least one hidden test case is required.");
+    if (!normalized.testCases || normalized.testCases.length === 0) {
+      errors.push("At least one test case is required.");
     }
     if (errors.length > 0) {
       return res.status(400).json({ error: errors.join(" "), errors });
@@ -124,8 +121,7 @@ export async function generateOutputs(req, res) {
     return res.status(200).json({
       message: "Expected outputs generated successfully.",
       accepted: true,
-      visibleTestCases: generated.visibleTestCases,
-      hiddenTestCases: generated.hiddenTestCases,
+      testCases: generated.testCases,
     });
   } catch (error) {
     console.error("Generate outputs error:", error.message);

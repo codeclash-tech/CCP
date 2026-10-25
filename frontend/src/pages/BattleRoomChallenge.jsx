@@ -500,6 +500,7 @@ export default function BattleRoomChallenge() {
         questionId: question._id,
         code,
         language: selectedLanguage,
+        question,
       });
 
       if (!result?.questionResult) {
@@ -615,23 +616,6 @@ export default function BattleRoomChallenge() {
         error: result.error ?? "",
         executionTime: result.executionTime ?? 0,
         memoryUsed: result.memoryUsed ?? 0,
-        visiblePassed:
-          result.visiblePassed ??
-          (result.results || []).filter(
-            (r) => !r.isHidden && ["PASSED", "ACCEPTED"].includes(r.status),
-          ).length,
-        visibleFailed:
-          result.visibleFailed ??
-          (result.results || []).filter(
-            (r) => !r.isHidden && !["PASSED", "ACCEPTED"].includes(r.status),
-          ).length,
-        hiddenCount: (result.results || []).filter((r) => r.isHidden).length,
-        hiddenPassed: (result.results || []).filter(
-          (r) => r.isHidden && ["PASSED", "ACCEPTED"].includes(r.status),
-        ).length,
-        hiddenFailed: (result.results || []).filter(
-          (r) => r.isHidden && !["PASSED", "ACCEPTED"].includes(r.status),
-        ).length,
         results: (result.results || []).map((r) => ({
           testCaseId: r.testCaseId,
           testCase: r.testCase,
@@ -642,7 +626,6 @@ export default function BattleRoomChallenge() {
           output: r.output ?? r.actualOutput ?? r.stdout ?? "",
           expectedOutput: r.expectedOutput ?? "",
           error: r.error ?? "",
-          isHidden: !!r.isHidden,
         })),
       };
 

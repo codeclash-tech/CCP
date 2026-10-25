@@ -19,7 +19,7 @@ export async function runSolution(challengeId, code, language) {
   return response.data;
 }
 
-// Execute the user's code against ALL test cases (including hidden) and score it.
+// Execute the user's code against every test case and score it.
 // This is the single final submission that produces the challenge score.
 export async function executeAndSubmit(
   challengeId,

@@ -79,17 +79,17 @@ export async function generateExpectedOutputsLocally(
     throw new Error("Code execution is currently unavailable.");
   }
 
-  const visibleTestCases = Array.isArray(question.visibleTestCases)
-    ? question.visibleTestCases
-    : [];
-  const hiddenTestCases = Array.isArray(question.hiddenTestCases)
-    ? question.hiddenTestCases
-    : [];
-  if (visibleTestCases.length === 0 || hiddenTestCases.length === 0) {
-    throw new Error("Add at least one visible and one hidden test case.");
+  const testCases = Array.isArray(question.testCases)
+    ? question.testCases
+    : [
+        ...(question.visibleTestCases || []),
+        ...(question.hiddenTestCases || []),
+      ];
+  if (testCases.length === 0) {
+    throw new Error("Add at least one test case.");
   }
 
-  const testCases = [...visibleTestCases, ...hiddenTestCases].map((testCase) => ({
+  const inputs = testCases.map((testCase) => ({
     input: getExecutionInput(testCase, question.signature),
     expectedOutput: REFERENCE_OUTPUT_SENTINEL,
   }));
@@ -104,35 +104,31 @@ export async function generateExpectedOutputsLocally(
     execution = await desktopBridge.engine.execute({
       code: program,
       language: question.referenceSolutionLanguage || "java",
-      testCases,
+      testCases: inputs,
     });
   } catch (error) {
     throwSafeLocalExecutionError(error);
   }
 
-  if (!Array.isArray(execution?.results) || execution.results.length !== testCases.length) {
+  if (!Array.isArray(execution?.results) || execution.results.length !== inputs.length) {
     throw new Error("Code execution is currently unavailable.");
   }
   validateReferenceResults(execution.results, question);
 
-  const generatedTestCases = [...visibleTestCases, ...hiddenTestCases].map(
-    (testCase, index) => ({
+  const generatedTestCases = testCases.map((testCase, index) => ({
       ...testCase,
-      input: testCases[index].input,
+      input: inputs[index].input,
       expectedOutput: getReferenceOutput(execution.results[index]),
-    }),
-  );
-  const visibleCount = visibleTestCases.length;
+    }));
 
   return {
-    visibleTestCases: generatedTestCases.slice(0, visibleCount),
-    hiddenTestCases: generatedTestCases.slice(visibleCount),
+    testCases: generatedTestCases,
     accepted: true,
     message: "Expected outputs generated successfully.",
   };
 }
 
-export async function executeVisibleCasesLocally({ question, code, language }) {
+export async function executeQuestionTestCasesLocally({ question, code, language }) {
   if (!question || typeof code !== "string") {
     throw new TypeError("A question and source code are required for code execution.");
   }
@@ -140,7 +136,14 @@ export async function executeVisibleCasesLocally({ question, code, language }) {
     throw new Error("Code execution is currently unavailable.");
   }
 
-  const sourceTestCases = (question.visibleTestCases || []).filter(
+  const sourceTestCases = (
+    Array.isArray(question.testCases)
+      ? question.testCases
+      : [
+          ...(question.visibleTestCases || []),
+          ...(question.hiddenTestCases || []),
+        ]
+  ).filter(
     (testCase) =>
       (testCase.input !== undefined && testCase.input !== null) ||
       (testCase.parameterValues &&
@@ -148,12 +151,12 @@ export async function executeVisibleCasesLocally({ question, code, language }) {
         question.signature?.name &&
         Object.keys(testCase.parameterValues).length > 0),
   );
-  const visibleTestCases = sourceTestCases.map((testCase) => ({
+  const testCases = sourceTestCases.map((testCase) => ({
     input: getExecutionInput(testCase, question.signature),
     expectedOutput: testCase.expectedOutput ?? "",
   }));
-  if (visibleTestCases.length === 0) {
-    throw new Error("No visible test cases are available for this question.");
+  if (testCases.length === 0) {
+    throw new Error("No test cases are available for this question.");
   }
 
   const program = question.signature?.name
@@ -163,14 +166,14 @@ export async function executeVisibleCasesLocally({ question, code, language }) {
     const execution = await window.codeClashDesktop.engine.execute({
       code: program,
       language,
-      testCases: visibleTestCases,
+      testCases,
     });
     return {
       ...execution,
       results: Array.isArray(execution?.results)
         ? execution.results.map((result, index) => ({
             ...result,
-            input: result.input ?? visibleTestCases[index]?.input ?? "",
+            input: result.input ?? testCases[index]?.input ?? "",
             output:
               result.actualOutput ??
               result.output ??
@@ -179,7 +182,7 @@ export async function executeVisibleCasesLocally({ question, code, language }) {
               "",
             expectedOutput:
               result.expectedOutput ??
-              visibleTestCases[index]?.expectedOutput ??
+              testCases[index]?.expectedOutput ??
               "",
           }))
         : [],
@@ -208,7 +211,14 @@ export async function submitQuestionLocally({
   const executionCode = question.signature?.name
     ? composeProgram(question, code, language)
     : code;
-  const testCases = (question.visibleTestCases || [])
+  const testCases = (
+    Array.isArray(question.testCases)
+      ? question.testCases
+      : [
+          ...(question.visibleTestCases || []),
+          ...(question.hiddenTestCases || []),
+        ]
+  )
     .filter(
       (testCase) =>
         (testCase.input !== undefined && testCase.input !== null) ||
@@ -246,7 +256,14 @@ export async function submitDailyChallengeLocally({
   if (typeof window.codeClashDesktop?.assessment?.submitDaily !== "function") {
     throw new Error("The CodeClash desktop submission service is not available.");
   }
-  const visibleTestCases = (question.visibleTestCases || [])
+  const testCases = (
+    Array.isArray(question.testCases)
+      ? question.testCases
+      : [
+          ...(question.visibleTestCases || []),
+          ...(question.hiddenTestCases || []),
+        ]
+  )
     .filter(
       (testCase) =>
         (testCase.input !== undefined && testCase.input !== null) ||
@@ -259,8 +276,8 @@ export async function submitDailyChallengeLocally({
       input: getExecutionInput(testCase, question.signature),
       expectedOutput: String(testCase.expectedOutput ?? ""),
     }));
-  if (visibleTestCases.length === 0) {
-    throw new Error("No visible test cases are available for this question.");
+  if (testCases.length === 0) {
+    throw new Error("No test cases are available for this question.");
   }
 
   return window.codeClashDesktop.assessment.submitDaily({
@@ -272,6 +289,6 @@ export async function submitDailyChallengeLocally({
     executionCode: question.signature?.name
       ? composeProgram(question, code, "java")
       : code,
-    testCases: visibleTestCases,
+    testCases,
   });
 }

@@ -1,4 +1,4 @@
-import { PlusCircle, Trash2, Eye, EyeOff } from "lucide-react";
+import { PlusCircle, Trash2 } from "lucide-react";
 import { PARAM_PLACEHOLDER } from "../../../utils/constants";
 
 const inputStyle = {
@@ -22,14 +22,13 @@ const inputStyle = {
  * these parameter values into the canonical judge input format and
  * auto-generates expected outputs from the reference solution.
  *
- * Expected outputs are hidden from the UI — they are generated and stored
+ * Expected outputs stay private to the authoring form — they are generated and stored
  * internally by the backend.
  */
 export default function ParameterTestCaseEditor({
   cases,
   onChange,
   signature,
-  hidden = false,
 }) {
   const params = Array.isArray(signature?.params) ? signature.params : [];
   const caseList = Array.isArray(cases) ? cases : [];
@@ -71,13 +70,8 @@ const updateValue = (caseIndex, paramName, value) => {
   return (
     <div style={{ border: "1px solid var(--border-color)", borderRadius: 10, padding: 16, background: "var(--bg-card)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-        {hidden ? (
-          <EyeOff size={14} color="var(--color-warning)" />
-        ) : (
-          <Eye size={14} color="var(--color-success)" />
-        )}
         <span style={{ color: "var(--text-primary)", fontSize: 13, fontFamily: "var(--font-ui)", fontWeight: 600 }}>
-          {hidden ? "Hidden Test Cases" : "Visible Test Cases (minimum 3)"}
+          Test Cases
         </span>
         <span style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-ui)", marginLeft: "auto" }}>
           {caseList.length} case(s)
@@ -178,7 +172,7 @@ const updateValue = (caseIndex, paramName, value) => {
           Add Test Case
         </button>
         <span style={{ fontSize: 11, fontFamily: "var(--font-ui)", color: "var(--text-muted)" }}>
-          Expected outputs are generated automatically from the reference solution (Step 6).
+          Expected outputs are generated automatically from the reference solution.
         </span>
       </div>
     </div>

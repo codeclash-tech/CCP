@@ -90,7 +90,7 @@ test("issues a one-use submission grant without returning test cases", async (t)
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.nonce, nonceValue);
   assert.equal(res.body.executionId, desktopGrantRequest(questionId).executionId);
-  assert.equal(res.body.testCount, 1);
+  assert.equal(res.body.testCount, 2);
   assert.equal(nonceArguments[0], userId);
   assert.equal(nonceArguments[1], "SUBMIT");
   assert.ok(nonceArguments[2].startsWith(`${roomId}:${submissionId}:${questionId}:${"c".repeat(64)}:`));
@@ -192,7 +192,7 @@ test("reissues a reconciliation grant for a completed result after the room clos
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.nonce, nonce);
   assert.equal(res.body.executionId, desktopGrantRequest(questionId).executionId);
-  assert.equal(res.body.testCount, 1);
+  assert.equal(res.body.testCount, 2);
   assert.equal(
     grantQuery.resourceId.startsWith(
       `${roomId}:${submissionId}:${questionId}:${codeHash}:`,
@@ -246,7 +246,7 @@ test("does not authorize new code for a completed submission after the room clos
   assert.equal(nonceIssued, false);
 });
 
-test("does not issue hidden-case grants to a user without a room submission", async (t) => {
+test("does not issue execution grants to a user without a room submission", async (t) => {
   const roomId = new mongoose.Types.ObjectId();
   const questionId = new mongoose.Types.ObjectId();
   t.mock.method(BattleRoom, "findOne", () => ({
@@ -392,7 +392,16 @@ test("accepts desktop source for asynchronous authoritative verification", async
   assert.equal(persistedQuestionResult.verificationStatus, "PENDING_VERIFICATION");
   assert.equal(persistedQuestionResult.executionGrantNonce, nonce);
   assert.equal(persistedQuestionResult.score, 0);
-  assert.equal(persistedQuestionResult.verificationTestCases[1].isHidden, true);
+  assert.deepEqual(
+    persistedQuestionResult.verificationTestCases.map(({ input, expectedOutput }) => ({
+      input,
+      expectedOutput,
+    })),
+    [
+      { input: "1 2", expectedOutput: "3" },
+      { input: "999 1", expectedOutput: "1000" },
+    ],
+  );
   assert.equal(res.body.questionResult.verificationStatus, "PENDING_VERIFICATION");
   assert.equal(res.body.questionResult.score, null);
   assert.equal(res.body.submissionId.toString(), submissionId.toString());
@@ -610,7 +619,14 @@ test("returns the persisted result when the same authorization is retried", asyn
     total: 2,
     results: [
       { status: "PASSED", output: "1", input: "1", expectedOutput: "1" },
-      { status: "WRONG_ANSWER", isHidden: true },
+      {
+        testCase: 2,
+        status: "WRONG_ANSWER",
+        input: "hidden",
+        output: "hidden result",
+        expectedOutput: "hidden result",
+        isHidden: true,
+      },
     ],
   };
   const submission = {
@@ -671,8 +687,11 @@ test("returns the persisted result when the same authorization is retried", asyn
   assert.equal(res.statusCode, 200);
   assert.equal(grantCompleted, true);
   assert.equal(res.body.questionResult.score, 50);
-  assert.equal(res.body.questionResult.hiddenPassed, 0);
-  assert.equal(JSON.stringify(res.body).includes("hidden result"), false);
+  assert.equal(res.body.questionResult.passed, 1);
+  assert.equal(res.body.questionResult.failed, 1);
+  assert.equal(res.body.questionResult.total, 2);
+  assert.equal("hiddenPassed" in res.body.questionResult, false);
+  assert.equal(JSON.stringify(res.body).includes("hidden result"), true);
   assert.equal(executionCalled, false);
 });
 

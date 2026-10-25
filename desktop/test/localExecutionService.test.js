@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { executeVisibleCasesLocally } from "../../frontend/src/services/localExecutionService.js";
+import { executeQuestionTestCasesLocally } from "../../frontend/src/services/localExecutionService.js";
 
-test("composes Java submissions and sends only visible cases to the local engine", async () => {
+test("composes Java submissions and sends every test case to the local engine", async () => {
   let executionRequest;
   globalThis.window = {
     codeClashDesktop: {
@@ -15,15 +15,17 @@ test("composes Java submissions and sends only visible cases to the local engine
     },
   };
 
-  const result = await executeVisibleCasesLocally({
+  const result = await executeQuestionTestCasesLocally({
     question: {
       signature: {
         name: "sum",
         returnType: "int",
         params: [{ name: "values", type: "int[]" }],
       },
-      visibleTestCases: [{ input: "[1, 2]", expectedOutput: "3" }],
-      hiddenTestCases: [{ input: "[100, 200]", expectedOutput: "300" }],
+      testCases: [
+        { input: "[1, 2]", expectedOutput: "3" },
+        { input: "[100, 200]", expectedOutput: "300" },
+      ],
     },
     code: "public class Solution { public int sum(int[] values) { return values[0] + values[1]; } }",
     language: "java",
@@ -34,11 +36,12 @@ test("composes Java submissions and sends only visible cases to the local engine
   assert.match(executionRequest.code, /class Solution/);
   assert.deepEqual(executionRequest.testCases, [
     { input: "[1, 2]", expectedOutput: "3" },
+    { input: "[100, 200]", expectedOutput: "300" },
   ]);
   delete globalThis.window;
 });
 
-test("returns visible case input, actual output, and expected output for the result panel", async () => {
+test("returns test case input, actual output, and expected output for the result panel", async () => {
   globalThis.window = {
     codeClashDesktop: {
       engine: {
@@ -53,9 +56,9 @@ test("returns visible case input, actual output, and expected output for the res
     },
   };
 
-  const result = await executeVisibleCasesLocally({
+  const result = await executeQuestionTestCasesLocally({
     question: {
-      visibleTestCases: [
+      testCases: [
         { input: "1 2", expectedOutput: "3" },
         { input: "3 4", expectedOutput: "7" },
       ],
@@ -78,7 +81,7 @@ test("returns visible case input, actual output, and expected output for the res
   delete globalThis.window;
 });
 
-test("executes parameter-based visible cases using the wrapper input format", async () => {
+test("executes parameter-based test cases using the wrapper input format", async () => {
   let executionRequest;
   globalThis.window = {
     codeClashDesktop: {
@@ -101,7 +104,7 @@ test("executes parameter-based visible cases using the wrapper input format", as
     },
   };
 
-  const result = await executeVisibleCasesLocally({
+  const result = await executeQuestionTestCasesLocally({
     question: {
       signature: {
         name: "sum",
@@ -111,7 +114,7 @@ test("executes parameter-based visible cases using the wrapper input format", as
           { name: "right", type: "int" },
         ],
       },
-      visibleTestCases: [
+      testCases: [
         { parameterValues: { left: "4", right: "5" }, expectedOutput: "9" },
       ],
     },
@@ -128,7 +131,7 @@ test("executes parameter-based visible cases using the wrapper input format", as
   delete globalThis.window;
 });
 
-test("rejects a question with no visible cases instead of calling the engine", async () => {
+test("rejects a question with no test cases instead of calling the engine", async () => {
   let wasCalled = false;
   globalThis.window = {
     codeClashDesktop: {
@@ -141,8 +144,8 @@ test("rejects a question with no visible cases instead of calling the engine", a
   };
 
   await assert.rejects(
-    executeVisibleCasesLocally({ question: { visibleTestCases: [] }, code: "class Main {}", language: "java" }),
-    /No visible test cases/,
+    executeQuestionTestCasesLocally({ question: { testCases: [] }, code: "class Main {}", language: "java" }),
+    /No test cases are available/,
   );
   assert.equal(wasCalled, false);
   delete globalThis.window;
@@ -160,9 +163,9 @@ test("hides local engine connection details from execution errors", async () => 
   };
 
   await assert.rejects(
-    executeVisibleCasesLocally({
+    executeQuestionTestCasesLocally({
       question: {
-        visibleTestCases: [{ input: "1", expectedOutput: "1" }],
+        testCases: [{ input: "1", expectedOutput: "1" }],
       },
       code: "class Main {}",
       language: "java",

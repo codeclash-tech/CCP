@@ -396,7 +396,6 @@ export default function Console({
                               : "var(--color-danger)",
                           }}
                         />
-                        {tc.isHidden ? "Hidden " : ""}
                         Test case {tc.testCase ?? resultIndex + 1}
                       </button>
                     );
@@ -423,35 +422,27 @@ export default function Console({
                       ` · ${activeTestCase.executionTime} ms`}
                   </div>
 
-                  {activeTestCase.isHidden ? (
-                    <div style={{ color: "var(--text-muted)", fontSize: 13 }}>
-                      Hidden test-case details are not shown.
-                    </div>
-                  ) : (
-                    <>
-                      <CodeDataBox
-                        label={`Input · Test case ${activeTestCase.testCase ?? activeTestCaseEntry.index + 1}`}
-                        value={activeTestCase.input ?? activeTestCase.testCase}
-                      />
+                  <CodeDataBox
+                    label={`Input · Test case ${activeTestCase.testCase ?? activeTestCaseEntry.index + 1}`}
+                    value={activeTestCase.input ?? activeTestCase.testCase}
+                  />
 
-                      <CodeDataBox
-                        isError={
-                          activeTestCase.status !== "PASSED" &&
-                          activeTestCase.status !== "ACCEPTED"
-                        }
-                        label="Actual Output"
-                        value={activeTestCase.output}
-                      />
+                  <CodeDataBox
+                    isError={
+                      activeTestCase.status !== "PASSED" &&
+                      activeTestCase.status !== "ACCEPTED"
+                    }
+                    label="Actual Output"
+                    value={activeTestCase.output}
+                  />
 
-                      <CodeDataBox
-                        isSuccess={true}
-                        label="Expected Output"
-                        value={activeTestCase.expectedOutput}
-                      />
-                    </>
-                  )}
+                  <CodeDataBox
+                    isSuccess={true}
+                    label="Expected Output"
+                    value={activeTestCase.expectedOutput}
+                  />
 
-                  {!activeTestCase.isHidden && activeTestCase.error && (
+                  {activeTestCase.error && (
                     <details style={{ marginTop: 8 }}>
                       <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--text-muted)" }}>
                         Failure Reason

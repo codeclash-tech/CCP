@@ -106,7 +106,7 @@ router.post(
   submitQuestionSolution,
 );
 
-// Debug run (stateless, read-only, visible test cases only, does NOT create a submission)
+// Debug run (stateless and read-only; does NOT create a submission)
 router.post(
   "/:roomCode/run",
   authenticate,

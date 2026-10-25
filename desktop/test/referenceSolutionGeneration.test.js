@@ -14,24 +14,22 @@ const question = {
   referenceSolution:
     "public class Solution { public int add(int a, int b) { return a + b; } }",
   referenceSolutionLanguage: "java",
-  visibleTestCases: [
+  testCases: [
     {
       parameterValues: { a: "1", b: "2" },
-      description: "parameter-based visible case",
+      description: "parameter-based case",
     },
     { input: "7\n8", expectedOutput: "old", description: "legacy raw case" },
-  ],
-  hiddenTestCases: [
     {
       input: "20\n22",
       expectedOutput: "",
-      description: "legacy hidden case",
+      description: "additional case",
       customMetadata: "preserved",
     },
   ],
 };
 
-test("Desktop reference generation batches visible and hidden cases through the local engine", async () => {
+test("Desktop reference generation batches all test cases through the local engine", async () => {
   let executionRequest;
   let backendCalled = false;
   const desktopBridge = {
@@ -65,21 +63,19 @@ test("Desktop reference generation batches visible and hidden cases through the 
     { input: "7\n8", expectedOutput: "__REFERENCE_OUTPUT_SENTINEL__" },
     { input: "20\n22", expectedOutput: "__REFERENCE_OUTPUT_SENTINEL__" },
   ]);
-  assert.deepEqual(generated.visibleTestCases, [
+  assert.deepEqual(generated.testCases, [
     {
-      ...question.visibleTestCases[0],
+      ...question.testCases[0],
       input: "1\n2",
       expectedOutput: "3",
     },
     {
-      ...question.visibleTestCases[1],
+      ...question.testCases[1],
       input: "7\n8",
       expectedOutput: "15",
     },
-  ]);
-  assert.deepEqual(generated.hiddenTestCases, [
     {
-      ...question.hiddenTestCases[0],
+      ...question.testCases[2],
       input: "20\n22",
       expectedOutput: "42",
     },
@@ -91,7 +87,7 @@ test("Desktop reference generation batches visible and hidden cases through the 
 
 test("Web reference generation keeps using the backend authoring endpoint", async () => {
   let backendQuestion;
-  const response = { accepted: true, visibleTestCases: [], hiddenTestCases: [] };
+  const response = { accepted: true, testCases: [] };
   const generated = await generateReferenceOutputs(
     question,
     undefined,
@@ -175,8 +171,8 @@ test("void reference functions allow the wrapper's null output", async () => {
 
   assert.equal(generated.accepted, true);
   assert.deepEqual(
-    generated.visibleTestCases.map((testCase) => testCase.expectedOutput),
-    ["null", "null"],
+    generated.testCases.map((testCase) => testCase.expectedOutput),
+    ["null", "null", "null"],
   );
 });
 
