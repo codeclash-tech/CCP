@@ -137,7 +137,7 @@ test("participant question resolution rejects missing or incomplete cycle snapsh
   );
 });
 
-test("saving an admin draft does not change the published question or schedule", async (t) => {
+test("saving a published queue updates upcoming questions without changing today's assignment", async (t) => {
   const activeQuestionId = new mongoose.Types.ObjectId();
   const upcomingQuestionId = new mongoose.Types.ObjectId();
   const startAt = new Date(Date.now() - 60 * 60 * 1000);
@@ -152,8 +152,10 @@ test("saving an admin draft does not change the published question or schedule",
   t.mock.method(Challenge, "find", () => ({
     select: async () => [{ _id: upcomingQuestionId }],
   }));
+  let filter;
   let update;
-  t.mock.method(GlobalChallenge, "findOneAndUpdate", (_filter, changes) => {
+  t.mock.method(GlobalChallenge, "findOneAndUpdate", (query, changes) => {
+    filter = query;
     update = changes;
     return populatedQuery(existing);
   });
@@ -164,10 +166,13 @@ test("saving an admin draft does not change the published question or schedule",
     questionIds: [String(upcomingQuestionId)],
   });
 
-  assert.deepEqual(Object.keys(update.$set), ["draft"]);
-  assert.equal(update.$set.draft.name, "Edited Challenge");
-  assert.deepEqual(update.$set.draft.questionIds, [String(upcomingQuestionId)]);
-  assert.equal(update.$set.draft.timezone, "Asia/Kolkata");
+  assert.equal(filter.lastScheduledCycleKey, existing.lastScheduledCycleKey);
+  assert.equal(String(filter.activeQuestionId), String(activeQuestionId));
+  assert.deepEqual(filter.questionIds, []);
+  assert.deepEqual(update.$set.questionIds, [String(upcomingQuestionId)]);
+  assert.equal(update.$set.status, "ACTIVE");
+  assert.deepEqual(update.$unset, { draft: "" });
+  assert.equal("activeQuestionId" in update.$set, false);
 });
 
 test("publishing a draft updates only future rotation while retaining the active cycle lock", async (t) => {

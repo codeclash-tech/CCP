@@ -1,14 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  ArrowRight,
-  BookOpen,
-  CheckCircle2,
-  Plus,
-  RefreshCw,
-  Save,
-  X,
-} from "lucide-react";
+import { ArrowRight, BookOpen, Save } from "lucide-react";
 import api from "../services/api";
 import {
   CATEGORY_VALUES,
@@ -37,6 +29,7 @@ const EMPTY_QUESTION = {
   visibleTestCases: [],
   hiddenTestCases: [],
 };
+const QUESTION_DRAFT_KEY = "ccp_super_admin_question_in_progress";
 
 function hasParameterValues(testCase, signature) {
   return (signature?.params || []).every((parameter) => {
@@ -81,108 +74,56 @@ function prepareCases(
 }
 
 export default function AdminQuestions() {
-  const [challenges, setChallenges] = useState([]);
-  const [globalChallenge, setGlobalChallenge] = useState(null);
-  const [questionIds, setQuestionIds] = useState([]);
   const [form, setForm] = useState(EMPTY_QUESTION);
   const [formVersion, setFormVersion] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [formRestored, setFormRestored] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [createdQuestionId, setCreatedQuestionId] = useState("");
-  const [rotationSavingId, setRotationSavingId] = useState("");
-
-  const loadChallenges = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
     try {
-      const [challengeResponse, configurationResponse] = await Promise.all([
-        api.get("/challenges", { params: { page: 1, limit: 100 } }),
-        api.get("/weekly-assessments/admin/global-challenge"),
-      ]);
-      const savedConfiguration = configurationResponse.data.globalChallenge;
-      setChallenges(challengeResponse.data.challenges || []);
-      setGlobalChallenge(savedConfiguration);
-      setQuestionIds(
-        (savedConfiguration?.questionIds || []).map((item) =>
-          String(item?._id || item),
-        ),
-      );
-    } catch (loadError) {
-      setError(loadError.message || "Could not load the saved question pool.");
+      const savedDraft = window.localStorage.getItem(QUESTION_DRAFT_KEY);
+      if (savedDraft) {
+        const parsedDraft = JSON.parse(savedDraft);
+        if (!parsedDraft || typeof parsedDraft !== "object" || Array.isArray(parsedDraft)) {
+          throw new Error("Saved question data has an invalid format.");
+        }
+        setForm({ ...EMPTY_QUESTION, ...parsedDraft });
+        setNotice("Your in-progress question was restored.");
+      }
+    } catch (restoreError) {
+      setError(restoreError.message || "Could not restore the saved question.");
     } finally {
-      setLoading(false);
+      setFormRestored(true);
     }
   }, []);
 
   useEffect(() => {
-    loadChallenges();
-  }, [loadChallenges]);
+    if (!formRestored) return;
+    try {
+      const hasContent = Object.entries(form).some(([key, value]) =>
+        JSON.stringify(value) !== JSON.stringify(EMPTY_QUESTION[key]),
+      );
+      if (hasContent) {
+        window.localStorage.setItem(QUESTION_DRAFT_KEY, JSON.stringify(form));
+      } else {
+        window.localStorage.removeItem(QUESTION_DRAFT_KEY);
+      }
+    } catch (saveError) {
+      setError(saveError.message || "Could not autosave the question on this device.");
+    }
+  }, [form, formRestored]);
 
   const updateQuestion = (fields) => {
     setForm((current) => ({ ...current, ...fields }));
     setError("");
     setNotice("");
-    setCreatedQuestionId("");
-  };
-
-  const resetQuestion = () => {
-    setForm(EMPTY_QUESTION);
-    setFormVersion((version) => version + 1);
-    setError("");
-    setNotice("");
-    setCreatedQuestionId("");
-  };
-
-  const saveRotation = async (nextQuestionIds) => {
-    if (!globalChallenge) {
-      throw new Error("Set up the Global Challenge before adding questions to its daily queue.");
-    }
-    const { data } = await api.put(
-      "/weekly-assessments/admin/global-challenge",
-      {
-        name: globalChallenge.name,
-        startAt: globalChallenge.startAt,
-        questionIds: nextQuestionIds,
-      },
-    );
-    const savedConfiguration = data.globalChallenge;
-    setGlobalChallenge(savedConfiguration);
-    setQuestionIds(
-      (savedConfiguration?.questionIds || []).map((item) =>
-        String(item?._id || item),
-      ),
-    );
-  };
-
-  const updateQuestionRotation = async (questionId) => {
-    setRotationSavingId(questionId);
-    setError("");
-    setNotice("");
-    const isInRotation = questionIds.includes(questionId);
-    const nextQuestionIds = isInRotation
-      ? questionIds.filter((id) => id !== questionId)
-      : [...questionIds, questionId];
-    try {
-      await saveRotation(nextQuestionIds);
-      setNotice(
-        isInRotation
-          ? "Question removed from the daily queue."
-          : "Question added to the end of the daily queue.",
-      );
-    } catch (rotationError) {
-      setError(rotationError.message || "Could not update the daily question queue.");
-    } finally {
-      setRotationSavingId("");
-    }
   };
 
   const createQuestion = async () => {
     setSaving(true);
     setError("");
     setNotice("");
-    setCreatedQuestionId("");
     try {
       if (!form.title.trim() || !form.description.trim() || !form.constraints.trim()) {
         throw new Error("Complete the question title, problem statement, and constraints.");
@@ -254,25 +195,16 @@ export default function AdminQuestions() {
           ? { referenceSolutionValidatedLocally: true }
           : {}),
       };
-      const { data } = await api.post("/challenges", payload);
-      const questionId = String(data.challenge?.id || data.challenge?._id || "");
-      await loadChallenges();
+      await api.post("/challenges", payload);
       setForm(EMPTY_QUESTION);
       setFormVersion((version) => version + 1);
-      setCreatedQuestionId(questionId);
-      if (globalChallenge && questionId && !questionIds.includes(questionId)) {
-        try {
-          await saveRotation([...questionIds, questionId]);
-          setNotice(
-            "Question created, reference-solution checks passed, and it was added to the end of the daily queue.",
-          );
-        } catch (rotationError) {
-          setError(
-            `Question created, but it could not be added to the daily queue: ${rotationError.message || "Please try again from Saved questions."}`,
-          );
-        }
-      } else {
-        setNotice("Question created and reference-solution checks passed.");
+      setNotice("Question created.");
+      try {
+        window.localStorage.removeItem(QUESTION_DRAFT_KEY);
+      } catch (storageError) {
+        setError(
+          `Question created, but its local autosave could not be cleared: ${storageError.message || "Storage unavailable."}`,
+        );
       }
     } catch (saveError) {
       const details = saveError.response?.data?.details;
@@ -295,50 +227,19 @@ export default function AdminQuestions() {
     <main className="weekly-admin-page">
       <header className="weekly-admin-heading">
         <div>
-          <p className="weekly-eyebrow">SUPER ADMIN · QUESTION MANAGEMENT</p>
-          <h1><BookOpen size={23} /> Question pool</h1>
-          <p>
-            Build one question at a time with guided fields, parameter-based test
-            cases, and automatic reference-answer checks.
-          </p>
+          <p className="weekly-eyebrow">SUPER ADMIN</p>
+          <h1><BookOpen size={23} /> Create question</h1>
         </div>
         <div className="weekly-question-actions">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={loadChallenges}
-            disabled={loading}
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-          <button type="button" className="btn-secondary" onClick={resetQuestion}>
-            <Plus size={14} /> New question
-          </button>
           <Link className="btn-secondary weekly-question-link" to="/admin">
-            Manage daily queue <ArrowRight size={14} />
+            Global Challenge <ArrowRight size={14} />
           </Link>
         </div>
       </header>
 
       {error && <p className="weekly-admin-alert" role="alert">{error}</p>}
       {notice && <p className="weekly-admin-notice" role="status">{notice}</p>}
-
-      {createdQuestionId && (
-        <section className="weekly-admin-card weekly-question-created">
-          <CheckCircle2 size={20} aria-hidden="true" />
-          <div>
-            <strong>Question saved</strong>
-            <p>
-              {globalChallenge
-                ? "It is available in the question pool. Queue changes apply to upcoming days; today's question stays unchanged."
-                : "Set up the Global Challenge daily queue, then add this question from the saved questions list."}
-            </p>
-          </div>
-          <Link to="/admin">
-            {globalChallenge ? "Manage rotation" : "Set up Global Challenge"} <ArrowRight size={14} />
-          </Link>
-        </section>
-      )}
+      <p className="weekly-question-autosave" role="status">Progress saves automatically on this device.</p>
 
       <section className="weekly-admin-card weekly-admin-form">
         <h2>1. Question details</h2>
@@ -459,66 +360,13 @@ export default function AdminQuestions() {
             className="btn-primary"
             type="button"
             onClick={createQuestion}
-            disabled={saving || loading}
+            disabled={saving || !formRestored}
           >
             <Save size={15} /> {saving ? "Creating question…" : "Create question"}
           </button>
         </div>
       </section>
 
-      <section className="weekly-admin-card">
-        <div className="weekly-question-library-heading">
-          <div>
-            <h2>Saved questions</h2>
-            <p>{loading ? "Loading questions…" : `${challenges.length} question${challenges.length === 1 ? "" : "s"} in the pool`}</p>
-          </div>
-          <Link to="/admin">Add or remove questions from the daily queue</Link>
-        </div>
-        {!loading && challenges.length === 0 ? (
-          <p>No saved questions yet. Create the first question above.</p>
-        ) : (
-          <div className="weekly-question-library">
-            {challenges.map((challenge) => {
-              const questionId = String(challenge._id || challenge.id);
-              const inRotation = questionIds.includes(questionId);
-              return (
-                <article className="weekly-question-library-item" key={questionId}>
-                  <div>
-                    <strong>{challenge.title}</strong>
-                    <small>{challenge.category || "Custom"} · {challenge.difficulty || "Question"}</small>
-                  </div>
-                  <div className="weekly-question-library-controls">
-                    <span className={`weekly-status ${challenge.isActive ? "status-active" : ""}`}>
-                      {challenge.isActive ? "Available" : "Archived"}
-                    </span>
-                    {challenge.isActive && (
-                      <button
-                        type="button"
-                        className={inRotation ? "weekly-rotation-remove" : "weekly-rotation-add"}
-                        onClick={() => updateQuestionRotation(questionId)}
-                        disabled={
-                          loading ||
-                          saving ||
-                          rotationSavingId === questionId ||
-                          (inRotation && questionIds.length <= 1)
-                        }
-                        aria-label={`${inRotation ? "Remove" : "Add"} ${challenge.title} ${inRotation ? "from" : "to"} the rotation`}
-                        title={inRotation && questionIds.length <= 1
-                          ? "At least one question must remain in the rotation"
-                          : undefined}
-                      >
-                        {inRotation
-                          ? <><X size={14} /> Remove from rotation</>
-                          : <><Plus size={14} /> Add to rotation</>}
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
     </main>
   );
 }

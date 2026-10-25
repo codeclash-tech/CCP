@@ -22,6 +22,7 @@ import {
   removeCandidateOrganization,
   retryWeeklyAnswer,
   submitWeeklyAnswer,
+  ensureCurrentGlobalCycle,
   createWeeklyLocalExecutionGrant,
   finalizeWeeklyLocalExecution,
   saveGlobalChallengeConfiguration,
@@ -283,8 +284,9 @@ export async function createWeeklyCycleHandler(req, res) {
 
 export async function getAdminGlobalChallenge(req, res) {
   try {
+    const currentCycle = await ensureCurrentGlobalCycle();
     const globalChallenge = await getGlobalChallengeConfiguration();
-    return res.json({ globalChallenge });
+    return res.json({ globalChallenge, currentCycle });
   } catch (error) {
     return sendFailure(res, error, "Could not load the global challenge.");
   }

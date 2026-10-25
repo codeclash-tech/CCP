@@ -378,6 +378,37 @@ export async function saveGlobalChallengeConfiguration({
     }
   }
 
+  if (hasPublishedConfiguration) {
+    if (
+      existing.activeQuestionId &&
+      normalizedIds.includes(String(existing.activeQuestionId))
+    ) {
+      throw requestError("Today's assigned question cannot be added to the upcoming queue.", 409);
+    }
+    const updated = await GlobalChallenge.findOneAndUpdate(
+      {
+        key: "global",
+        lastScheduledCycleKey: existing.lastScheduledCycleKey ?? null,
+        activeQuestionId: existing.activeQuestionId ?? null,
+        questionIds: existing.questionIds || [],
+      },
+      {
+        $set: {
+          questionIds: normalizedIds,
+          status: existing.startAt > now ? "SCHEDULED" : "ACTIVE",
+        },
+        $unset: { draft: "" },
+      },
+      { new: true, runValidators: true },
+    )
+      .populate("questionIds", "title difficulty isActive")
+      .populate("activeQuestionId", "title difficulty isActive");
+    if (!updated) {
+      throw requestError("The daily queue changed before it was saved. Reload and try again.", 409);
+    }
+    return updated;
+  }
+
   const draft = {
     name: String(name || "").trim(),
     timezone: "Asia/Kolkata",
