@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   AlertCircle,
-  CheckCircle2,
   Clock3,
   Code2,
   EyeOff,
@@ -79,7 +79,6 @@ export default function WeeklyAssessment() {
   const [assessment, setAssessment] = useState(null);
   const [code, setCode] = useState("");
   const [localResult, setLocalResult] = useState(null);
-  const [submissionResult, setSubmissionResult] = useState(null);
   const [recoverableSubmissions, setRecoverableSubmissions] = useState([]);
   const [retryingId, setRetryingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -111,7 +110,6 @@ export default function WeeklyAssessment() {
           currentError.message === "There is no active weekly assessment.") {
           setAssessment(null);
           setCode("");
-          setSubmissionResult(null);
           return;
         }
         throw currentError;
@@ -120,7 +118,6 @@ export default function WeeklyAssessment() {
       if (!data?.cycle || !data?.question) {
         setAssessment(null);
         setCode("");
-        setSubmissionResult(null);
         return;
       }
       setAssessment(data);
@@ -131,9 +128,6 @@ export default function WeeklyAssessment() {
       const saved = readSavedSource(key);
       const initialCode = data.question.starterCodes?.java || "";
       setCode(saved?.code ?? initialCode);
-      setSubmissionResult(data.submission?.status === "FINALIZED"
-        ? { ...data.submission, status: data.submission.resultStatus }
-        : null);
       if (data.submission?.status === "FINALIZED") {
         try {
           localStorage.removeItem(key);
@@ -381,6 +375,12 @@ export default function WeeklyAssessment() {
       String(submission.cycleId) !== String(assessment.cycle.id) ||
       submission.dayIndex !== assessment.dayIndex,
   );
+  const completedRecoverySubmissions = displayedRecoverySubmissions.filter(
+    (submission) => submission.status === "FINALIZED",
+  );
+  const unresolvedRecoverySubmissions = displayedRecoverySubmissions.filter(
+    (submission) => submission.status !== "FINALIZED",
+  );
 
   if (loading) {
     return <section className="weekly-page" aria-busy="true"><p>Loading today’s global challenge…</p></section>;
@@ -388,28 +388,35 @@ export default function WeeklyAssessment() {
   if (!assessment) {
     return (
       <section className="weekly-page">
-        <header className="weekly-heading">
-          <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
-          <h1>Daily challenge</h1>
-          <p>No daily challenge is open right now. Check back tomorrow for the next challenge.</p>
-        </header>
+        {completedRecoverySubmissions.length === 0 && (
+          <header className="weekly-heading">
+            <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
+            <h1>Daily challenge</h1>
+            <p>No daily challenge is open right now. Check back tomorrow for the next challenge.</p>
+          </header>
+        )}
         {error && <p className="weekly-error" role="alert">{error}</p>}
-        {displayedRecoverySubmissions.length > 0 && (
+        {completedRecoverySubmissions.length > 0 && (
+          <section className="weekly-completion-card">
+            <p className="weekly-eyebrow">DAILY CHALLENGE</p>
+            <h2>Daily challenge completed</h2>
+            <p>Your submission is complete. Visit the leaderboard or certificate library.</p>
+            <div className="weekly-completion-actions">
+              <Link className="weekly-completion-primary" to="/rankings">See leaderboard</Link>
+              <Link className="weekly-completion-secondary" to="/certificates">View certificates</Link>
+            </div>
+          </section>
+        )}
+        {unresolvedRecoverySubmissions.length > 0 && (
           <section className="weekly-recovery-list">
             <h2>Daily submission status</h2>
-            <p>Your submission status and results remain available during the recovery window.</p>
-            {displayedRecoverySubmissions.map((submission) => (
+            <p>Your submission is being processed or can be retried.</p>
+            {unresolvedRecoverySubmissions.map((submission) => (
               <div className="weekly-recovery-row" key={submission.id}>
                 <span>
-                  {submission.questionTitle} · {submission.status === "FINALIZED"
-                    ? `Final result: ${submission.resultStatus}`
-                    : submission.status}
+                  {submission.questionTitle} · {submission.canRetry ? "Ready to retry" : "Verifying"}
                 </span>
-                {submission.status === "FINALIZED" ? (
-                  <span role="status">
-                    {submission.passed} / {submission.total} tests · {Number(submission.score).toFixed(2)} points
-                  </span>
-                ) : submission.canRetry ? (
+                {submission.canRetry ? (
                   <button
                     className="btn-secondary"
                     type="button"
@@ -429,8 +436,7 @@ export default function WeeklyAssessment() {
     );
   }
 
-  const hasFinalSubmission =
-    Boolean(submissionResult) || assessment.submission?.status === "FINALIZED";
+  const hasFinalSubmission = assessment.submission?.status === "FINALIZED";
   const isVerifying = [
     "PENDING_VERIFICATION",
     "VERIFYING",
@@ -442,6 +448,13 @@ export default function WeeklyAssessment() {
     assessment.roster?.participationStatus === "DISQUALIFIED";
   const canRetry =
     assessment.submission?.status === "RETRYABLE";
+  const hasSubmitted = [
+    "PENDING_VERIFICATION",
+    "VERIFYING",
+    "JUDGING",
+    "RETRYABLE",
+    "FINALIZED",
+  ].includes(assessment.submission?.status);
   const hasStartedChallenge =
     challengeStarted ||
     (startedCycleId === String(assessment.cycle.id) &&
@@ -452,6 +465,55 @@ export default function WeeklyAssessment() {
     !isVerifying &&
     !canRetry &&
     !isDisqualified;
+
+  if (hasSubmitted || isDisqualified) {
+    const isComplete = hasFinalSubmission;
+    const isRetryable = canRetry;
+    return (
+      <main className="weekly-completion-page">
+        <section className="weekly-completion-card">
+          <p className="weekly-eyebrow">DAILY CHALLENGE</p>
+          <h1>
+            {isComplete
+              ? "Daily challenge completed"
+              : isDisqualified
+                ? "Daily challenge ended"
+                : isRetryable
+                  ? "Submission needs a retry"
+                  : "Submission received"}
+          </h1>
+          <p>
+            {isComplete
+              ? "Your submission is complete. Visit the leaderboard or certificate library."
+              : isDisqualified
+                ? "This challenge attempt has ended."
+                : isRetryable
+                  ? "We could not complete verification. Retry your saved submission to finish."
+                  : "Your submission is being finalized. This page will update when processing is complete."}
+          </p>
+          {error && <p className="weekly-error" role="alert"><AlertCircle size={16} />{error}</p>}
+          {isRetryable && (
+            <button
+              className="weekly-completion-primary"
+              type="button"
+              onClick={() => retrySavedSubmission({
+                ...assessment.submission,
+                id: assessment.submission.submissionId,
+                cycleId: assessment.cycle.id,
+              })}
+              disabled={Boolean(retryingId)}
+            >
+              {retryingId ? "Submitting retry…" : "Retry saved submission"}
+            </button>
+          )}
+          <div className="weekly-completion-actions">
+            <Link className="weekly-completion-primary" to="/rankings">See leaderboard</Link>
+            <Link className="weekly-completion-secondary" to="/certificates">View certificates</Link>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     showInstructions ? (
@@ -521,22 +583,16 @@ export default function WeeklyAssessment() {
             <p>Submit your saved solution again to continue.</p>
           </section>
         )}
-        {displayedRecoverySubmissions.length > 0 && (
+        {unresolvedRecoverySubmissions.length > 0 && (
           <section className="weekly-recovery-list weekly-coding-notice">
             <h2>Daily submission status</h2>
-            <p>Your submission status and results remain available during the recovery window.</p>
-            {displayedRecoverySubmissions.map((submission) => (
+            <p>Your earlier submission is being processed or can be retried.</p>
+            {unresolvedRecoverySubmissions.map((submission) => (
               <div className="weekly-recovery-row" key={submission.id}>
                 <span>
-                  {submission.questionTitle} · {submission.status === "FINALIZED"
-                    ? `Final result: ${submission.resultStatus}`
-                    : submission.status}
+                  {submission.questionTitle} · {submission.canRetry ? "Ready to retry" : "Verifying"}
                 </span>
-                {submission.status === "FINALIZED" ? (
-                  <span role="status">
-                    {submission.passed} / {submission.total} tests · {Number(submission.score).toFixed(2)} points
-                  </span>
-                ) : submission.canRetry ? (
+                {submission.canRetry ? (
                   <button
                     className="btn-secondary"
                     type="button"
@@ -597,8 +653,6 @@ export default function WeeklyAssessment() {
             <div className="weekly-editor-status" role="status" aria-live="polite">
               {isVerifying ? (
                 <><strong>Submission received.</strong> Your result is being finalized.</>
-              ) : hasFinalSubmission ? (
-                <><strong>Final result:</strong> {submissionResult?.passed ?? assessment.submission.passed}/{submissionResult?.total ?? assessment.submission.total} tests passed · {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} points</>
               ) : canRetry ? (
                 <>Verification could not be completed. Retry the exact saved source.</>
               ) : (
@@ -635,13 +689,6 @@ export default function WeeklyAssessment() {
                 onHeightChange={setConsoleHeight}
               />
             </div>
-            {hasFinalSubmission && (
-              <section className="weekly-result weekly-authoritative-result weekly-final-result" aria-live="polite">
-                <h3><CheckCircle2 size={16} /> Final result · {submissionResult?.resultStatus || assessment.submission.resultStatus}</h3>
-                <p>{submissionResult?.passed ?? assessment.submission.passed} / {submissionResult?.total ?? assessment.submission.total} test cases passed</p>
-                <p>Daily score: {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} / 100</p>
-              </section>
-            )}
           </section>
         </div>
         <ProctorGuard
@@ -656,6 +703,7 @@ export default function WeeklyAssessment() {
               !isVerifying &&
               !serverDisqualified,
           )}
+          showIntegrityWarnings={false}
           onExit={endChallenge}
         />
       </main>

@@ -48,6 +48,74 @@
   box-shadow: 0 16px 48px rgb(0 0 0 / 20%);
 }
 
+.weekly-completion-page {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: clamp(20px, 4vw, 48px) var(--page-gutter);
+  color: var(--text-primary);
+  background: var(--bg-main);
+}
+
+.weekly-completion-card {
+  width: min(620px, 100%);
+  padding: clamp(24px, 5vw, 40px);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 100% 0%, rgb(226 180 79 / 10%), transparent 45%),
+    var(--bg-elevated);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 24%);
+}
+
+.weekly-completion-card h1,
+.weekly-completion-card h2 {
+  margin: 10px 0;
+  font-size: clamp(26px, 4vw, 34px);
+  letter-spacing: -0.035em;
+}
+
+.weekly-completion-card > p:not(.weekly-eyebrow):not(.weekly-error) {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.weekly-completion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.weekly-completion-primary,
+.weekly-completion-secondary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.weekly-completion-primary {
+  color: #211708;
+  background: linear-gradient(120deg, #ffe8a4, #e4ad3e);
+}
+
+.weekly-completion-secondary {
+  border-color: rgb(244 199 104 / 30%);
+  color: #f2deb1;
+  background: rgb(244 199 104 / 6%);
+}
+
 .weekly-instructions-card .weekly-eyebrow {
   margin: 0 0 10px;
 }

@@ -343,6 +343,10 @@ export default function BattleRoom() {
 
   return (
     <div className="battle-room-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
+      <blockquote className="battle-room-quote">
+        <p>Every great solution begins with one bold move.</p>
+        <cite>CodeClash</cite>
+      </blockquote>
       <header className="battle-room-hero">
         <div className="battle-room-hero-copy">
           <p className="battle-room-hero-eyebrow">CODECLASH BATTLES</p>

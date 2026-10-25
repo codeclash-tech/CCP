@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Code2, Maximize2, Minimize2, Minus, X } from "lucide-react";
+import { Maximize2, Minimize2, Minus, X } from "lucide-react";
+import codeclashLogo from "../../../../desktop/assets/codeclash.ico";
 
 export default function DesktopTitleBar() {
   const [maximized, setMaximized] = useState(false);
@@ -43,9 +44,7 @@ export default function DesktopTitleBar() {
       aria-label="CodeClash window controls"
     >
       <div className="desktop-titlebar-brand">
-        <span className="desktop-titlebar-mark">
-          <Code2 size={21} strokeWidth={2.2} aria-hidden="true" />
-        </span>
+        <img className="desktop-titlebar-mark" src={codeclashLogo} alt="" />
         <strong>CodeClash</strong>
       </div>
       <div className="desktop-titlebar-actions">

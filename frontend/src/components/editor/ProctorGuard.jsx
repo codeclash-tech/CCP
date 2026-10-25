@@ -9,6 +9,7 @@ export default function ProctorGuard({
   onIntegrityEvent,
   enabled,
   onExit,
+  showIntegrityWarnings = true,
 }) {
   const {
     isFullscreen,
@@ -141,7 +142,7 @@ export default function ProctorGuard({
         </div>
       )}
 
-      {warning && (
+      {showIntegrityWarnings && warning && (
         <div className="pg-warning-bar">
           <AlertTriangle size={13} style={{ marginRight: 6, verticalAlign: "middle" }} />
           {warning.message} {warning.reason ? `Reason: ${warning.reason}` : ""}
