@@ -26,6 +26,7 @@ import {
   shouldWaitForWeeklyRecovery,
   takeNextQueuedQuestion,
   WEEKLY_SHRINKAGE_K,
+  isWeeklyParticipationEligible,
 } from "../utils/weeklyAssessment.js";
 import {
   LOCAL_EXECUTION_PROTOCOL_VERSION,
@@ -1554,6 +1555,8 @@ async function refreshCycleRosterScores(cycleId) {
         $group: {
           _id: "$rosterEntryId",
           score: { $sum: "$score" },
+          passedTestCases: { $sum: "$passed" },
+          totalTestCases: { $sum: "$total" },
           completedDays: { $addToSet: "$dayIndex" },
           lastSubmittedAt: { $max: "$finalizedAt" },
         },
@@ -1573,6 +1576,9 @@ async function refreshCycleRosterScores(cycleId) {
             $set: {
               score: Math.round((Number(aggregate?.score) || 0) * 100) / 100,
               completedDays,
+              passedTestCases: Number(aggregate?.passedTestCases) || 0,
+              totalTestCases: Number(aggregate?.totalTestCases) || 0,
+              resultFinalizedAt: aggregate?.lastSubmittedAt || null,
               participationStatus: completedDays.length ? "PARTICIPATED" : "NOT_STARTED",
               lastSubmittedAt: aggregate?.lastSubmittedAt || null,
             },
@@ -1817,38 +1823,44 @@ export function getWeeklyCertificateCategory(rank, type = "INDIVIDUAL") {
 async function persistWeeklyCertificates(cycle, rankings, roster) {
   const issuedAt = new Date();
   const rosterById = new Map(roster.map((entry) => [String(entry.candidateId), entry]));
-  for (const ranking of rankings.individualRankings) {
-    if (ranking.status === "MISSED" || ranking.status === "DISQUALIFIED") continue;
-    const category = getWeeklyCertificateCategory(ranking.rank);
+  const rankedById = new Map(
+    rankings.individualRankings.map((ranking) => [
+      String(ranking.candidateId),
+      ranking,
+    ]),
+  );
+  for (const [candidateId, rosterEntry] of rosterById) {
+    if (!isWeeklyParticipationEligible(rosterEntry)) continue;
+    const ranking = rankedById.get(candidateId);
+    const category = ranking
+      ? getWeeklyCertificateCategory(ranking.rank)
+      : "PARTICIPATION";
     await WeeklyCertificate.updateOne(
-      { cycleId: cycle._id, userId: ranking.candidateId, type: "INDIVIDUAL" },
+      { cycleId: cycle._id, userId: rosterEntry.candidateId, type: "INDIVIDUAL" },
       {
         $setOnInsert: {
           certificateId: `DLY-${cycle.cycleKey.replaceAll("-", "")}-I-${randomUUID().toUpperCase()}`,
           cycleId: cycle._id,
           type: "INDIVIDUAL",
           category,
-          userId: ranking.candidateId,
+          userId: rosterEntry.candidateId,
           snapshot: {
-            subjectName: ranking.candidateNameSnapshot,
-            organizationName: ranking.organizationNameSnapshot,
+            subjectName: rosterEntry.candidateNameSnapshot,
+            organizationName: rosterEntry.organizationNameSnapshot,
             assessmentName: cycle.name,
             cycleKey: cycle.cycleKey,
-            score: ranking.score,
-            rank: ranking.rank,
+            score: rosterEntry.score,
+            rank: ranking?.rank ?? null,
             issuedAt,
           },
         },
       },
       { upsert: true },
     );
-    if (!rosterById.has(String(ranking.candidateId))) {
-      throw new Error("Certificate ranking candidate is missing from the frozen roster.");
-    }
   }
 
   for (const ranking of rankings.organizationRankings.slice(0, 3)) {
-    if (ranking.participatingEligibleCandidates === 0) continue;
+    if (ranking.eligibleCandidates === 0) continue;
     const category = getWeeklyCertificateCategory(ranking.rank, "ORGANIZATION");
     await WeeklyCertificate.updateOne(
       { cycleId: cycle._id, organizationId: ranking.organizationId, type: "ORGANIZATION" },

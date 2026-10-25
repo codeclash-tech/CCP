@@ -1,7 +1,7 @@
 .weekly-page {
   width: min(1440px, 100%);
   margin: 0 auto;
-  padding: clamp(20px, 4vw, 48px);
+  padding: clamp(20px, 4vw, 48px) var(--page-gutter);
   color: var(--text-primary);
 }
 
@@ -33,7 +33,7 @@
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  padding: clamp(20px, 4vw, 48px);
+  padding: clamp(20px, 4vw, 48px) var(--page-gutter);
   color: var(--text-primary);
   background: var(--bg-main);
 }
@@ -46,18 +46,6 @@
   border-radius: 18px;
   background: var(--bg-elevated);
   box-shadow: 0 16px 48px rgb(0 0 0 / 20%);
-}
-
-.weekly-instructions-icon {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  margin-bottom: 22px;
-  border: 1px solid var(--accent-blue);
-  border-radius: 12px;
-  color: var(--accent-blue-bright);
-  background: var(--accent-blue-soft);
 }
 
 .weekly-instructions-card .weekly-eyebrow {
@@ -114,18 +102,19 @@
   margin-top: 28px;
   padding: 18px 24px;
   overflow: hidden;
-  border: 1px solid rgb(191 219 254 / 75%);
+  border: 1px solid rgb(255 235 173 / 76%);
   border-radius: 14px;
-  color: #fff;
+  color: #211708;
   background:
-    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 28%), transparent 58%),
-    linear-gradient(110deg, #1d4ed8 0%, #2563eb 42%, #6d28d9 100%);
+    radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 44%), transparent 58%),
+    linear-gradient(110deg, #ffe8a4 0%, #f4cc69 48%, #e4ad3e 100%);
   box-shadow:
-    0 12px 30px rgb(37 99 235 / 35%),
-    inset 0 1px 0 rgb(255 255 255 / 25%);
+    0 12px 30px rgb(226 180 79 / 28%),
+    inset 0 1px 0 rgb(255 255 255 / 45%);
   font-size: clamp(17px, 2vw, 21px);
-  font-weight: 800;
-  letter-spacing: 0.01em;
+  font-family: var(--font-ui);
+  font-weight: 760;
+  letter-spacing: 0.015em;
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
 }
@@ -149,10 +138,10 @@
 }
 
 .weekly-ready-button:hover {
-  filter: brightness(1.12);
+  filter: brightness(1.08);
   box-shadow:
-    0 16px 40px rgb(37 99 235 / 45%),
-    inset 0 1px 0 rgb(255 255 255 / 30%);
+    0 16px 40px rgb(226 180 79 / 38%),
+    inset 0 1px 0 rgb(255 255 255 / 55%);
   transform: translateY(-2px);
 }
 
@@ -165,7 +154,7 @@
 }
 
 .weekly-ready-button:focus-visible {
-  outline: 3px solid #bfdbfe;
+  outline: 3px solid #ffe8a4;
   outline-offset: 4px;
 }
 
@@ -445,6 +434,12 @@
   background: rgb(127 29 29 / 18%);
 }
 
+.weekly-coding-error {
+  border-color: rgba(226, 180, 79, 0.34);
+  color: #f2d99a;
+  background: rgba(161, 114, 28, 0.13);
+}
+
 .weekly-coding-error,
 .weekly-coding-notice {
   flex: 0 0 auto;
@@ -491,7 +486,7 @@
 @media (max-width: 760px) {
   .weekly-instructions-page {
     justify-content: flex-start;
-    padding: 20px 16px;
+    padding: 20px var(--page-gutter-compact);
   }
 
   .weekly-ready-button {

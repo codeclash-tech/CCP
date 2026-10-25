@@ -8,6 +8,41 @@ import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
 import WeeklySubmission from "../src/models/WeeklySubmission.js";
 import { createWeeklyLocalExecutionGrant } from "../src/services/weeklyAssessmentService.js";
 
+test("Daily Challenge local reservations do not require persisted source code", async () => {
+  const submission = new WeeklySubmission({
+    cycleId: new mongoose.Types.ObjectId(),
+    candidateId: new mongoose.Types.ObjectId(),
+    rosterEntryId: new mongoose.Types.ObjectId(),
+    dayIndex: 0,
+    challengeId: new mongoose.Types.ObjectId(),
+    sourceHash: "a".repeat(64),
+    sourceCode: "",
+    executionMode: "DESKTOP_LOCAL",
+    status: "AUTHORIZED",
+  });
+
+  await assert.doesNotReject(submission.validate());
+});
+
+test("server-verified submissions still require persisted source code", async () => {
+  const submission = new WeeklySubmission({
+    cycleId: new mongoose.Types.ObjectId(),
+    candidateId: new mongoose.Types.ObjectId(),
+    rosterEntryId: new mongoose.Types.ObjectId(),
+    dayIndex: 0,
+    challengeId: new mongoose.Types.ObjectId(),
+    sourceHash: "a".repeat(64),
+    sourceCode: "",
+    executionMode: "SERVER_VERIFIED",
+    status: "PENDING_VERIFICATION",
+  });
+
+  await assert.rejects(
+    submission.validate(),
+    (error) => Boolean(error.errors.sourceCode),
+  );
+});
+
 function setupActiveDailyCycle(t, candidateId) {
   const cycleId = new mongoose.Types.ObjectId();
   const challengeId = new mongoose.Types.ObjectId();

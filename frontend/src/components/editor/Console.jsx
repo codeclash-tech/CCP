@@ -289,10 +289,8 @@ export default function Console({
           >
             <strong style={{ color: "var(--text-primary)", fontSize: 14 }}>
               {resultAuthority === "OFFICIAL"
-                ? "Server-verified official result"
-                : resultAuthority === "VISIBLE"
-                  ? "Visible-case run feedback (not official)"
-                  : "Local run feedback (not official)"}
+                ? "Final result"
+                : "Preview result"}
             </strong>
             {result && (
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>

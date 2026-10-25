@@ -106,25 +106,26 @@ export default function RoleNavigation({
               }
               onClick={onNavigate}
             >
-              <Icon size={17} aria-hidden="true" />
-              <span>{label}</span>
-              {path === "/weekly-assessment" && (
+              {path === "/weekly-assessment" ? (
                 dailyChallengeCompleted ? (
                   <LockKeyholeOpen
                     className="daily-challenge-lock"
-                    size={15}
-                    aria-label="Daily challenge completed"
+                    size={17}
+                    aria-hidden="true"
                     title="Daily challenge completed"
                   />
                 ) : (
                   <LockKeyhole
                     className="daily-challenge-lock"
-                    size={15}
-                    aria-label="Daily challenge not completed"
+                    size={17}
+                    aria-hidden="true"
                     title="Daily challenge not completed"
                   />
                 )
+              ) : (
+                <Icon size={17} aria-hidden="true" />
               )}
+              <span>{label}</span>
             </NavLink>
           ))}
         </nav>

@@ -258,6 +258,7 @@ const battleRoomSubmissionSchema = new mongoose.Schema(
       roomTitle: { type: String, default: "" },
       rank: { type: Number, default: 0 },
       totalParticipants: { type: Number, default: 0 },
+      totalTestCases: { type: Number, min: 0, default: 0 },
       completedAt: { type: Date, default: null },
     },
     disqualifyReason: {

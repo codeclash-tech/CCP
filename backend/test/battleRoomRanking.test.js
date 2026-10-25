@@ -5,6 +5,10 @@ import {
   getRoomSubmissionTime,
   sortRoomSubmissions,
 } from "../src/services/battleRoomRanking.js";
+import {
+  isBattleRoomCertificateEligible,
+  isBattleRoomRankedEligible,
+} from "../src/services/battleRoomScoring.js";
 
 test("calculates total room submission time", () => {
   assert.equal(
@@ -55,4 +59,35 @@ test("uses leaderboard tie-breakers when ranking room submissions", () => {
     "COMPLETED",
     "DISQUALIFIED",
   ]);
+});
+
+test("battle certificates require complete execution and at least one passing case", () => {
+  const result = { status: "COMPLETED", totalPassed: 1, totalFailed: 4 };
+  assert.equal(isBattleRoomCertificateEligible(result, 5), true);
+  assert.equal(isBattleRoomRankedEligible(result, 5), false);
+  assert.equal(
+    isBattleRoomCertificateEligible({ ...result, totalPassed: 0 }, 5),
+    false,
+  );
+  assert.equal(isBattleRoomCertificateEligible(result, 6), false);
+  assert.equal(
+    isBattleRoomCertificateEligible({ ...result, status: "DISQUALIFIED" }, 5),
+    false,
+  );
+  assert.equal(
+    isBattleRoomRankedEligible({ ...result, totalPassed: 5, totalFailed: 0 }, 5),
+    true,
+  );
+  assert.equal(
+    isBattleRoomRankedEligible({ ...result, totalPassed: 5, totalFailed: 1 }, 5),
+    false,
+  );
+  assert.equal(
+    isBattleRoomCertificateEligible({ ...result, totalPassed: 2, totalFailed: 4 }, 5),
+    false,
+  );
+  assert.equal(
+    isBattleRoomCertificateEligible({ ...result, totalPassed: -1, totalFailed: 6 }, 5),
+    false,
+  );
 });

@@ -6,7 +6,6 @@ import {
   Code2,
   EyeOff,
   LogOut,
-  Maximize2,
   Monitor,
   Play,
   Send,
@@ -27,10 +26,6 @@ import ProctorGuard from "../components/editor/ProctorGuard";
 import "./WeeklyAssessment.css";
 
 const STARTED_CYCLE_STORAGE_KEY = "ccp-weekly-started-cycle";
-
-function isDesktopLocalResult(submission) {
-  return submission?.executionMode === "DESKTOP_LOCAL";
-}
 
 function recoveryKey(cycleOrId, dayIndex) {
   const cycleId = typeof cycleOrId === "string" ? cycleOrId : cycleOrId.id;
@@ -402,12 +397,12 @@ export default function WeeklyAssessment() {
         {displayedRecoverySubmissions.length > 0 && (
           <section className="weekly-recovery-list">
             <h2>Daily submission status</h2>
-            <p>Server verification continues after you leave this page. Submission status and verified results remain available during the recovery window.</p>
+            <p>Your submission status and results remain available during the recovery window.</p>
             {displayedRecoverySubmissions.map((submission) => (
               <div className="weekly-recovery-row" key={submission.id}>
                 <span>
                   {submission.questionTitle} · {submission.status === "FINALIZED"
-                    ? `Official result: ${submission.resultStatus}`
+                    ? `Final result: ${submission.resultStatus}`
                     : submission.status}
                 </span>
                 {submission.status === "FINALIZED" ? (
@@ -462,18 +457,16 @@ export default function WeeklyAssessment() {
     showInstructions ? (
       <main className="weekly-instructions-page">
         <section className="weekly-instructions-card" aria-labelledby="weekly-instructions-title">
-          <div className="weekly-instructions-icon"><ShieldAlert size={28} /></div>
           <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
           <h1 id="weekly-instructions-title">Before you begin</h1>
           <p className="weekly-instructions-intro">
-            Take on a new coding problem each day, run your solution, and submit
-            it for your daily score. Read and follow these rules for the full
-            challenge session.
+            Solve today&apos;s problem and submit your best solution before time
+            runs out.
           </p>
 
           <ul className="weekly-rules-list">
             <li><Monitor size={19} /><span><strong>Stay in fullscreen.</strong> Continue enters fullscreen; leaving fullscreen during the challenge is a proctoring violation.</span></li>
-            <li><EyeOff size={19} /><span><strong>Stay on this page and keep this window focused.</strong> Switching tabs or windows may disqualify your attempt.</span></li>
+            <li><EyeOff size={19} /><span><strong>Keep this window focused.</strong> Switching tabs or windows may disqualify your attempt.</span></li>
             <li><Code2 size={19} /><span><strong>Write your solution in the coding editor.</strong> Copy and paste are allowed only inside the editor.</span></li>
             <li><ShieldAlert size={19} /><span><strong>Do not open developer tools or view page source.</strong> These actions are blocked during the challenge.</span></li>
             <li><Clock3 size={19} /><span><strong>Manage your time.</strong> The challenge closes when its countdown reaches zero.</span></li>
@@ -486,7 +479,7 @@ export default function WeeklyAssessment() {
             className="weekly-ready-button"
             onClick={enterChallenge}
           >
-            <span><Maximize2 size={22} /> I am ready for challenge</span>
+            <span>Enter today&apos;s challenge</span>
           </button>
         </section>
       </main>
@@ -494,7 +487,7 @@ export default function WeeklyAssessment() {
       <main className="weekly-coding-page">
         <header className="weekly-coding-header">
           <div className="weekly-coding-title">
-            <span className="weekly-eyebrow">GLOBAL CHALLENGE</span>
+            <span className="weekly-eyebrow">DAILY CHALLENGE</span>
             <strong>{assessment.cycle.name}</strong>
           </div>
           <div className="weekly-coding-meta">
@@ -510,7 +503,7 @@ export default function WeeklyAssessment() {
             <span>
               {hasFinalSubmission || !assessment.submission
                 ? `${assessment.roster.score.toFixed(2)} / 100 points today`
-                : "Score pending server verification"}
+                : "Score pending"}
             </span>
           </div>
         </header>
@@ -519,30 +512,24 @@ export default function WeeklyAssessment() {
         {isDisqualified && (
           <section className="weekly-result weekly-authoritative-result weekly-coding-notice" role="alert">
             <h3><AlertCircle size={16} /> Daily challenge disqualified</h3>
-            <p>Your official score is 0. This challenge can no longer be submitted.</p>
-          </section>
-        )}
-        {isVerifying && (
-          <section className="weekly-result weekly-coding-notice" role="status" aria-live="polite">
-            <h3><Clock3 size={16} /> Submission received · Verifying...</h3>
-            <p>Your solution is being verified by CodeClash. The official result will appear here when server checks finish.</p>
+            <p>Your score is 0. This challenge can no longer be submitted.</p>
           </section>
         )}
         {assessment.submission?.status === "RETRYABLE" && (
           <section className="weekly-result weekly-coding-notice" role="alert">
             <h3><AlertCircle size={16} /> Verification could not be completed</h3>
-            <p>Retry the exact saved source to request authoritative verification again.</p>
+            <p>Submit your saved solution again to continue.</p>
           </section>
         )}
         {displayedRecoverySubmissions.length > 0 && (
           <section className="weekly-recovery-list weekly-coding-notice">
             <h2>Daily submission status</h2>
-            <p>Server verification continues after you leave this page. Submission status and verified results remain available during the recovery window.</p>
+            <p>Your submission status and results remain available during the recovery window.</p>
             {displayedRecoverySubmissions.map((submission) => (
               <div className="weekly-recovery-row" key={submission.id}>
                 <span>
                   {submission.questionTitle} · {submission.status === "FINALIZED"
-                    ? `${isDesktopLocalResult(submission) ? "Desktop local result" : "Server-verified result"}: ${submission.resultStatus}`
+                    ? `Final result: ${submission.resultStatus}`
                     : submission.status}
                 </span>
                 {submission.status === "FINALIZED" ? (
@@ -597,7 +584,7 @@ export default function WeeklyAssessment() {
 
           <section className="weekly-editor-panel">
             <div className="weekly-editor-toolbar">
-              <span>Java · Global Challenge</span>
+              <span>Java · Daily Challenge</span>
               <div className="weekly-actions">
                 <button type="button" className="btn-secondary" onClick={runLocally} disabled={running || submitting || isDisqualified || isVerifying || hasFinalSubmission}>
                   <Play size={14} /> {running ? "Running…" : "Run"}
@@ -609,13 +596,13 @@ export default function WeeklyAssessment() {
             </div>
             <div className="weekly-editor-status" role="status" aria-live="polite">
               {isVerifying ? (
-                <><strong>Submission received.</strong> Your solution is being verified by CodeClash.</>
+                <><strong>Submission received.</strong> Your result is being finalized.</>
               ) : hasFinalSubmission ? (
-                <><strong>{isDesktopLocalResult(submissionResult || assessment.submission) ? "Desktop local result (not independently re-executed)" : "Server-verified result"}:</strong> {submissionResult?.passed ?? assessment.submission.passed}/{submissionResult?.total ?? assessment.submission.total} tests passed · {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} points</>
+                <><strong>Final result:</strong> {submissionResult?.passed ?? assessment.submission.passed}/{submissionResult?.total ?? assessment.submission.total} tests passed · {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} points</>
               ) : canRetry ? (
                 <>Verification could not be completed. Retry the exact saved source.</>
               ) : (
-                <>Run feedback is {isDesktop ? "local" : "visible-case"} and is not authoritative.</>
+                <>Run your solution to preview the result. Submit it to finish the challenge.</>
               )}
             </div>
             <div className="weekly-code-editor-host">
@@ -637,7 +624,7 @@ export default function WeeklyAssessment() {
                 height="100%"
               />
             </div>
-            {canRetry && <p className="weekly-retry-note">A recoverable judge attempt exists. Retry is bound to your previously submitted source.</p>}
+            {canRetry && <p className="weekly-retry-note">Retry your saved solution to continue.</p>}
             <div className="weekly-console">
               <Console
                 result={localResult}
@@ -650,7 +637,7 @@ export default function WeeklyAssessment() {
             </div>
             {hasFinalSubmission && (
               <section className="weekly-result weekly-authoritative-result weekly-final-result" aria-live="polite">
-                <h3><CheckCircle2 size={16} /> {isDesktopLocalResult(submissionResult || assessment.submission) ? "Desktop local result · not independently re-executed" : "Server-verified result"} · {submissionResult?.resultStatus || submissionResult?.status || assessment.submission.resultStatus}</h3>
+                <h3><CheckCircle2 size={16} /> Final result · {submissionResult?.resultStatus || assessment.submission.resultStatus}</h3>
                 <p>{submissionResult?.passed ?? assessment.submission.passed} / {submissionResult?.total ?? assessment.submission.total} test cases passed</p>
                 <p>Daily score: {Number(submissionResult?.score ?? assessment.submission.score).toFixed(2)} / 100</p>
               </section>

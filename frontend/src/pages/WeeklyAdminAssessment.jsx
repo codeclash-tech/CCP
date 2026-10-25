@@ -445,12 +445,9 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
                                 {entry.securityReport.riskLevel || "LOW"} risk · {entry.securityReport.riskScore || 0}/100
                               </summary>
                               <div>
-                                <p>Mode: {entry.securityReport.executionMode || (entry.securityReport.submissionId ? "SERVER_VERIFIED" : "INTEGRITY EVENTS ONLY")}</p>
-                                {entry.securityReport.executionMode === "DESKTOP_LOCAL" && (
-                                  <p>Desktop-local evidence is integrity metadata only; this result was not independently re-executed by the server.</p>
-                                )}
+                                <p>Mode: {entry.securityReport.executionMode === "DESKTOP_LOCAL" ? "Desktop app" : entry.securityReport.executionMode || (entry.securityReport.submissionId ? "CodeClash service" : "Integrity events")}</p>
                                 <p>Result: {entry.securityReport.resultStatus || entry.securityReport.status} · {entry.securityReport.passed ?? 0}/{entry.securityReport.total ?? 0} tests</p>
-                                <p>Client / engine: {entry.securityReport.clientVersion || "—"} / {entry.securityReport.engineVersion || "—"}</p>
+                                <p>Client / runtime: {entry.securityReport.clientVersion || "—"} / {entry.securityReport.engineVersion || "—"}</p>
                                 <p>Protocol: {entry.securityReport.executionProtocolVersion || "—"}</p>
                                 <p>Execution ID: <code>{entry.securityReport.executionId || "—"}</code></p>
                                 <p>Source SHA-256: <code>{entry.securityReport.sourceHash || "—"}</code></p>

@@ -49,7 +49,7 @@ export default function Navbar({ navigationOpen = false, onToggleNavigation }) {
           </button>
         )}
         <Link to="/" className="app-navbar-brand">
-          <Code2 size={22} aria-hidden="true" />
+          <Code2 size={27} aria-hidden="true" />
           <span>CodeClash</span>
         </Link>
       </div>

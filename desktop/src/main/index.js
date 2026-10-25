@@ -94,6 +94,7 @@ async function createMainWindow() {
     height: 920,
     minWidth: 1000,
     minHeight: 680,
+    frame: false,
     show: false,
     backgroundColor: "#101114",
     autoHideMenuBar: true,
@@ -109,6 +110,12 @@ async function createMainWindow() {
 
   mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
     console.error(`Failed to load the CodeClash preload (${preloadPath}):`, error);
+  });
+  mainWindow.on("maximize", () => {
+    mainWindow?.webContents.send("codeclash:window-maximized", true);
+  });
+  mainWindow.on("unmaximize", () => {
+    mainWindow?.webContents.send("codeclash:window-maximized", false);
   });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event, url) => {
@@ -238,6 +245,36 @@ ipcMain.handle("codeclash:challenge-mode", (event, enabled) => {
   }
   challengeFocusMode = enabled;
   return challengeFocusMode;
+});
+
+ipcMain.handle("codeclash:window-is-maximized", (event) => {
+  requireTrustedSender(event);
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error("The CodeClash application window is unavailable.");
+  }
+  return mainWindow.isMaximized();
+});
+
+ipcMain.handle("codeclash:window-control", (event, action) => {
+  requireTrustedSender(event);
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error("The CodeClash application window is unavailable.");
+  }
+
+  switch (action) {
+    case "minimize":
+      mainWindow.minimize();
+      return;
+    case "toggle-maximize":
+      if (mainWindow.isMaximized()) mainWindow.unmaximize();
+      else mainWindow.maximize();
+      return mainWindow.isMaximized();
+    case "close":
+      mainWindow.close();
+      return;
+    default:
+      throw new TypeError("A supported window control action is required.");
+  }
 });
 
 ipcMain.handle("codeclash:auth-get-tokens", (event) => {

@@ -10,6 +10,8 @@ import {
   getRecurringCycleBounds,
   getWeeklyDayIndex,
   getWeeklyRecoveryDeadline,
+  isWeeklyParticipationEligible,
+  isWeeklyRankedEligible,
   shouldWaitForWeeklyRecovery,
   takeNextQueuedQuestion,
 } from "../src/utils/weeklyAssessment.js";
@@ -20,6 +22,40 @@ import {
   reserveQuestionForCycle,
   saveGlobalChallengeConfiguration,
 } from "../src/services/weeklyAssessmentService.js";
+
+test("weekly eligibility separates participation from ranking and requires finalized results", () => {
+  const base = {
+    participationStatus: "PARTICIPATED",
+    resultFinalizedAt: new Date("2026-10-25T10:00:00.000Z"),
+    totalTestCases: 5,
+  };
+
+  assert.equal(isWeeklyParticipationEligible({ ...base, passedTestCases: 0 }), false);
+  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 0 }), false);
+  assert.equal(
+    isWeeklyParticipationEligible({ ...base, passedTestCases: 6 }),
+    false,
+  );
+  assert.equal(
+    isWeeklyParticipationEligible({ ...base, totalTestCases: 0, passedTestCases: 1 }),
+    false,
+  );
+  assert.equal(isWeeklyParticipationEligible({ ...base, passedTestCases: 1 }), true);
+  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 1 }), false);
+  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 5 }), true);
+  assert.equal(
+    isWeeklyParticipationEligible({
+      ...base,
+      passedTestCases: 5,
+      participationStatus: "DISQUALIFIED",
+    }),
+    false,
+  );
+  assert.equal(
+    isWeeklyParticipationEligible({ ...base, passedTestCases: 5, resultFinalizedAt: null }),
+    false,
+  );
+});
 
 function populatedQuery(value) {
   return {
@@ -302,6 +338,9 @@ test("organization score uses completed participants and k=5", () => {
         organizationNameSnapshot: organizationName,
         participationStatus: "PARTICIPATED",
         completedDays: [0],
+        passedTestCases: 4,
+        totalTestCases: 4,
+        resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
         score: 20,
         lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
       });
@@ -330,6 +369,9 @@ test("incomplete and disqualified candidates do not appear in individual or orga
       organizationNameSnapshot: "Small Org",
       participationStatus: "PARTICIPATED",
       completedDays: [0],
+      passedTestCases: 4,
+      totalTestCases: 4,
+      resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
       score: 20,
       lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
     },
@@ -350,6 +392,9 @@ test("incomplete and disqualified candidates do not appear in individual or orga
       organizationNameSnapshot: "Large Org",
       participationStatus: "DISQUALIFIED",
       completedDays: [0, 1],
+      passedTestCases: 10,
+      totalTestCases: 10,
+      resultFinalizedAt: new Date("2024-01-09T10:00:00.000Z"),
       score: 180,
       lastSubmittedAt: new Date("2024-01-09T10:00:00.000Z"),
     },
@@ -409,6 +454,9 @@ test("individual ranking tie-breaking is deterministic", () => {
       organizationNameSnapshot: "Org",
       participationStatus: "PARTICIPATED",
       completedDays: [0],
+      passedTestCases: 4,
+      totalTestCases: 4,
+      resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
       score: 10,
       lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
     },
@@ -419,6 +467,9 @@ test("individual ranking tie-breaking is deterministic", () => {
       organizationNameSnapshot: "Org",
       participationStatus: "PARTICIPATED",
       completedDays: [0],
+      passedTestCases: 4,
+      totalTestCases: 4,
+      resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
       score: 10,
       lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
     },
@@ -429,6 +480,9 @@ test("individual ranking tie-breaking is deterministic", () => {
       organizationNameSnapshot: "Org",
       participationStatus: "PARTICIPATED",
       completedDays: [0],
+      passedTestCases: 4,
+      totalTestCases: 4,
+      resultFinalizedAt: new Date("2024-01-08T09:00:00.000Z"),
       score: 10,
       lastSubmittedAt: new Date("2024-01-08T09:00:00.000Z"),
     },

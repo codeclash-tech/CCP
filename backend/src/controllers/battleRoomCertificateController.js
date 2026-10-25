@@ -3,6 +3,9 @@ import {
   streamBattleRoomCertificateData,
 } from "../services/battleRoomCertificateService.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import {
+  isBattleRoomCertificateEligible,
+} from "../services/battleRoomScoring.js";
 
 export function toParticipantCertificate(submission) {
   const snapshot = submission.certificateSnapshot;
@@ -29,12 +32,17 @@ export async function listParticipantBattleRoomCertificates(req, res) {
       "certificateSnapshot.roomCode": { $exists: true, $nin: ["", null] },
       "certificateSnapshot.completedAt": { $ne: null },
     })
-      .select("_id certificateSnapshot totalScore")
+      .select("_id certificateSnapshot totalScore totalPassed totalFailed status")
       .sort({ "certificateSnapshot.completedAt": -1 })
       .lean();
 
     return res.json({
-      certificates: submissions.map(toParticipantCertificate),
+      certificates: submissions
+        .filter((submission) => isBattleRoomCertificateEligible(
+          submission,
+          Number(submission.certificateSnapshot?.totalTestCases),
+        ))
+        .map(toParticipantCertificate),
     });
   } catch (error) {
     console.error("[BattleRoomCertificate] Certificate library failed:", error.message);
@@ -59,7 +67,13 @@ export async function downloadParticipantBattleRoomCertificate(req, res) {
       status: "COMPLETED",
     }).lean();
 
-    if (!submission?.certificateSnapshot) {
+    if (
+      !submission?.certificateSnapshot ||
+      !isBattleRoomCertificateEligible(
+        submission,
+        Number(submission.certificateSnapshot.totalTestCases),
+      )
+    ) {
       return res.status(404).json({
         error: "Your certificate is not available for this battle.",
       });

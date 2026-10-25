@@ -208,6 +208,24 @@ test("submits Daily Challenge transcript using the cycle-bound grant routes", as
   );
 });
 
+test("includes the backend request ID when Daily Challenge grant authorization fails", async () => {
+  await assert.rejects(
+    submitDesktopDailyQuestion(
+      submissionOptions(
+        async () => response(
+          {
+            error: "Could not authorize local Daily Challenge execution.",
+            requestId: "daily-grant-request-123",
+          },
+          500,
+        ),
+        { request: { ...request, roomCode: undefined } },
+      ),
+    ),
+    /HTTP 500, request ID: daily-grant-request-123/,
+  );
+});
+
 test("rejects unapproved API origins before making a request", async () => {
   let requestCount = 0;
   await assert.rejects(

@@ -1,6 +1,10 @@
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
-import { countRoomTestCases } from "./battleRoomScoring.js";
+import {
+  countRoomTestCases,
+  isBattleRoomCertificateEligible,
+  isBattleRoomRankedEligible,
+} from "./battleRoomScoring.js";
 import {
   RANKED_SUBMISSION_STATUSES,
   sortRoomSubmissions,
@@ -52,6 +56,16 @@ async function deliverRoomResults(room) {
     .lean();
   sortRoomSubmissions(submissions);
   const totalTestCases = countRoomTestCases(room.questions);
+  const rankedSubmissions = submissions.filter((submission) =>
+    isBattleRoomRankedEligible(submission, totalTestCases),
+  );
+  sortRoomSubmissions(rankedSubmissions);
+  const rankedById = new Map(
+    rankedSubmissions.map((submission, index) => [
+      String(submission._id),
+      index + 1,
+    ]),
+  );
   let emailsSent = 0;
   let emailFailures = 0;
   let emailsSkipped = 0;
@@ -65,17 +79,21 @@ async function deliverRoomResults(room) {
       submission.participantName !== "Participant"
         ? submission.participantName
         : user?.name;
-    const certificateSnapshot = {
-      roomCode: room.roomCode,
-      roomTitle: room.title,
-      rank: index + 1,
-      totalParticipants: submissions.length,
-      completedAt: submission.submittedAt,
-    };
-    await BattleRoomSubmission.updateOne(
-      { _id: submission._id, roomId: room._id },
-      { $set: { certificateSnapshot } },
-    );
+    const rankedPosition = rankedById.get(String(submission._id));
+    if (isBattleRoomCertificateEligible(submission, totalTestCases)) {
+      const certificateSnapshot = {
+        roomCode: room.roomCode,
+        roomTitle: room.title,
+        rank: rankedPosition || null,
+        totalParticipants: rankedSubmissions.length,
+        totalTestCases,
+        completedAt: submission.submittedAt,
+      };
+      await BattleRoomSubmission.updateOne(
+        { _id: submission._id, roomId: room._id },
+        { $set: { certificateSnapshot } },
+      );
+    }
 
     if (!recipientEmail || !participantName) {
       emailsSkipped += 1;
@@ -130,8 +148,8 @@ async function deliverRoomResults(room) {
         totalScore: submission.totalScore,
         totalPassed: submission.totalPassed,
         totalTestCases,
-        rank: index + 1,
-        totalParticipants: submissions.length,
+        rank: rankedPosition || Math.max(1, index + 1),
+        totalParticipants: Math.max(1, rankedSubmissions.length),
         roomCode: room.roomCode,
         startTime: room.startDate || room.startTime,
         endTime: room.endDate || room.endTime,

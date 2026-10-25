@@ -299,42 +299,66 @@ export default function WeeklyRankings() {
               <p>Daily Global Challenge standings appear when a challenge cycle opens.</p>
             </div>
           ) : (
-            <div className="weekly-rankings-layout">
-              <div className="weekly-ranking-sidebar">
-                <nav className="weekly-global-type-tabs" aria-label="Global Challenge ranking type">
+            <div className="weekly-rankings-layout weekly-rankings-layout-global">
+              <article
+                className="weekly-ranking-detail"
+                id="global-ranking-results"
+                role="tabpanel"
+                aria-labelledby={
+                  globalRankingType === "individual"
+                    ? "global-individual-tab"
+                    : "global-organization-tab"
+                }
+              >
+                <nav
+                  className="weekly-global-type-tabs"
+                  role="tablist"
+                  aria-label="Global Challenge leaderboard view"
+                >
                   <button
+                    id="global-individual-tab"
                     type="button"
+                    role="tab"
+                    aria-selected={globalRankingType === "individual"}
+                    aria-controls="global-ranking-results"
+                    tabIndex={globalRankingType === "individual" ? 0 : -1}
                     className={globalRankingType === "individual" ? "selected" : ""}
-                    aria-pressed={globalRankingType === "individual"}
                     onClick={() => setGlobalRankingType("individual")}
                   >
                     Individual
                   </button>
                   <button
+                    id="global-organization-tab"
                     type="button"
+                    role="tab"
+                    aria-selected={globalRankingType === "organization"}
+                    aria-controls="global-ranking-results"
+                    tabIndex={globalRankingType === "organization" ? 0 : -1}
                     className={globalRankingType === "organization" ? "selected" : ""}
-                    aria-pressed={globalRankingType === "organization"}
                     onClick={() => setGlobalRankingType("organization")}
                   >
-                    Organisation
+                    Global
                   </button>
                 </nav>
-                <nav className="weekly-history-list" aria-label="Daily challenge cycles">
-                  {history.map((item) => (
-                    <button
-                      type="button"
-                      key={item.cycle?.id}
-                      className={String(item.cycle?.id) === selectedCycleId ? "selected" : ""}
-                      onClick={() => setSelectedCycleId(String(item.cycle?.id))}
+                {history.length > 1 && (
+                  <label className="weekly-cycle-select">
+                    <span>Challenge date</span>
+                    <select
+                      value={selectedCycleId}
+                      onChange={(event) => setSelectedCycleId(event.target.value)}
                     >
-                      <strong>{item.cycle?.name || "Global Challenge"}</strong>
-                      <span>{labelDate(item.cycle?.startAt || item.cycle?.cycleKey)}</span>
-                      <span>{item.cycle?.status}</span>
-                    </button>
-                  ))}
-                </nav>
-              </div>
-              <article className="weekly-ranking-detail">
+                      {history.map((item) => (
+                        <option
+                          key={item.cycle?.id}
+                          value={String(item.cycle?.id || "")}
+                        >
+                          {item.cycle?.name || "Global Challenge"} ·{" "}
+                          {labelDate(item.cycle?.startAt || item.cycle?.cycleKey)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {rankings && (
                   <>
                     <h2>{rankings.cycle.name}</h2>

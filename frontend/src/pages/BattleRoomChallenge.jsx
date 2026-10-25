@@ -385,7 +385,7 @@ export default function BattleRoomChallenge() {
       if (["COMPLETED", "DISQUALIFIED"].includes(result.status)) {
         setSubmitted(true);
       } else {
-        setError("Time is up. Your accepted submissions are still being verified.");
+        setError("Time is up. Your accepted submissions are being evaluated.");
       }
       await fetchRoom();
     } catch (endError) {
@@ -551,7 +551,7 @@ export default function BattleRoomChallenge() {
     if (submitted) return;
     if (
       !window.confirm(
-        "End the test now? Submitted solutions will continue server verification, and only verified results can be finalized.",
+        "End the test now? Submitted solutions will continue processing and completed results will be saved.",
       )
     ) {
       return;
@@ -564,7 +564,7 @@ export default function BattleRoomChallenge() {
         setSubmitted(true);
       } else {
         setError(
-          "Test ended. Your submitted solutions are still being verified.",
+          "Test ended. Your submitted solutions are being evaluated.",
         );
       }
       await fetchRoom();
@@ -1132,13 +1132,13 @@ export default function BattleRoomChallenge() {
           </p>
           {userSubmissionState?.status === "PROCESSING" && (
             <p role="status" aria-live="polite">
-              Submission received. CodeClash is still verifying your submitted
-              solution. Refresh to check the official result.
+              Submission received. Your result is being finalized. Refresh to
+              check the latest status.
             </p>
           )}
           {userSubmissionState?.status === "COMPLETED" && (
             <p role="status">
-              Official result: {userSubmissionState.totalScore} points.
+              Final result: {userSubmissionState.totalScore} points.
             </p>
           )}
           {scheduledStart ? (
@@ -1904,24 +1904,23 @@ export default function BattleRoomChallenge() {
               {isVerificationPending ? (
                 <>
                   <strong>Submission received.</strong>{" "}
-                  Your solution is being verified by CodeClash.
+                  Your result is being finalized.
                 </>
               ) : currentQResult?.verificationStatus === "VERIFIED" ? (
                 <>
-                  <strong>Official result:</strong> {currentQResult.score} points
+                  <strong>Final result:</strong> {currentQResult.score} points
                   {" · "}{currentQResult.passed}/{currentQResult.total} tests passed
-                  {" · "}server verified
                 </>
               ) : verificationFailed ? (
                 <>
-                  <strong>Verification failed.</strong>{" "}
-                  CodeClash could not complete server verification. Retry this
-                  submission to try again.
+                  <strong>Evaluation failed.</strong>{" "}
+                  CodeClash could not complete this submission. Retry to try
+                  again.
                 </>
               ) : (
                 <>
-                  Official result: Not submitted. Run feedback is{" "}
-                  {isDesktop ? "local" : "visible-case"} and is not authoritative.
+                  No final result yet. Run your solution to preview its output,
+                  then submit it when you are ready.
                 </>
               )}
             </div>

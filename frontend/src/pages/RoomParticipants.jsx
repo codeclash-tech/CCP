@@ -83,8 +83,8 @@ export default function RoomParticipants() {
                           <div>
                             {participant.securityReport.executions.map((execution) => (
                               <section key={execution.executionId}>
-                                <p>Question {execution.questionId} · {execution.executionMode || "DESKTOP_LOCAL"} · {execution.resultStatus}</p>
-                                <p>Client / engine: {execution.clientVersion} / {execution.engineVersion}</p>
+                                <p>Question {execution.questionId} · {execution.executionMode === "DESKTOP_LOCAL" ? "Desktop app" : execution.executionMode || "Execution"} · {execution.resultStatus}</p>
+                                <p>Client / runtime: {execution.clientVersion} / {execution.engineVersion}</p>
                                 <p>Protocol: {execution.executionProtocolVersion}</p>
                                 <p>Execution ID: <code>{execution.executionId}</code></p>
                                 <p>Source SHA-256: <code>{execution.sourceHash}</code></p>
@@ -102,7 +102,6 @@ export default function RoomParticipants() {
                                     ))}</ul>
                                   </>
                                 )}
-                                <p>Desktop-local result; the server did not independently re-execute it.</p>
                               </section>
                             ))}
                             {participant.securityReport.integritySessions.map((session) => (

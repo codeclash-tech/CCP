@@ -30,6 +30,10 @@ import {
 } from "../services/weeklyAssessmentService.js";
 import { streamWeeklyCertificate } from "../services/weeklyCertificateService.js";
 import { calculateIntegrityRisk } from "../services/assessmentIntegrityService.js";
+import {
+  isWeeklyParticipationEligible,
+  isWeeklyRankedEligible,
+} from "../utils/weeklyAssessment.js";
 
 function sendFailure(res, error, fallback = "Weekly assessment request failed.", additional = {}) {
   const status = Number(error?.statusCode) || 500;
@@ -81,7 +85,18 @@ export async function createDesktopWeeklyExecutionGrant(req, res) {
     });
     return res.status(200).json(grant);
   } catch (error) {
-    return sendFailure(res, error, "Could not authorize local Daily Challenge execution.");
+    if (Number(error?.statusCode) >= 500 || !error?.statusCode) {
+      console.error("[DailyLocalSubmission] Grant authorization failed.", {
+        requestId: req.requestId || null,
+        error: error?.stack || error?.message || String(error),
+      });
+    }
+    return sendFailure(
+      res,
+      error,
+      "Could not authorize local Daily Challenge execution.",
+      { ...(req.requestId ? { requestId: req.requestId } : {}) },
+    );
   }
 }
 
@@ -749,10 +764,11 @@ export async function updateOwnOrganizationProfile(req, res) {
 
 export async function listMyWeeklyCertificates(req, res) {
   try {
-    const certificates = await WeeklyCertificate.find({ userId: req.userId })
+    const storedCertificates = await WeeklyCertificate.find({ userId: req.userId })
       .sort({ "snapshot.issuedAt": -1 })
       .select("certificateId cycleId type category snapshot")
       .lean();
+    const certificates = await filterCurrentlyEligibleCertificates(storedCertificates);
     return res.json({ certificates });
   } catch (error) {
     return sendFailure(res, error, "Could not load weekly certificates.");
@@ -763,10 +779,11 @@ export async function listMyOrganizationCertificates(req, res) {
   try {
     const organization = await OrganizationProfile.findOne({ ownerUserId: req.userId }).select("_id");
     if (!organization) return res.json({ certificates: [] });
-    const certificates = await WeeklyCertificate.find({
+    const storedCertificates = await WeeklyCertificate.find({
       organizationId: organization._id,
       type: "ORGANIZATION",
     }).sort({ "snapshot.issuedAt": -1 }).select("certificateId cycleId type category snapshot").lean();
+    const certificates = await filterCurrentlyEligibleCertificates(storedCertificates);
     return res.json({ certificates });
   } catch (error) {
     return sendFailure(res, error, "Could not load organization certificates.");
@@ -792,8 +809,48 @@ export async function downloadWeeklyCertificate(req, res) {
     if (req.user.role !== "ADMIN" && !isIndividualOwner && !isOrganizationOwner) {
       return res.status(403).json({ error: "You are not authorized to download this certificate." });
     }
+    const [eligibleCertificate] = await filterCurrentlyEligibleCertificates([certificate]);
+    if (!eligibleCertificate) {
+      return res.status(404).json({ error: "Weekly certificate not found." });
+    }
     return streamWeeklyCertificate(certificate, res);
   } catch (error) {
     return sendFailure(res, error, "Could not generate the weekly certificate.");
   }
+}
+
+async function filterCurrentlyEligibleCertificates(certificates) {
+  const eligible = [];
+  for (const certificate of certificates) {
+    if (certificate.type === "INDIVIDUAL") {
+      const rosterEntry = await WeeklyRosterEntry.findOne({
+        cycleId: certificate.cycleId,
+        candidateId: certificate.userId,
+      })
+        .select(
+          "participationStatus disqualifiedAt passedTestCases totalTestCases resultFinalizedAt",
+        )
+        .lean();
+      if (!isWeeklyParticipationEligible(rosterEntry)) continue;
+      if (
+        certificate.category !== "PARTICIPATION" &&
+        !isWeeklyRankedEligible(rosterEntry)
+      ) {
+        continue;
+      }
+      eligible.push(certificate);
+      continue;
+    }
+
+    if (certificate.type === "ORGANIZATION") {
+      const cycle = await WeeklyCycle.findById(certificate.cycleId)
+        .select("organizationRankings")
+        .lean();
+      const ranking = cycle?.organizationRankings?.find(
+        (entry) => String(entry.organizationId) === String(certificate.organizationId),
+      );
+      if (ranking?.eligibleCandidates > 0) eligible.push(certificate);
+    }
+  }
+  return eligible;
 }

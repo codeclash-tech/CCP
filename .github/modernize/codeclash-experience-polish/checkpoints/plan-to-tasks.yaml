@@ -1,0 +1,196 @@
+# Plan-to-Tasks Traceability Checkpoint
+metadata:
+  generated: "2026-10-25"
+  source_plan: ".github/modernize/codeclash-experience-polish/plan.md"
+  target_tasks: ".github/modernize/codeclash-experience-polish/plan.md (inline task breakdown)"
+
+summary:
+  total_plan_items: 13
+  covered_plan_items: 13
+  missing_plan_items: 0
+  coverage_percentage: 100.0
+  total_tasks_generated: 23
+  orphan_tasks: 0
+
+phases:
+  - phase_id: "Phase-1"
+    phase_name: "Setup and preservation"
+    items:
+      - item_id: "1.1"
+        description: "Establish safe implementation baseline"
+        tasks:
+          - task_id: "T001"
+            description: "Reconfirm worktree status and inspect overlapping user changes"
+        notes: ""
+  - phase_id: "Phase-2"
+    phase_name: "Server-authoritative eligibility"
+    items:
+      - item_id: "2.1"
+        description: "Define eligibility from finalized server records"
+        tasks:
+          - task_id: "T002"
+            description: "Trace authoritative result fields"
+          - task_id: "T003"
+            description: "Implement server-side eligibility predicate"
+        notes: ""
+      - item_id: "2.2"
+        description: "Enforce ranking eligibility"
+        tasks:
+          - task_id: "T003"
+            description: "Implement server-side eligibility predicate"
+          - task_id: "T004"
+            description: "Update score synchronization and ranking aggregation"
+        notes: ""
+      - item_id: "2.3"
+        description: "Enforce certificate issuance and access eligibility"
+        tasks:
+          - task_id: "T005"
+            description: "Gate Daily Challenge certificate issue and access"
+          - task_id: "T006"
+            description: "Trace and gate Battle Room certificate access"
+        notes: ""
+      - item_id: "2.4"
+        description: "Cover eligibility boundaries with backend tests"
+        tasks:
+          - task_id: "T007"
+            description: "Test Daily Challenge eligibility and certificates"
+          - task_id: "T008"
+            description: "Test Battle Room changes where applicable"
+        notes: ""
+  - phase_id: "Phase-3"
+    phase_name: "Shared desktop navigation and page layout"
+    items:
+      - item_id: "3.1"
+        description: "Improve desktop title/navigation hierarchy"
+        tasks:
+          - task_id: "T009"
+            description: "Update shared navbar and desktop navigation styles"
+        notes: ""
+      - item_id: "3.2"
+        description: "Standardize gutters and hide scrollbar chrome accessibly"
+        tasks:
+          - task_id: "T010"
+            description: "Apply consistent responsive horizontal gutters"
+          - task_id: "T011"
+            description: "Hide scrollbar chrome while retaining scrolling"
+        notes: ""
+  - phase_id: "Phase-4"
+    phase_name: "Daily challenge, dashboard, and rankings experience"
+    items:
+      - item_id: "4.1"
+        description: "Refine dashboard language and daily challenge CTA"
+        tasks:
+          - task_id: "T012"
+            description: "Remove dashboard section and unused styling"
+          - task_id: "T013"
+            description: "Replace user-facing terminology"
+          - task_id: "T014"
+            description: "Restyle the Daily Challenge CTA"
+        notes: ""
+      - item_id: "4.2"
+        description: "Simplify the daily challenge coding room"
+        tasks:
+          - task_id: "T013"
+            description: "Refine Daily Challenge language"
+          - task_id: "T015"
+            description: "Simplify coding-room content"
+        notes: ""
+      - item_id: "4.3"
+        description: "Move ranking type tabs into the leaderboard context"
+        tasks:
+          - task_id: "T016"
+            description: "Refactor leaderboard tabs and accessible states"
+        notes: ""
+  - phase_id: "Phase-5"
+    phase_name: "Registration/legal presentation, copy review, and cleanup"
+    items:
+      - item_id: "5.1"
+        description: "Polish registration and terms/policies UI"
+        tasks:
+          - task_id: "T017"
+            description: "Improve registration consent and terms presentation"
+        notes: ""
+      - item_id: "5.2"
+        description: "Review user-facing copy and remove only evidenced dead code"
+        tasks:
+          - task_id: "T018"
+            description: "Audit user-facing copy"
+          - task_id: "T019"
+            description: "Remove only verified dead/unneeded artifacts"
+        notes: ""
+  - phase_id: "Phase-6"
+    phase_name: "Validation and final preservation check"
+    items:
+      - item_id: "6.1"
+        description: "Validate functionality, accessibility, and safe scope"
+        tasks:
+          - task_id: "T020"
+            description: "Run backend tests"
+          - task_id: "T021"
+            description: "Run frontend tests, lint, build, and visual checks"
+          - task_id: "T022"
+            description: "Run desktop tests and build where needed"
+          - task_id: "T023"
+            description: "Review final diff and preserve pre-existing edits"
+        notes: ""
+
+missing_plan_items: []
+orphan_tasks: []
+upstream_trace:
+  - plan_item: "1.1"
+    source_requirements: ["REQ-009", "REQ-014"]
+    tasks: ["T001"]
+    full_trace: "REQ-009,REQ-014 → Phase-1.1 → T001"
+  - plan_item: "2.1"
+    source_requirements: ["REQ-009"]
+    tasks: ["T002", "T003"]
+    full_trace: "REQ-009 → Phase-2.1 → T002,T003"
+  - plan_item: "2.2"
+    source_requirements: ["REQ-009"]
+    tasks: ["T003", "T004"]
+    full_trace: "REQ-009 → Phase-2.2 → T003,T004"
+  - plan_item: "2.3"
+    source_requirements: ["REQ-009"]
+    tasks: ["T005", "T006"]
+    full_trace: "REQ-009 → Phase-2.3 → T005,T006"
+  - plan_item: "2.4"
+    source_requirements: ["REQ-009"]
+    tasks: ["T007", "T008"]
+    full_trace: "REQ-009 → Phase-2.4 → T007,T008"
+  - plan_item: "3.1"
+    source_requirements: ["REQ-001", "REQ-002", "REQ-013"]
+    tasks: ["T009"]
+    full_trace: "REQ-001,REQ-002,REQ-013 → Phase-3.1 → T009"
+  - plan_item: "3.2"
+    source_requirements: ["REQ-004", "REQ-006", "REQ-013"]
+    tasks: ["T010", "T011"]
+    full_trace: "REQ-004,REQ-006,REQ-013 → Phase-3.2 → T010,T011"
+  - plan_item: "4.1"
+    source_requirements: ["REQ-003", "REQ-005", "REQ-007", "REQ-013"]
+    tasks: ["T012", "T013", "T014"]
+    full_trace: "REQ-003,REQ-005,REQ-007,REQ-013 → Phase-4.1 → T012,T013,T014"
+  - plan_item: "4.2"
+    source_requirements: ["REQ-010", "REQ-012", "REQ-013"]
+    tasks: ["T013", "T015"]
+    full_trace: "REQ-010,REQ-012,REQ-013 → Phase-4.2 → T013,T015"
+  - plan_item: "4.3"
+    source_requirements: ["REQ-008", "REQ-013"]
+    tasks: ["T016"]
+    full_trace: "REQ-008,REQ-013 → Phase-4.3 → T016"
+  - plan_item: "5.1"
+    source_requirements: ["REQ-011", "REQ-013"]
+    tasks: ["T017"]
+    full_trace: "REQ-011,REQ-013 → Phase-5.1 → T017"
+  - plan_item: "5.2"
+    source_requirements: ["REQ-003", "REQ-012", "REQ-014"]
+    tasks: ["T018", "T019"]
+    full_trace: "REQ-003,REQ-012,REQ-014 → Phase-5.2 → T018,T019"
+  - plan_item: "6.1"
+    source_requirements: ["REQ-001", "REQ-002", "REQ-003", "REQ-004", "REQ-005", "REQ-006", "REQ-007", "REQ-008", "REQ-009", "REQ-010", "REQ-011", "REQ-012", "REQ-013", "REQ-014"]
+    tasks: ["T020", "T021", "T022", "T023"]
+    full_trace: "REQ-001–REQ-014 → Phase-6.1 → T020,T021,T022,T023"
+
+validation:
+  passed: true
+  errors: []
+  warnings: []

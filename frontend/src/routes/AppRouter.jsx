@@ -10,6 +10,7 @@ import {
 import { AuthProvider } from "../context/AuthContext";
 
 import Navbar from "../components/layout/Navbar";
+import DesktopTitleBar from "../components/layout/DesktopTitleBar";
 import Footer from "../components/layout/Footer";
 import RoleNavigation from "../components/layout/RoleNavigation";
 import { useAuth } from "../context/AuthContext";
@@ -64,6 +65,7 @@ function AppLayout({ children }) {
     <div
       className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
     >
+      {isDesktop && !isFullscreen && <DesktopTitleBar />}
       {!isFullscreen && !isDesktop && (
         <Navbar
           navigationOpen={navigationOpen}

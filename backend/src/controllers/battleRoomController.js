@@ -30,6 +30,7 @@ import {
 import {
   countRoomTestCases,
   calculateQuestionScore,
+  isBattleRoomRankedEligible,
 } from "../services/battleRoomScoring.js";
 import {
   LOCAL_EXECUTION_PROTOCOL_VERSION,
@@ -2888,10 +2889,12 @@ export async function getRoomLeaderboard(req, res) {
         isCreator ? "name email organization" : "name organization",
       )
       .lean();
-    sortRoomSubmissions(submissions);
-
     const totalTestCases = countRoomTestCases(room.questions);
-    const leaderboard = submissions.map((sub, index) => {
+    const rankedSubmissions = submissions.filter((submission) =>
+      isBattleRoomRankedEligible(submission, totalTestCases),
+    );
+    sortRoomSubmissions(rankedSubmissions);
+    const leaderboard = rankedSubmissions.map((sub, index) => {
       const totalTime = getRoomSubmissionTime(sub);
       const submissionUserId = sub.userId?._id || sub.userId;
       const isCurrentUser =
@@ -2971,12 +2974,16 @@ export async function getUserResult(req, res) {
       roomId: room._id,
       status: { $in: RANKED_SUBMISSION_STATUSES },
     }).lean();
-    sortRoomSubmissions(allSubmissions);
+    const totalTestCases = countRoomTestCases(room.questions);
+    const rankedSubmissions = allSubmissions.filter((candidate) =>
+      isBattleRoomRankedEligible(candidate, totalTestCases),
+    );
+    sortRoomSubmissions(rankedSubmissions);
 
     const rank =
-      allSubmissions.findIndex(
+      rankedSubmissions.findIndex(
         (s) => s.userId.toString() === userId.toString(),
-      ) + 1;
+      );
     const visibleTestCaseCounts = Object.fromEntries(
       room.questions.map((question) => [
         question._id.toString(),
@@ -2996,8 +3003,8 @@ export async function getUserResult(req, res) {
         questionCount: room.questions.length,
       },
       submission: submission.toPublicJSON({ visibleTestCaseCounts }),
-      rank,
-      totalParticipants: allSubmissions.length,
+      rank: rank < 0 ? null : rank + 1,
+      totalParticipants: rankedSubmissions.length,
     });
   } catch (error) {
     console.error("Get user result error:", error.message);
@@ -3154,7 +3161,11 @@ export async function getLeaderboardByRoomCodePublic(req, res) {
       .populate("userId", "name organization")
       .lean();
 
-    submissions.sort((a, b) => {
+    const totalTestCases = countRoomTestCases(room.questions);
+    const rankedSubmissions = submissions.filter((submission) =>
+      isBattleRoomRankedEligible(submission, totalTestCases),
+    );
+    rankedSubmissions.sort((a, b) => {
       if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
       if (b.totalPassed !== a.totalPassed) return b.totalPassed - a.totalPassed;
       if (a.totalFailed !== b.totalFailed) return a.totalFailed - b.totalFailed;
@@ -3175,7 +3186,7 @@ export async function getLeaderboardByRoomCodePublic(req, res) {
       );
     });
 
-    const leaderboard = submissions.map((sub, index) => ({
+    const leaderboard = rankedSubmissions.map((sub, index) => ({
       rank: index + 1,
       name: sub.participantName || sub.userId?.name || "Unknown",
       organization: sub.participantOrganization || sub.userId?.organization || "Unknown",

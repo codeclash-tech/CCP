@@ -106,7 +106,12 @@ async function requestJson(fetchImpl, url, accessToken, body, timeoutMs) {
       responseBody?.error ||
       responseBody?.message ||
       `The CodeClash backend returned HTTP ${response.status}.`;
-    throw new Error(`${message} (HTTP ${response.status})`);
+    const requestId =
+      responseBody?.requestId ||
+      response.headers?.get?.("x-request-id");
+    throw new Error(
+      `${message} (HTTP ${response.status}${requestId ? `, request ID: ${requestId}` : ""})`,
+    );
   }
   if (!responseBody || typeof responseBody !== "object") {
     throw new Error("The CodeClash backend returned an invalid response.");

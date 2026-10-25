@@ -203,7 +203,7 @@ export default function AdminQuestions() {
         window.localStorage.removeItem(QUESTION_DRAFT_KEY);
       } catch (storageError) {
         setError(
-          `Question created, but its local autosave could not be cleared: ${storageError.message || "Storage unavailable."}`,
+          `Question created, but the saved draft could not be cleared automatically: ${storageError.message || "Storage unavailable."}`,
         );
       }
     } catch (saveError) {
@@ -351,7 +351,7 @@ export default function AdminQuestions() {
         <p className="weekly-question-reference-note">
           Add at least three visible and one hidden test case, then generate
           expected outputs before saving. In the desktop app, outputs are
-          regenerated locally when saving. The reference solution and hidden
+          regenerated when saving. The reference solution and hidden
           cases are never shown to participants.
         </p>
 

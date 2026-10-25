@@ -84,16 +84,35 @@ export function latestEligibilityAt(user, instant) {
     .sort((left, right) => new Date(right.effectiveAt) - new Date(left.effectiveAt))[0] || null;
 }
 
+export function isWeeklyParticipationEligible(result) {
+  const finalizedAt = new Date(result?.resultFinalizedAt || result?.finalizedAt || NaN);
+  const total = Number(result?.totalTestCases ?? result?.total);
+  const passed = Number(result?.passedTestCases ?? result?.passed);
+  return Boolean(
+    result?.participationStatus !== "DISQUALIFIED" &&
+    !result?.disqualifiedAt &&
+    Number.isFinite(finalizedAt.getTime()) &&
+    Number.isFinite(total) &&
+    total > 0 &&
+    Number.isFinite(passed) &&
+    passed >= 1 &&
+    passed <= total,
+  );
+}
+
+export function isWeeklyRankedEligible(result) {
+  if (!isWeeklyParticipationEligible(result)) return false;
+  return Number(result.passedTestCases ?? result.passed) ===
+    Number(result.totalTestCases ?? result.total);
+}
+
 export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K) {
   if (shrinkageK !== WEEKLY_SHRINKAGE_K) {
     throw new Error("Weekly ranking shrinkage k must remain 5.");
   }
 
   const rows = roster
-    .filter((entry) =>
-      entry.participationStatus !== "DISQUALIFIED" &&
-      (entry.completedDays || []).length > 0,
-    )
+    .filter(isWeeklyRankedEligible)
     .map((entry) => ({
       ...entry,
       score: Number(entry.score) || 0,

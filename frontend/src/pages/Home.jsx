@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
-  CalendarDays,
-  Code2,
   KeyRound,
   PlusCircle,
   Swords,
@@ -13,6 +11,7 @@ import {
   Building2,
   GraduationCap,
   Briefcase,
+  LockKeyhole,
 } from "lucide-react";
 import "../styles/productPages.css";
 
@@ -21,7 +20,7 @@ const cards = [
     icon: PlusCircle,
     title: "Create a Battle Room",
     text: "Add custom Java/DS questions, set time limits, and generate a secure battle key for participants or students.",
-    action: "Create Arena",
+    action: "Create Battle Room",
     to: "/battle-room/create",
     badge: "For Hosts & Recruiters",
   },
@@ -34,7 +33,7 @@ const cards = [
     badge: "For Participants & Coders",
   },
   {
-    icon: CalendarDays,
+    icon: LockKeyhole,
     title: "Daily Global Challenge",
     text: "Solve today’s shared challenge. Individual scores and organization rankings start fresh every day.",
     action: "Attend today",
@@ -68,17 +67,17 @@ export default function Home() {
             <p className="product-eyebrow">CODECLASH · AN AMUX PRODUCT</p>
             <h1>Build skill. Beat the clock.</h1>
             <p>
-              A focused coding arena for daily practice, head-to-head battles,
+              A focused coding platform for daily practice, head-to-head battles,
               and measurable progress.
             </p>
           </div>
-          <span className="desktop-dashboard-tag">YOUR CODING ARENA</span>
+          <span className="desktop-dashboard-tag">CODING BATTLES</span>
         </header>
 
         <section className="desktop-daily-challenge" aria-labelledby="desktop-daily-title">
           <div className="desktop-daily-content">
             <span className="desktop-daily-badge">
-              <CalendarDays size={15} aria-hidden="true" />
+              <LockKeyhole size={15} aria-hidden="true" />
               DAILY CHALLENGE
             </span>
             <h2 id="desktop-daily-title">A new problem.<br />A sharper you.</h2>
@@ -88,8 +87,8 @@ export default function Home() {
             </p>
             <div className="desktop-daily-actions">
               <Link className="desktop-daily-primary" to="/weekly-assessment">
+                <LockKeyhole size={16} aria-hidden="true" />
                 Start today&apos;s challenge
-                <ArrowRight size={17} aria-hidden="true" />
               </Link>
               <Link className="desktop-daily-secondary" to="/rankings">
                 View rankings
@@ -100,23 +99,15 @@ export default function Home() {
               Your daily progress, recognized.
             </span>
           </div>
-          <div className="desktop-daily-art" aria-hidden="true">
-            <div className="desktop-daily-art-orbit" />
-            <div className="desktop-daily-art-icon">
-              <CalendarDays size={54} strokeWidth={1.3} />
-            </div>
-            <span className="desktop-daily-art-label">NEW EVERY DAY</span>
-            <span className="desktop-daily-art-number">01</span>
-          </div>
         </section>
 
-        <section className="desktop-dashboard-section" aria-labelledby="desktop-arena-title">
+        <section className="desktop-dashboard-section" aria-labelledby="desktop-battle-title">
           <div className="desktop-dashboard-section-heading">
             <div>
               <p className="product-eyebrow">CHOOSE YOUR NEXT MOVE</p>
-              <h2 id="desktop-arena-title">Your arena</h2>
+              <h2 id="desktop-battle-title">Choose your next battle</h2>
             </div>
-            <p>Practice solo or bring your people into the competition.</p>
+            <p>Practice solo or bring your team into the competition.</p>
           </div>
           <div className="desktop-dashboard-quick-links">
             <Link className="desktop-dashboard-quick-link" to="/battle-room">
@@ -146,29 +137,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="desktop-dashboard-about" aria-labelledby="desktop-about-title">
-          <div className="desktop-dashboard-about-codeclash">
-            <p className="product-eyebrow">MADE FOR MOMENTUM</p>
-            <h2 id="desktop-about-title">About CodeClash</h2>
-            <p>
-              A coding arena for daily practice, friendly competition, and
-              measurable progress.
-            </p>
-          </div>
-          <div className="desktop-dashboard-about-brand">
-            <span className="desktop-dashboard-about-mark"><Code2 size={22} /></span>
-            <strong>CodeClash</strong>
-            <span>by AMUX</span>
-          </div>
-          <div className="desktop-dashboard-about-amux">
-            <h2>About AMUX</h2>
-            <p>
-              AMUX builds technology products that address practical problems
-              with thoughtful product design and engineering. We provide
-              specialized services through AMUX Ideon and Thrive.
-            </p>
-          </div>
-        </section>
       </main>
     );
   }
@@ -179,7 +147,7 @@ export default function Home() {
           width: 100%;
           max-width: 1600px;
           margin: 0 auto;
-          padding: 20px clamp(20px, 4vw, 64px) 48px;
+          padding: 20px var(--page-gutter) 48px;
           font-family: var(--font-ui);
           color: var(--text-primary);
           box-sizing: border-box;
@@ -601,8 +569,8 @@ export default function Home() {
 
         @media (max-width: 900px) {
           .home-page {
-            padding-left: 24px;
-            padding-right: 24px;
+            padding-left: var(--page-gutter-compact);
+            padding-right: var(--page-gutter-compact);
           }
 
           .home-cards {
@@ -626,7 +594,7 @@ export default function Home() {
 
         @media (max-width: 520px) {
           .home-page {
-            padding: 12px 16px 32px;
+            padding: 12px var(--page-gutter-compact) 32px;
           }
 
           .home-hero {
@@ -693,7 +661,7 @@ export default function Home() {
         <div className="home-hero-content">
           <div className="home-eyebrow">
             <Swords size={15} />
-            <span>Java Coding Battle Engine</span>
+            <span>Java Coding Battles</span>
           </div>
 
           <h1>
@@ -758,7 +726,7 @@ export default function Home() {
             </div>
             <div style={{ paddingLeft: "32px" }}>
               <span className="code-comment">
-                // Real-time Java evaluation engine
+                // Solve. Submit. Compete.
               </span>
             </div>
             <div style={{ paddingLeft: "32px" }}>
@@ -814,7 +782,7 @@ export default function Home() {
             <article className="home-card" key={title}>
               <span className="home-card-badge">{badge}</span>
 
-              <div className="home-card-icon">
+              <div className={`home-card-icon${title === "Daily Global Challenge" ? " home-card-icon-daily" : ""}`}>
                 <Icon size={22} />
               </div>
 

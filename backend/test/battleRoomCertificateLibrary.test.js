@@ -15,6 +15,9 @@ test("certificate library returns only the authenticated user's completed certif
   const submission = {
     _id: "507f1f77bcf86cd799439011",
     totalScore: 85,
+    totalPassed: 12,
+    totalFailed: 0,
+    status: "COMPLETED",
     participantName: "Candidate Name",
     questionResults: [{ code: "private source" }],
     certificateSnapshot: {
@@ -22,9 +25,28 @@ test("certificate library returns only the authenticated user's completed certif
       roomTitle: "Secure Assessment",
       rank: 2,
       totalParticipants: 8,
+      totalTestCases: 12,
       completedAt,
     },
   };
+  const ineligibleSubmissions = [
+    {
+      ...submission,
+      _id: "partial-result",
+      totalPassed: 1,
+      totalFailed: 3,
+      certificateSnapshot: {
+        ...submission.certificateSnapshot,
+        totalTestCases: 5,
+      },
+    },
+    {
+      ...submission,
+      _id: "zero-pass-result",
+      totalPassed: 0,
+      totalFailed: 12,
+    },
+  ];
   let filter;
   let selectedFields;
   let sort;
@@ -41,7 +63,7 @@ test("certificate library returns only the authenticated user's completed certif
         return chain;
       },
       async lean() {
-        return [submission];
+        return [submission, ...ineligibleSubmissions];
       },
     };
     return chain;
@@ -65,7 +87,10 @@ test("certificate library returns only the authenticated user's completed certif
       "certificateSnapshot.roomCode": { $exists: true, $nin: ["", null] },
       "certificateSnapshot.completedAt": { $ne: null },
     });
-    assert.equal(selectedFields, "_id certificateSnapshot totalScore");
+    assert.equal(
+      selectedFields,
+      "_id certificateSnapshot totalScore totalPassed totalFailed status",
+    );
     assert.deepEqual(sort, { "certificateSnapshot.completedAt": -1 });
     assert.deepEqual(responseBody, {
       certificates: [

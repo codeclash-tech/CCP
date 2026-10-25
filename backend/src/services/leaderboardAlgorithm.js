@@ -6,6 +6,17 @@ import { getCurrentWindow } from "../utils/challengeWindow.js";
 
 const TOP_K = 5;
 
+function isRankedSubmission(submission) {
+  return Boolean(
+    submission?.status === "ACCEPTED" &&
+    submission.isDisqualified !== true &&
+    Number.isFinite(Number(submission.passed)) &&
+    Number.isFinite(Number(submission.total)) &&
+    Number(submission.total) > 0 &&
+    Number(submission.passed) === Number(submission.total),
+  );
+}
+
 export async function calculateUserScores(challengeId) {
   const submissions = await Submission.find({
     challengeId,
@@ -16,7 +27,7 @@ export async function calculateUserScores(challengeId) {
     .sort({ score: -1 })
     .lean();
 
-  const rankedSubmissions = submissions.map((sub, index) => ({
+  const rankedSubmissions = submissions.filter(isRankedSubmission).map((sub, index) => ({
     rank: index + 1,
     userId: sub.userId?._id,
     name: sub.userId?.name || "Unknown",
@@ -44,7 +55,7 @@ export async function calculateOrganizationScores(challengeId) {
     .lean();
 
   const orgGroups = {};
-  for (const sub of submissions) {
+  for (const sub of submissions.filter(isRankedSubmission)) {
     const orgName = sub.userId?.organization || "Unknown";
     if (!orgGroups[orgName]) {
       orgGroups[orgName] = [];
@@ -137,6 +148,7 @@ export async function getGlobalUserLeaderboard(limit = 100) {
   const filtered = submissions
     .filter((sub) => {
       if (!sub || !sub.userId) return false;
+      if (!isRankedSubmission(sub)) return false;
       if (sub.score === undefined || sub.score === null) return false;
       if (typeof sub.score === "number" && Number.isNaN(sub.score))
         return false;
@@ -171,7 +183,8 @@ export async function getTodayUserRank(userId, todayChallengeId) {
     .sort({ score: -1 })
     .lean();
 
-  const userEntry = submissions.find(
+  const rankedSubmissions = submissions.filter(isRankedSubmission);
+  const userEntry = rankedSubmissions.find(
     (sub) => sub.userId?._id?.toString() === userId.toString(),
   );
 
@@ -180,8 +193,8 @@ export async function getTodayUserRank(userId, todayChallengeId) {
   }
 
   const rank =
-    submissions.findIndex(
-      (sub) => sub.userId?._id?.toString() === userId.toString(),
+    rankedSubmissions.findIndex((sub) =>
+      sub.userId?._id?.toString() === userId.toString(),
     ) + 1;
 
   return {

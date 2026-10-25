@@ -300,6 +300,7 @@ export default function AuthPage({ mode }) {
           <div style={{ display: "grid", gap: 14 }}>
             {isRegistration && (
               <label
+                className="auth-terms-consent"
                 style={{
                   display: "flex",
                   alignItems: "flex-start",

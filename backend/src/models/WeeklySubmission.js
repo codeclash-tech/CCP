@@ -8,7 +8,13 @@ const weeklySubmissionSchema = new mongoose.Schema(
     dayIndex: { type: Number, required: true, min: 0, max: 0 },
     challengeId: { type: mongoose.Schema.Types.ObjectId, ref: "Challenge", required: true },
     sourceHash: { type: String, required: true, select: false },
-    sourceCode: { type: String, required: true, select: false },
+    sourceCode: {
+      type: String,
+      required() {
+        return this.executionMode !== "DESKTOP_LOCAL";
+      },
+      select: false,
+    },
     executionId: { type: String, default: "", index: true },
     executionMode: {
       type: String,

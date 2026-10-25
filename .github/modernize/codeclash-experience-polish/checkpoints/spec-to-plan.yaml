@@ -1,0 +1,172 @@
+# Spec-to-Plan Traceability Checkpoint
+metadata:
+  generated: "2026-10-25"
+  source_spec: "Direct user request in session; no assessment/spec file"
+  target_plan: ".github/modernize/codeclash-experience-polish/plan.md"
+
+summary:
+  total_requirements: 14
+  covered_requirements: 14
+  missing_requirements: 0
+  coverage_percentage: 100.0
+
+requirements:
+  - req_id: "REQ-001"
+    req_description: "Increase desktop title/navigation height and improve logo position/visibility"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-3"
+      phase_name: "Shared desktop navigation and page layout"
+      items:
+        - item_id: "3.1"
+          description: "Improve desktop title/navigation hierarchy"
+    notes: ""
+  - req_id: "REQ-002"
+    req_description: "Add space between welcome name and left navigation links"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-3"
+      phase_name: "Shared desktop navigation and page layout"
+      items:
+        - item_id: "3.1"
+          description: "Improve desktop title/navigation hierarchy"
+    notes: ""
+  - req_id: "REQ-003"
+    req_description: "Replace user-facing Coding Arena terminology with coding-battle wording"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-4"
+      phase_name: "Daily challenge, dashboard, and rankings experience"
+      items:
+        - item_id: "4.1"
+          description: "Refine dashboard language and daily challenge CTA"
+        - item_id: "5.2"
+          description: "Review user-facing copy and remove only evidenced dead code"
+    notes: ""
+  - req_id: "REQ-004"
+    req_description: "Hide right-side scrollbar chrome without disabling scrolling"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-3"
+      phase_name: "Shared desktop navigation and page layout"
+      items:
+        - item_id: "3.2"
+          description: "Standardize gutters and hide scrollbar chrome accessibly"
+    notes: ""
+  - req_id: "REQ-005"
+    req_description: "Remove dashboard Made for Momentum section"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-4"
+      phase_name: "Daily challenge, dashboard, and rankings experience"
+      items:
+        - item_id: "4.1"
+          description: "Refine dashboard language and daily challenge CTA"
+    notes: ""
+  - req_id: "REQ-006"
+    req_description: "Standardize horizontal page gutters"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-3"
+      phase_name: "Shared desktop navigation and page layout"
+      items:
+        - item_id: "3.2"
+          description: "Standardize gutters and hide scrollbar chrome accessibly"
+    notes: ""
+  - req_id: "REQ-007"
+    req_description: "Restyle Daily Challenge CTA and remove arrow/shield decoration"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-4"
+      phase_name: "Daily challenge, dashboard, and rankings experience"
+      items:
+        - item_id: "4.1"
+          description: "Refine dashboard language and daily challenge CTA"
+    notes: ""
+  - req_id: "REQ-008"
+    req_description: "Move individual/global tabs into leaderboard after Daily Global Challenge"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-4"
+      phase_name: "Daily challenge, dashboard, and rankings experience"
+      items:
+        - item_id: "4.3"
+          description: "Move ranking type tabs into the leaderboard context"
+    notes: ""
+  - req_id: "REQ-009"
+    req_description: "Enforce certificate and leaderboard eligibility server-side"
+    priority: "P1"
+    plan_mapping:
+      phase: "Phase-2"
+      phase_name: "Server-authoritative eligibility"
+      items:
+        - item_id: "2.1"
+          description: "Define eligibility from finalized server records"
+        - item_id: "2.2"
+          description: "Enforce ranking eligibility"
+        - item_id: "2.3"
+          description: "Enforce certificate issuance and access eligibility"
+        - item_id: "2.4"
+          description: "Cover eligibility boundaries with backend tests"
+    notes: "Disqualified/incomplete: no certificate; participation: at least one passed test; ranked eligibility: all tests passed."
+  - req_id: "REQ-010"
+    req_description: "Simplify Daily Challenge coding room without removing critical status/error feedback"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-4"
+      phase_name: "Daily challenge, dashboard, and rankings experience"
+      items:
+        - item_id: "4.2"
+          description: "Simplify the daily challenge coding room"
+    notes: ""
+  - req_id: "REQ-011"
+    req_description: "Improve desktop registration terms/policies UI"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-5"
+      phase_name: "Registration/legal presentation, copy review, and cleanup"
+      items:
+        - item_id: "5.1"
+          description: "Polish registration and terms/policies UI"
+    notes: "Preserve consent semantics and legal text absent separately approved content changes."
+  - req_id: "REQ-012"
+    req_description: "Remove internal/weakening/unrelated instructions from user-facing app"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-5"
+      phase_name: "Registration/legal presentation, copy review, and cleanup"
+      items:
+        - item_id: "5.2"
+          description: "Review user-facing copy and remove only evidenced dead code"
+    notes: "Do not remove internal logs, tests, or technical documentation."
+  - req_id: "REQ-013"
+    req_description: "Apply consistent premium brand polish"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-3"
+      phase_name: "Shared desktop navigation and page layout"
+      items:
+        - item_id: "3.1"
+          description: "Improve desktop title/navigation hierarchy"
+        - item_id: "3.2"
+          description: "Standardize gutters and hide scrollbar chrome accessibly"
+      phase_note: "Also covered by Phases 4 and 5"
+    notes: ""
+  - req_id: "REQ-014"
+    req_description: "Remove only clearly dead/unneeded code; preserve useful tests/docs/release assets"
+    priority: "P2"
+    plan_mapping:
+      phase: "Phase-5"
+      phase_name: "Registration/legal presentation, copy review, and cleanup"
+      items:
+        - item_id: "5.2"
+          description: "Review user-facing copy and remove only evidenced dead code"
+    notes: "Final preservation check is also covered by Phase 6.1."
+
+missing_requirements: []
+orphan_plan_items: []
+validation:
+  passed: true
+  errors: []
+  warnings:
+    - "Direct request is the source specification; no separate spec or assessment artifact was provided."

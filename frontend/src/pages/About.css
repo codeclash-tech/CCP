@@ -2,7 +2,7 @@
   width: 100%;
   max-width: 1600px;
   margin: 0 auto;
-  padding: 20px clamp(20px, 4vw, 64px) 48px;
+  padding: 20px var(--page-gutter) 48px;
 }
 
 .about-hero {
@@ -580,7 +580,7 @@
 
 @media (max-width: 700px) {
   .about-page {
-    padding: 36px 18px 28px;
+    padding: 36px var(--page-gutter-compact) 28px;
   }
 
   .about-hero {

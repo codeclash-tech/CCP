@@ -16,6 +16,14 @@ contextBridge.exposeInMainWorld(
     window: Object.freeze({
       setChallengeMode: (enabled) =>
         ipcRenderer.invoke("codeclash:challenge-mode", enabled),
+      control: (action) => ipcRenderer.invoke("codeclash:window-control", action),
+      isMaximized: () => ipcRenderer.invoke("codeclash:window-is-maximized"),
+      onMaximizeChanged: (listener) => {
+        const handler = (_event, isMaximized) => listener(isMaximized);
+        ipcRenderer.on("codeclash:window-maximized", handler);
+        return () =>
+          ipcRenderer.removeListener("codeclash:window-maximized", handler);
+      },
     }),
     auth: Object.freeze({
       getTokens: () => ipcRenderer.invoke("codeclash:auth-get-tokens"),

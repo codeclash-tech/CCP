@@ -345,13 +345,13 @@ export default function BattleRoom() {
     <div className="battle-room-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
       <header className="battle-room-hero">
         <div className="battle-room-hero-copy">
-          <p className="battle-room-hero-eyebrow">CODECLASH ARENA</p>
+          <p className="battle-room-hero-eyebrow">CODECLASH BATTLES</p>
           <h1>
             <Swords size={25} aria-hidden="true" />
             Battle Room
           </h1>
           <p>
-            Create a private coding arena, share its key, and put your problem
+            Create a private coding battle, share its key, and put your problem
             solving to the test with friends or teammates.
           </p>
           <span className="battle-room-hero-flow">CREATE <i /> INVITE <i /> COMPETE</span>

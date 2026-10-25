@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 import OrganizationProfile from "../src/models/OrganizationProfile.js";
 import WeeklyCertificate from "../src/models/WeeklyCertificate.js";
+import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
 import { downloadWeeklyCertificate } from "../src/controllers/weeklyAssessmentController.js";
 
 function responseRecorder() {
@@ -24,18 +25,108 @@ function responseRecorder() {
   return response;
 }
 
-async function withCertificateMocks(certificate, organizationExists, run) {
+async function withCertificateMocks(
+  certificate,
+  organizationExists,
+  run,
+  rosterEntry = {
+    participationStatus: "PARTICIPATED",
+    passedTestCases: 4,
+    totalTestCases: 4,
+    resultFinalizedAt: new Date("2026-05-04T00:00:00.000Z"),
+    disqualifiedAt: null,
+  },
+) {
   const originalFindOne = WeeklyCertificate.findOne;
   const originalExists = OrganizationProfile.exists;
+  const originalRosterFindOne = WeeklyRosterEntry.findOne;
   WeeklyCertificate.findOne = () => ({ lean: async () => certificate });
   OrganizationProfile.exists = organizationExists;
+  WeeklyRosterEntry.findOne = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => rosterEntry,
+  });
   try {
     await run();
   } finally {
     WeeklyCertificate.findOne = originalFindOne;
     OrganizationProfile.exists = originalExists;
+    WeeklyRosterEntry.findOne = originalRosterFindOne;
   }
 }
+
+test("weekly certificate download rejects disqualified, incomplete, zero-pass, and unranked results", async () => {
+  const ineligibleResults = [
+    {
+      category: "PARTICIPATION",
+      rosterEntry: {
+        participationStatus: "DISQUALIFIED",
+        passedTestCases: 4,
+        totalTestCases: 4,
+        resultFinalizedAt: new Date("2026-05-04T00:00:00.000Z"),
+        disqualifiedAt: new Date("2026-05-04T00:00:00.000Z"),
+      },
+    },
+    {
+      category: "PARTICIPATION",
+      rosterEntry: {
+        participationStatus: "PARTICIPATED",
+        passedTestCases: 1,
+        totalTestCases: 4,
+        resultFinalizedAt: null,
+        disqualifiedAt: null,
+      },
+    },
+    {
+      category: "PARTICIPATION",
+      rosterEntry: {
+        participationStatus: "PARTICIPATED",
+        passedTestCases: 0,
+        totalTestCases: 4,
+        resultFinalizedAt: new Date("2026-05-04T00:00:00.000Z"),
+        disqualifiedAt: null,
+      },
+    },
+    {
+      category: "WINNER",
+      rosterEntry: {
+        participationStatus: "PARTICIPATED",
+        passedTestCases: 1,
+        totalTestCases: 4,
+        resultFinalizedAt: new Date("2026-05-04T00:00:00.000Z"),
+        disqualifiedAt: null,
+      },
+    },
+  ];
+
+  for (const [index, result] of ineligibleResults.entries()) {
+    const res = responseRecorder();
+    await withCertificateMocks(
+      {
+        certificateId: `WK-ineligible-${index}`,
+        cycleId: "cycle-1",
+        type: "INDIVIDUAL",
+        category: result.category,
+        userId: "candidate-a",
+      },
+      async () => false,
+      async () => {
+        await downloadWeeklyCertificate(
+          {
+            params: { certificateId: `WK-ineligible-${index}` },
+            userId: "candidate-a",
+            user: { role: "USER", creatorType: null },
+          },
+          res,
+        );
+      },
+      result.rosterEntry,
+    );
+    assert.equal(res.statusCode, 404);
+  }
+});
 
 test("candidate cannot download another candidate's weekly certificate", async () => {
   const res = responseRecorder();
@@ -107,6 +198,7 @@ test("Super Admin is authorized to download an administrative weekly certificate
   await withCertificateMocks(
     {
       certificateId: "WK-admin-download",
+      cycleId: "cycle-1",
       type: "INDIVIDUAL",
       userId: "candidate-b",
       organizationId: null,

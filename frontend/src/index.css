@@ -35,6 +35,8 @@
   --color-danger: #da3633;
   --color-warning: #d29922;
   --color-info: #0d7aeb;
+  --page-gutter: clamp(16px, 4vw, 56px);
+  --page-gutter-compact: 16px;
 
   /* Syntax Highlighting (One Dark Pro) */
   --syntax-keyword: #61afef;    /* blue */
@@ -76,23 +78,17 @@ body {
   flex-direction: column;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Hide native scrollbar chrome without changing scroll behavior. Monaco keeps its
+   editor-managed scrollbars and all page/nested surfaces remain scrollable. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--bg-main);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #4a4a4a;
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* Selection color */
@@ -494,7 +490,7 @@ input:-webkit-autofill:focus {
   width: 100%;
   max-width: 1600px;
   margin: 0 auto !important;
-  padding: 20px clamp(20px, 4vw, 64px) 48px !important;
+  padding: 20px var(--page-gutter) 48px !important;
 }
 
 .battle-room-hero {
@@ -672,7 +668,7 @@ input:-webkit-autofill:focus {
   .battle-room-page,
   .create-battle-page,
   .leaderboard-page {
-    padding: 20px !important;
+    padding: 20px var(--page-gutter-compact) 48px !important;
   }
 
   .battle-room-page [style*="grid-template-columns"],
@@ -727,7 +723,7 @@ input:-webkit-autofill:focus {
   .battle-room-page,
   .create-battle-page,
   .leaderboard-page {
-    padding: 16px !important;
+    padding: 20px var(--page-gutter-compact) 40px !important;
   }
 
   .battle-room-page [style*="grid-template-columns"],
@@ -1151,7 +1147,7 @@ canvas {
     padding-right: 16px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    scrollbar-width: thin;
+    scrollbar-width: none;
   }
 
   .battle-room-page .room-list-created .room-list-row {
@@ -1169,7 +1165,7 @@ canvas {
     overflow-x: auto;
     padding-bottom: 6px;
     overscroll-behavior-x: contain;
-    scrollbar-width: thin;
+    scrollbar-width: none;
   }
 
   .create-step-tab {
@@ -1257,12 +1253,12 @@ canvas {
   top: 0;
   z-index: 400;
   display: flex !important;
-  flex: 0 0 58px;
+  flex: 0 0 68px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 58px !important;
-  min-height: 58px !important;
+  height: 68px !important;
+  min-height: 68px !important;
   padding: 0 20px !important;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-color);
@@ -1283,7 +1279,7 @@ canvas {
   align-items: center;
   gap: 8px;
   color: var(--accent-blue-bright);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
   text-decoration: none;
@@ -1490,7 +1486,6 @@ canvas {
 
 .role-navigation-links a.daily-challenge-link .daily-challenge-lock {
   color: #f2c95f;
-  margin-left: auto;
 }
 
 .role-navigation-links a.daily-challenge-link.active {
@@ -1509,8 +1504,28 @@ canvas {
   padding: 0;
 }
 
+.auth-terms-consent {
+  padding: 13px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: linear-gradient(145deg, var(--bg-card), rgba(255, 255, 255, 0.018));
+}
+
+.auth-terms-consent input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.auth-terms-consent a {
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .development-route-page {
-  width: min(100% - 40px, 840px);
+  width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 840px);
   margin: clamp(28px, 6vh, 64px) auto;
   padding: clamp(22px, 4vw, 38px);
   border: 1px solid var(--border-color);
@@ -1591,7 +1606,7 @@ canvas {
 }
 
 .certificate-library {
-  width: min(100% - 40px, 1040px);
+  width: min(calc(100% - var(--page-gutter) - var(--page-gutter)), 1040px);
   margin: clamp(28px, 6vh, 64px) auto;
   color: var(--text-primary);
   font-family: var(--font-ui);
@@ -1795,12 +1810,12 @@ canvas {
   }
 
   .development-route-page {
-    width: min(100% - 32px, 840px);
+    width: min(calc(100% - var(--page-gutter-compact) - var(--page-gutter-compact)), 840px);
     margin: 24px auto;
   }
 
   .certificate-library {
-    width: min(100% - 32px, 1040px);
+    width: min(calc(100% - var(--page-gutter-compact) - var(--page-gutter-compact)), 1040px);
     margin: 24px auto;
   }
 }
@@ -1831,20 +1846,97 @@ canvas {
 }
 
 .desktop-app-shell {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100vh;
   min-height: 600px;
-  grid-template-columns: 252px minmax(0, 1fr);
   overflow: hidden;
 }
 
-.desktop-app-shell.fullscreen-app-shell {
+.desktop-titlebar {
+  z-index: 500;
+  display: flex;
+  flex: 0 0 48px;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 10px 0 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(110deg, #17191e, #111216);
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.desktop-titlebar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  color: #f4f6fa;
+  font-size: 14px;
+  letter-spacing: -0.015em;
+}
+
+.desktop-titlebar-mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgb(246 209 126 / 48%);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgb(246 209 126 / 22%), rgb(246 209 126 / 7%));
+  color: #f6d17e;
+  box-shadow: 0 0 20px rgb(246 209 126 / 12%);
+}
+
+.desktop-titlebar-actions {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+}
+
+.desktop-titlebar-button {
+  display: grid;
+  width: 48px;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #c3c8d2;
+  cursor: pointer;
+}
+
+.desktop-titlebar-button:hover {
+  background: rgb(255 255 255 / 9%);
+  color: #fff;
+}
+
+.desktop-titlebar-close:hover {
+  background: #c8323e;
+  color: #fff;
+}
+
+.desktop-titlebar-button:focus-visible {
+  z-index: 1;
+  outline-offset: -3px;
+}
+
+.desktop-app-shell.fullscreen-app-shell .desktop-titlebar {
+  display: none;
+}
+
+.desktop-app-shell.fullscreen-app-shell .app-shell-body {
   grid-template-columns: minmax(0, 1fr);
 }
 
 .desktop-app-shell .app-shell-body {
-  display: contents;
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  grid-template-columns: 252px minmax(0, 1fr);
 }
 
 .desktop-app-shell .role-navigation.desktop-navigation {
@@ -1854,7 +1946,7 @@ canvas {
   left: auto;
   z-index: 1;
   width: 252px;
-  height: 100vh;
+  height: 100%;
   min-height: 0;
   padding: 18px 12px 12px;
   visibility: visible;
@@ -1864,7 +1956,7 @@ canvas {
 
 .desktop-navigation-brand {
   display: grid;
-  flex: 0 0 54px;
+  flex: 0 0 66px;
   align-content: center;
   gap: 3px;
   padding: 0 11px;
@@ -1873,6 +1965,7 @@ canvas {
   font-size: 10px;
   font-weight: 650;
   text-decoration: none;
+  margin-bottom: 20px;
 }
 
 .desktop-navigation-brand strong {
@@ -1970,13 +2063,22 @@ canvas {
 
 .desktop-app-shell .app-shell-content {
   width: 100%;
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   overflow: auto;
   background: var(--bg-main);
 }
 
+.desktop-app-shell .weekly-coding-page {
+  height: 100%;
+}
+
+.desktop-app-shell .weekly-instructions-page {
+  min-height: 100%;
+}
+
 @media (max-width: 900px) {
-  .desktop-app-shell {
+  .desktop-app-shell .app-shell-body {
     grid-template-columns: 220px minmax(0, 1fr);
   }
 
@@ -1986,15 +2088,15 @@ canvas {
 }
 
 @media (max-width: 680px) {
-  .desktop-app-shell {
-    min-height: 0;
+  .desktop-app-shell .app-shell-body {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .desktop-app-shell .role-navigation.desktop-navigation {
     position: fixed;
-    top: 0;
+    top: 48px;
     bottom: 0;
+    height: calc(100vh - 48px);
     left: 0;
     z-index: 300;
     width: min(280px, calc(100vw - 40px));

@@ -108,7 +108,7 @@ export default function Profile() {
           max-width: 1600px;
           margin: 0 auto;
           min-height: calc(100vh - 64px);
-          padding: 20px clamp(20px, 4vw, 64px) 48px;
+          padding: 20px var(--page-gutter) 48px;
           color: var(--text-primary);
         }
 
