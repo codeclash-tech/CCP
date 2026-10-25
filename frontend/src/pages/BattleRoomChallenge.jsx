@@ -766,11 +766,11 @@ export default function BattleRoomChallenge() {
       >
         <div style={{ maxWidth: 1600, height: "100%", margin: "0 auto" }}>
           <div
+            className="loading-skeleton"
             style={{
               height: 48,
               marginBottom: 16,
               borderRadius: 8,
-              background: "var(--bg-elevated)",
               border: "1px solid var(--border-color)",
             }}
           />
@@ -783,9 +783,9 @@ export default function BattleRoomChallenge() {
             }}
           >
             <div
+              className="loading-skeleton"
               style={{
                 borderRadius: 10,
-                background: "var(--bg-elevated)",
                 border: "1px solid var(--border-color)",
               }}
             />
@@ -797,16 +797,16 @@ export default function BattleRoomChallenge() {
               }}
             >
               <div
+                className="loading-skeleton"
                 style={{
                   borderRadius: 10,
-                  background: "var(--bg-elevated)",
                   border: "1px solid var(--border-color)",
                 }}
               />
               <div
+                className="loading-skeleton"
                 style={{
                   borderRadius: 10,
-                  background: "var(--bg-elevated)",
                   border: "1px solid var(--border-color)",
                 }}
               />

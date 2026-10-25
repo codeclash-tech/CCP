@@ -1,8 +1,11 @@
 .terms-page {
-  width: 100%;
-  max-width: 1200px;
+  display: grid;
+  width: min(100%, 980px);
+  min-width: 0;
+  gap: 16px;
   margin: 0 auto;
-  padding: 28px var(--page-gutter) 56px;
+  padding: 28px clamp(16px, 3vw, 32px) 56px;
+  box-sizing: border-box;
 }
 
 .terms-back-link {
@@ -52,8 +55,16 @@
 .terms-content {
   display: grid;
   gap: 12px;
-  padding: 24px 0;
-  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+.terms-header,
+.terms-section,
+.terms-agreement {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .terms-section {

@@ -3,6 +3,7 @@ import { Award, Download, RefreshCw } from "lucide-react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
+import PageSkeleton from "../components/layout/PageSkeleton";
 
 function CertificateCard({ certificate, downloading, onDownload, onPreview }) {
   const isDaily = certificate.type === "DAILY";
@@ -149,9 +150,7 @@ export default function CertificateLibrary() {
       )}
 
       {loading ? (
-        <div className="certificate-message" role="status" aria-busy="true">
-          Loading certificates…
-        </div>
+        <PageSkeleton compact label="Loading certificates" />
       ) : certificates.length === 0 ? (
         !error && (
           <div className="certificate-empty-state">

@@ -148,7 +148,7 @@ export default function About() {
               : stats
                 ? "Join the battle now!"
                 : statsLoading
-                  ? "Loading community totals…"
+                  ? <span className="loading-skeleton about-stats-note-skeleton" aria-label="Loading community totals" />
                   : ""}
           </p>
         </aside>

@@ -54,7 +54,7 @@ function RoomListSkeleton({ joined = false }) {
     ? "100px 1fr 80px 80px 100px"
     : "100px 1fr 90px 70px 90px 90px";
   return (
-    <div aria-label="Loading rooms" aria-busy="true">
+    <div role="status" aria-label="Loading rooms" aria-busy="true">
       {Array.from({ length: 4 }, (_, index) => (
         <div
           key={index}
@@ -74,9 +74,8 @@ function RoomListSkeleton({ joined = false }) {
                 height: 14,
                 maxWidth: cell === 1 ? 260 : 90,
                 borderRadius: 4,
-                background: "var(--bg-card)",
-                opacity: 0.75,
               }}
+              className="loading-skeleton"
             />
           ))}
         </div>

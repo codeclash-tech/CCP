@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import api from "../services/api";
@@ -8,6 +8,7 @@ import {
   getRoomLeaderboard,
 } from "../services/battleRoomService";
 import { useAuth } from "../context/AuthContext";
+import PageSkeleton from "../components/layout/PageSkeleton";
 import "./WeeklyRankings.css";
 
 function labelDate(value) {
@@ -47,6 +48,8 @@ export default function WeeklyRankings() {
   const [selectedCycleId, setSelectedCycleId] = useState("");
   const [globalRankingType, setGlobalRankingType] = useState("individual");
   const [rankings, setRankings] = useState(null);
+  const [loadingRankings, setLoadingRankings] = useState(false);
+  const rankingsCycleIdRef = useRef("");
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [error, setError] = useState("");
 
@@ -109,16 +112,28 @@ export default function WeeklyRankings() {
 
   const loadRankings = useCallback(async () => {
     if (!selectedCycleId) {
+      rankingsCycleIdRef.current = "";
       setRankings(null);
+      setLoadingRankings(false);
       return;
     }
+    if (rankingsCycleIdRef.current !== selectedCycleId) {
+      rankingsCycleIdRef.current = selectedCycleId;
+      setRankings(null);
+      setLoadingRankings(true);
+    }
+    const cycleId = selectedCycleId;
     try {
       const { data } = await api.get(
-        `/weekly-assessments/cycles/${selectedCycleId}/rankings`,
+        `/weekly-assessments/cycles/${cycleId}/rankings`,
       );
-      setRankings(data);
+      if (rankingsCycleIdRef.current === cycleId) setRankings(data);
     } catch (requestError) {
-      setError(requestError.message || "Could not load daily rankings.");
+      if (rankingsCycleIdRef.current === cycleId) {
+        setError(requestError.message || "Could not load daily rankings.");
+      }
+    } finally {
+      if (rankingsCycleIdRef.current === cycleId) setLoadingRankings(false);
     }
   }, [selectedCycleId]);
 
@@ -285,7 +300,9 @@ export default function WeeklyRankings() {
                       </div>
                     ) : <p>No completed submissions have been ranked yet.</p>}
                   </>
-                ) : roomLoading ? <p role="status">Loading live leaderboard…</p> : null}
+                ) : roomLoading ? (
+                  <PageSkeleton compact label="Loading live leaderboard" rows={2} />
+                ) : null}
               </article>
             </div>
           )}
@@ -293,7 +310,7 @@ export default function WeeklyRankings() {
       ) : (
         <section id="global-panel" role="tabpanel" aria-labelledby="global-tab">
           {error && <p className="weekly-error" role="alert">{error}</p>}
-          {loadingHistory ? <p role="status">Loading daily rankings…</p> : history.length === 0 ? (
+          {loadingHistory ? <PageSkeleton compact label="Loading daily rankings" /> : history.length === 0 ? (
             <div className="weekly-ranking-empty">
               <h2>No daily rankings yet</h2>
               <p>Daily Global Challenge standings appear when a challenge cycle opens.</p>
@@ -337,7 +354,7 @@ export default function WeeklyRankings() {
                     className={globalRankingType === "organization" ? "selected" : ""}
                     onClick={() => setGlobalRankingType("organization")}
                   >
-                    Global
+                    Organisation
                   </button>
                 </nav>
                 {history.length > 1 && (
@@ -359,7 +376,7 @@ export default function WeeklyRankings() {
                     </select>
                   </label>
                 )}
-                {rankings && (
+                {rankings ? (
                   <>
                     <h2>{rankings.cycle.name}</h2>
                     <p>{labelDate(rankings.cycle.startAt)} · {rankings.cycle.status} · Live updates every 5 seconds</p>
@@ -484,7 +501,9 @@ export default function WeeklyRankings() {
                       <p>No organization rankings are available for this cycle.</p>
                     )}
                   </>
-                )}
+                ) : loadingRankings ? (
+                  <PageSkeleton compact label="Loading leaderboard" />
+                ) : null}
               </article>
             </div>
           )}

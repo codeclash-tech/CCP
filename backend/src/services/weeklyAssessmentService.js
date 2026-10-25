@@ -27,6 +27,7 @@ import {
   takeNextQueuedQuestion,
   WEEKLY_SHRINKAGE_K,
   isWeeklyParticipationEligible,
+  summarizeWeeklySubmissions,
 } from "../utils/weeklyAssessment.js";
 import {
   LOCAL_EXECUTION_PROTOCOL_VERSION,
@@ -1526,21 +1527,14 @@ async function synchronizeRosterScore(rosterEntryId) {
   const submissions = await WeeklySubmission.find({
     rosterEntryId,
     status: "FINALIZED",
-  }).select("dayIndex score finalizedAt");
-  const score = submissions.reduce((total, submission) => total + submission.score, 0);
-  const completedDays = [...new Set(submissions.map((submission) => submission.dayIndex))].sort();
-  const lastSubmittedAt = submissions.reduce(
-    (latest, submission) => submission.finalizedAt > latest ? submission.finalizedAt : latest,
-    new Date(0),
-  );
+  }).select("dayIndex score passed total finalizedAt");
+  const result = summarizeWeeklySubmissions(submissions);
   await WeeklyRosterEntry.updateOne(
     { _id: rosterEntryId, participationStatus: { $ne: "DISQUALIFIED" } },
     {
       $set: {
-        score: Math.round(score * 100) / 100,
-        completedDays,
-        participationStatus: completedDays.length ? "PARTICIPATED" : "NOT_STARTED",
-        lastSubmittedAt: completedDays.length ? lastSubmittedAt : null,
+        ...result,
+        lastSubmittedAt: result.resultFinalizedAt,
       },
     },
   );

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { RefreshCw, Users } from "lucide-react";
 import { getRoomParticipants } from "../services/battleRoomService";
+import PageSkeleton from "../components/layout/PageSkeleton";
 import "./WeeklyAdminAssessment.css";
 
 export default function RoomParticipants() {
@@ -28,7 +29,7 @@ export default function RoomParticipants() {
   }, [load]);
 
   if (loading && !data) {
-    return <main className="page-container" aria-busy="true">Loading room participants…</main>;
+    return <PageSkeleton className="page-container" label="Loading room participants" />;
   }
 
   return (

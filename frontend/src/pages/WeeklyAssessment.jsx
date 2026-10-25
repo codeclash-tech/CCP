@@ -23,6 +23,7 @@ import { API_BASE_URL } from "../utils/constants";
 import CodeEditorSandbox from "../components/editor/CodeEditorSandbox";
 import Console from "../components/editor/Console";
 import ProctorGuard from "../components/editor/ProctorGuard";
+import PageSkeleton from "../components/layout/PageSkeleton";
 import "./WeeklyAssessment.css";
 
 const STARTED_CYCLE_STORAGE_KEY = "ccp-weekly-started-cycle";
@@ -383,7 +384,7 @@ export default function WeeklyAssessment() {
   );
 
   if (loading) {
-    return <section className="weekly-page" aria-busy="true"><p>Loading today’s global challenge…</p></section>;
+    return <PageSkeleton className="weekly-page-loading" label="Loading daily challenge" />;
   }
   if (!assessment) {
     return (
@@ -562,11 +563,6 @@ export default function WeeklyAssessment() {
             >
               <LogOut size={14} /> End test
             </button>
-            <span>
-              {hasFinalSubmission || !assessment.submission
-                ? `${assessment.roster.score.toFixed(2)} / 100 points today`
-                : "Score pending"}
-            </span>
           </div>
         </header>
 
@@ -574,7 +570,7 @@ export default function WeeklyAssessment() {
         {isDisqualified && (
           <section className="weekly-result weekly-authoritative-result weekly-coding-notice" role="alert">
             <h3><AlertCircle size={16} /> Daily challenge disqualified</h3>
-            <p>Your score is 0. This challenge can no longer be submitted.</p>
+            <p>This challenge attempt can no longer be submitted.</p>
           </section>
         )}
         {assessment.submission?.status === "RETRYABLE" && (

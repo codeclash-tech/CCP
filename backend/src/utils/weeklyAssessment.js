@@ -106,6 +106,40 @@ export function isWeeklyRankedEligible(result) {
     Number(result.totalTestCases ?? result.total);
 }
 
+export function summarizeWeeklySubmissions(submissions) {
+  const summary = submissions.reduce(
+    (result, submission) => {
+      const finalizedAt = new Date(submission.finalizedAt || NaN);
+      result.score += Number(submission.score) || 0;
+      result.passedTestCases += Number(submission.passed) || 0;
+      result.totalTestCases += Number(submission.total) || 0;
+      result.completedDays.add(submission.dayIndex);
+      if (Number.isFinite(finalizedAt.getTime()) && finalizedAt > result.resultFinalizedAt) {
+        result.resultFinalizedAt = finalizedAt;
+      }
+      return result;
+    },
+    {
+      score: 0,
+      passedTestCases: 0,
+      totalTestCases: 0,
+      completedDays: new Set(),
+      resultFinalizedAt: new Date(0),
+    },
+  );
+  const completedDays = [...summary.completedDays].sort((left, right) => left - right);
+
+  return {
+    score: Math.round(summary.score * 100) / 100,
+    passedTestCases: summary.passedTestCases,
+    totalTestCases: summary.totalTestCases,
+    completedDays,
+    resultFinalizedAt:
+      summary.resultFinalizedAt.getTime() > 0 ? summary.resultFinalizedAt : null,
+    participationStatus: completedDays.length ? "PARTICIPATED" : "NOT_STARTED",
+  };
+}
+
 export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K) {
   if (shrinkageK !== WEEKLY_SHRINKAGE_K) {
     throw new Error("Weekly ranking shrinkage k must remain 5.");

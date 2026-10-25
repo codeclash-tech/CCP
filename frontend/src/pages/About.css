@@ -152,6 +152,13 @@
   min-height: 22px;
 }
 
+.about-stats-note-skeleton {
+  display: inline-block;
+  width: 180px;
+  height: 14px;
+  vertical-align: middle;
+}
+
 /* =========================================
    CODECLASH — COMPACT PARTNER RIBBON
    ========================================= */

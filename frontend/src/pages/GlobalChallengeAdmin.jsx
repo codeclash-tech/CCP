@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import api from "../services/api";
+import PageSkeleton from "../components/layout/PageSkeleton";
 import "./WeeklyAdminAssessment.css";
 
 function toIstDateTimeInput(value) {
@@ -318,7 +319,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
       {error && <p className="weekly-admin-alert" role="alert">{error}</p>}
       {notice && <p className="weekly-admin-notice" role="status">{notice}</p>}
 
-      {loading ? <p>Loading global challenge…</p> : view === "rankings" ? (
+      {loading ? <PageSkeleton compact label="Loading global challenge" /> : view === "rankings" ? (
         <section className="weekly-admin-card">
           <label className="weekly-data-toolbar">
             Daily cycle
@@ -342,7 +343,11 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
               </p>
               <RankingTable rankings={rankings.individualRankings} />
             </>
-          ) : <p>{cycles.length ? "Loading rankings…" : "No daily cycles have started yet."}</p>}
+          ) : cycles.length ? (
+            <PageSkeleton compact label="Loading daily rankings" rows={2} />
+          ) : (
+            <p>No daily cycles have started yet.</p>
+          )}
         </section>
       ) : (
         <>

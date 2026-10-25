@@ -12,6 +12,7 @@ import {
   getWeeklyRecoveryDeadline,
   isWeeklyParticipationEligible,
   isWeeklyRankedEligible,
+  summarizeWeeklySubmissions,
   shouldWaitForWeeklyRecovery,
   takeNextQueuedQuestion,
 } from "../src/utils/weeklyAssessment.js";
@@ -55,6 +56,33 @@ test("weekly eligibility separates participation from ranking and requires final
     isWeeklyParticipationEligible({ ...base, passedTestCases: 5, resultFinalizedAt: null }),
     false,
   );
+});
+
+test("live roster summary synchronizes test counts and finalization for ranking eligibility", () => {
+  const finalizedAt = new Date("2026-10-25T10:00:00.000Z");
+  const summary = summarizeWeeklySubmissions([
+    {
+      dayIndex: 0,
+      score: 100,
+      passed: 7,
+      total: 7,
+      finalizedAt,
+    },
+  ]);
+  const rosterEntry = {
+    ...summary,
+    participationStatus: summary.participationStatus,
+  };
+
+  assert.deepEqual(summary, {
+    score: 100,
+    passedTestCases: 7,
+    totalTestCases: 7,
+    completedDays: [0],
+    resultFinalizedAt: finalizedAt,
+    participationStatus: "PARTICIPATED",
+  });
+  assert.equal(isWeeklyRankedEligible(rosterEntry), true);
 });
 
 function populatedQuery(value) {

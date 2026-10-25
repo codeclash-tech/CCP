@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, RefreshCw, Save } from "lucide-react";
 import api from "../services/api";
+import PageSkeleton from "../components/layout/PageSkeleton";
 import "./WeeklyAdminAssessment.css";
 
 const ADMIN_VIEWS = [
@@ -274,7 +275,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
 
       {error && <p className="weekly-admin-alert" role="alert">{error}</p>}
       {notice && <p className="weekly-admin-notice" role="status">{notice}</p>}
-      {loading ? <p>Loading daily challenge data…</p> : (
+      {loading ? <PageSkeleton compact label="Loading daily challenge data" /> : (
         <>
           {(view === "cycles" || view === "history") && (
             <>

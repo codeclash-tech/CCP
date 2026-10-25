@@ -11,6 +11,7 @@ import SignatureBuilder from "../components/battleRoom/authoring/SignatureBuilde
 import ParameterTestCaseEditor from "../components/battleRoom/authoring/ParameterTestCaseEditor";
 import ReferenceSolutionEditor from "../components/battleRoom/authoring/ReferenceSolutionEditor";
 import ValidationPanel from "../components/battleRoom/authoring/ValidationPanel";
+import PageSkeleton from "../components/layout/PageSkeleton";
 import {
   PlusCircle, Trash2, Check, ChevronLeft, ChevronRight, Loader2,
   ListOrdered, Newspaper, Braces, Code2, FlaskConical, ShieldCheck, KeyRound,
@@ -468,7 +469,7 @@ export default function CreateBattleRoom() {
   const currentStepId = STEPS[currentStep]?.id;
 
   if (loadingEdit) {
-    return <main className="create-battle-page" aria-busy="true">Loading saved Battle Room…</main>;
+    return <PageSkeleton className="create-battle-page" label="Loading saved Battle Room" />;
   }
 
   if (!creatorProfileComplete) {

@@ -234,6 +234,67 @@ input:-webkit-autofill:focus {
   background-color: var(--accent-blue-soft);
 }
 
+.page-loading-skeleton {
+  display: grid;
+  width: min(100%, 1280px);
+  gap: 16px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 48px) var(--page-gutter);
+}
+
+.page-loading-skeleton-compact {
+  width: 100%;
+  gap: 12px;
+  padding: 0;
+}
+
+.page-loading-skeleton-heading {
+  width: min(54%, 480px);
+  height: 42px;
+}
+
+.page-loading-skeleton-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.page-loading-skeleton-card {
+  min-height: 142px;
+}
+
+.page-loading-skeleton-compact .page-loading-skeleton-heading {
+  width: min(42%, 320px);
+  height: 22px;
+}
+
+.page-loading-skeleton-compact .page-loading-skeleton-card {
+  min-height: 76px;
+}
+
+.page-loading-skeleton-compact .page-loading-skeleton-cards {
+  grid-template-columns: 1fr;
+}
+
+.leaderboard-loading-skeleton {
+  display: grid;
+  gap: 1px;
+  padding: 8px 16px;
+}
+
+.leaderboard-loading-row {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) minmax(0, 1fr) 120px;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.leaderboard-loading-cell {
+  height: 14px;
+  border-radius: 4px;
+}
+
 .route-skeleton-content {
   display: grid;
   width: min(100%, 1280px);
@@ -1904,8 +1965,9 @@ canvas {
 
 .desktop-titlebar-mark {
   display: block;
-  width: 38px;
-  height: 38px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   object-fit: contain;
 }
 

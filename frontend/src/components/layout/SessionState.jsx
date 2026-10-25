@@ -1,17 +1,8 @@
-import { AlertCircle, LoaderCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import PageSkeleton from "./PageSkeleton";
 
 export function LoadingScreen({ message = "Loading your workspace..." }) {
-  return (
-    <main
-      className="session-state"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
-      <LoaderCircle className="session-state-icon" size={28} aria-hidden="true" />
-      <span>{message}</span>
-    </main>
-  );
+  return <PageSkeleton label={message} />;
 }
 
 export function SessionErrorScreen({ message, onRetry }) {

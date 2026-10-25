@@ -1,10 +1,28 @@
 import {
-  Loader2,
   Medal,
   Trophy,
   Users,
   Building2,
 } from "lucide-react";
+
+function TableLoadingSkeleton() {
+  return (
+    <div
+      className="leaderboard-loading-skeleton"
+      role="status"
+      aria-label="Loading leaderboard"
+      aria-busy="true"
+    >
+      {Array.from({ length: 5 }, (_, row) => (
+        <div className="leaderboard-loading-row" key={row}>
+          {Array.from({ length: 4 }, (_, cell) => (
+            <div className="loading-skeleton leaderboard-loading-cell" key={cell} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function getRankIcon(rank) {
   if (Number.isNaN(rank) || rank == null) return null;
@@ -193,20 +211,7 @@ export function UserLeaderboardTable({
 
       <div style={{ maxHeight: 480, overflow: "auto" }}>
         {isLoading ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 32,
-            }}
-          >
-            <Loader2
-              size={20}
-              color="var(--accent-blue-bright)"
-              style={{ animation: "spin 1s linear infinite" }}
-            />
-          </div>
+          <TableLoadingSkeleton />
         ) : !data || data.length === 0 ? (
           <div
             style={{
@@ -302,20 +307,7 @@ export function OrganizationLeaderboardTable({
 
       <div style={{ maxHeight: 480, overflow: "auto" }}>
         {isLoading ? (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 32,
-            }}
-          >
-            <Loader2
-              size={20}
-              color="var(--accent-blue-bright)"
-              style={{ animation: "spin 1s linear infinite" }}
-            />
-          </div>
+          <TableLoadingSkeleton />
         ) : !data || data.length === 0 ? (
           <div
             style={{
