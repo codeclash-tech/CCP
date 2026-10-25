@@ -89,11 +89,16 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
     throw new Error("Weekly ranking shrinkage k must remain 5.");
   }
 
-  const rows = roster.map((entry) => ({
-    ...entry,
-    score: entry.participationStatus === "DISQUALIFIED" ? 0 : Number(entry.score) || 0,
-    completedQuestions: (entry.completedDays || []).length,
-  }));
+  const rows = roster
+    .filter((entry) =>
+      entry.participationStatus !== "DISQUALIFIED" &&
+      (entry.completedDays || []).length > 0,
+    )
+    .map((entry) => ({
+      ...entry,
+      score: Number(entry.score) || 0,
+      completedQuestions: (entry.completedDays || []).length,
+    }));
   const cycleMean = rows.length
     ? rows.reduce((sum, row) => sum + row.score, 0) / rows.length
     : 0;
@@ -111,11 +116,7 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
     organizationNameSnapshot: entry.organizationNameSnapshot,
     score: entry.score,
     completedQuestions: entry.completedQuestions,
-    status: entry.participationStatus === "DISQUALIFIED"
-      ? "DISQUALIFIED"
-      : entry.completedQuestions > 0
-        ? "PARTICIPATED"
-        : "MISSED",
+    status: "PARTICIPATED",
     lastSubmittedAt: entry.lastSubmittedAt || null,
   }));
 
@@ -134,13 +135,11 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
     }
     const organization = organizations.get(key);
     organization.scores.push(entry.score);
-    if (entry.participationStatus !== "DISQUALIFIED") {
-      if (entry.completedQuestions > 0) {
-        organization.participatingEligibleCandidates += 1;
-      }
-      if (entry.completedQuestions === 1) {
-        organization.completedEligibleCandidates += 1;
-      }
+    if (entry.completedQuestions > 0) {
+      organization.participatingEligibleCandidates += 1;
+    }
+    if (entry.completedQuestions === 1) {
+      organization.completedEligibleCandidates += 1;
     }
   }
 

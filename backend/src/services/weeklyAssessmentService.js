@@ -1989,14 +1989,6 @@ export async function finalizeWeeklyCycle(cycleId, now = new Date()) {
 export async function getWeeklyCycleResults(cycleId) {
   const cycle = await WeeklyCycle.findById(cycleId);
   if (!cycle) return null;
-  if (cycle.status === "FINALIZED") {
-    return {
-      cycle: cycle.toObject(),
-      individualRankings: cycle.individualRankings,
-      organizationRankings: cycle.organizationRankings,
-    };
-  }
-
   const roster = await WeeklyRosterEntry.find({ cycleId }).lean();
   return {
     cycle: cycle.toObject(),

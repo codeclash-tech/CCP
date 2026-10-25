@@ -462,11 +462,6 @@ export default function WeeklyAssessment() {
     showInstructions ? (
       <main className="weekly-instructions-page">
         <section className="weekly-instructions-card" aria-labelledby="weekly-instructions-title">
-          <div className="weekly-instructions-start">
-            <button type="button" className="btn-primary" onClick={enterChallenge}>
-              <Maximize2 size={16} /> I am ready for challenge
-            </button>
-          </div>
           <div className="weekly-instructions-icon"><ShieldAlert size={28} /></div>
           <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
           <h1 id="weekly-instructions-title">Before you begin</h1>
@@ -486,6 +481,13 @@ export default function WeeklyAssessment() {
 
           {error && <p className="weekly-error" role="alert"><AlertCircle size={16} />{error}</p>}
           {fullscreenError && <p className="weekly-error" role="alert"><AlertCircle size={16} />{fullscreenError}</p>}
+          <button
+            type="button"
+            className="weekly-ready-button"
+            onClick={enterChallenge}
+          >
+            <span><Maximize2 size={22} /> I am ready for challenge</span>
+          </button>
         </section>
       </main>
     ) : (

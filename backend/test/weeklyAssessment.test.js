@@ -287,7 +287,7 @@ test("weekly recovery deadline is 24 hours after close and delays finalization o
   }), false);
 });
 
-test("organization score uses the entire frozen eligible roster and k=5", () => {
+test("organization score uses completed participants and k=5", () => {
   const roster = [];
   for (const [organizationId, organizationName, count] of [
     ["org-a", "A", 1],
@@ -321,7 +321,7 @@ test("organization score uses the entire frozen eligible roster and k=5", () => 
   assert.ok(results.organizationRankings.every((ranking) => ranking.shrinkageK === 5));
 });
 
-test("missed and disqualified roster candidates remain zero-score denominator members", () => {
+test("incomplete and disqualified candidates do not appear in individual or organization rankings", () => {
   const roster = [
     {
       candidateId: "participating",
@@ -362,21 +362,42 @@ test("missed and disqualified roster candidates remain zero-score denominator me
   const largeOrganization = results.organizationRankings.find(
     (organization) => organization.organizationId === "large",
   );
-  const disqualifiedCandidate = results.individualRankings.find(
-    (candidate) => candidate.candidateId === "disqualified",
-  );
 
-  assert.equal(smallOrganization.eligibleCandidates, 2);
-  assert.equal(smallOrganization.organizationMean, 10);
+  assert.equal(results.individualRankings.length, 1);
+  assert.equal(results.individualRankings[0].candidateId, "participating");
+  assert.equal(results.individualRankings[0].rank, 1);
+  assert.equal(smallOrganization.eligibleCandidates, 1);
+  assert.equal(smallOrganization.organizationMean, 20);
   assert.equal(smallOrganization.completedEligibleCandidates, 1);
   assert.equal(smallOrganization.participatingEligibleCandidates, 1);
-  assert.equal(smallOrganization.completionRate, 50);
-  assert.equal(largeOrganization.eligibleCandidates, 1);
-  assert.equal(largeOrganization.organizationMean, 0);
-  assert.equal(largeOrganization.completedEligibleCandidates, 0);
-  assert.equal(largeOrganization.participatingEligibleCandidates, 0);
-  assert.equal(disqualifiedCandidate.score, 0);
-  assert.equal(disqualifiedCandidate.status, "DISQUALIFIED");
+  assert.equal(smallOrganization.completionRate, 100);
+  assert.equal(largeOrganization, undefined);
+});
+
+test("daily leaderboards start empty until an eligible participant completes a question", () => {
+  const results = calculateWeeklyRankings([
+    {
+      candidateId: "incomplete",
+      candidateNameSnapshot: "Candidate A",
+      organizationId: "org",
+      organizationNameSnapshot: "Org",
+      participationStatus: "NOT_STARTED",
+      completedDays: [],
+      score: 0,
+    },
+    {
+      candidateId: "disqualified",
+      candidateNameSnapshot: "Candidate B",
+      organizationId: "another-org",
+      organizationNameSnapshot: "Another Org",
+      participationStatus: "DISQUALIFIED",
+      completedDays: [0],
+      score: 100,
+    },
+  ]);
+
+  assert.deepEqual(results.individualRankings, []);
+  assert.deepEqual(results.organizationRankings, []);
 });
 
 test("individual ranking tie-breaking is deterministic", () => {
