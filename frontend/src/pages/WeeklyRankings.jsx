@@ -22,6 +22,28 @@ function normalizeOrganizationName(value) {
   return String(value || "").trim().toLocaleLowerCase();
 }
 
+function indiaDateKey(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const dateParts = Object.fromEntries(
+    parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]),
+  );
+  return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+}
+
+function getVisibleRankingCycleKeys(now = new Date()) {
+  const today = indiaDateKey(now);
+  const [year, month, day] = today.split("-").map(Number);
+  const yesterday = new Date(Date.UTC(year, month - 1, day - 1))
+    .toISOString()
+    .slice(0, 10);
+  return new Set([yesterday, today]);
+}
+
 function roomIsActive(room, now = Date.now()) {
   const status = String(room.status || "").toUpperCase();
   if (["CLOSED", "ENDED", "CANCELLED"].includes(status)) return false;
@@ -97,11 +119,18 @@ export default function WeeklyRankings() {
           new Date(right.cycle?.startAt || 0) -
           new Date(left.cycle?.startAt || 0),
       );
-      setHistory(records);
+      const visibleCycleKeys = getVisibleRankingCycleKeys();
+      const recentRecords = records.filter((item) => {
+        const cycleKey =
+          item.cycle?.cycleKey ||
+          (item.cycle?.startAt ? indiaDateKey(new Date(item.cycle.startAt)) : "");
+        return visibleCycleKeys.has(cycleKey);
+      });
+      setHistory(recentRecords);
       setSelectedCycleId((current) =>
-        records.some((item) => String(item.cycle?.id) === current)
+        recentRecords.some((item) => String(item.cycle?.id) === current)
           ? current
-          : String(records[0]?.cycle?.id || ""),
+          : String(recentRecords[0]?.cycle?.id || ""),
       );
     } catch (requestError) {
       setError(requestError.message || "Could not load daily challenge history.");

@@ -232,7 +232,7 @@ export default function AuthPage({ mode }) {
     <main
       className={`auth-page${isDesktop ? " desktop-auth-page" : ""}`}
       style={{
-        minHeight: isDesktop ? "100vh" : "calc(100vh - 112px)",
+        minHeight: isDesktop ? "100%" : "calc(100vh - 112px)",
         display: "grid",
         placeItems: "center",
         padding: 24,

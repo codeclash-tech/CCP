@@ -15,8 +15,9 @@ function CertificateCard({ certificate, onDownload, onPreview }) {
   const title = isDaily
     ? certificate.snapshot.assessmentName
     : certificate.roomTitle;
+  const dailyRank = Number(certificate.snapshot?.rank);
   const description = isDaily
-    ? `${certificate.category.replaceAll("_", " ")} · Rank ${certificate.snapshot.rank} · Score ${certificate.snapshot.score.toFixed(2)} · ${completedAt}`
+    ? `${certificate.category.replaceAll("_", " ")} · ${dailyRank > 0 ? `Rank ${dailyRank}` : "Participation"} · Score ${Number(certificate.snapshot.score || 0).toFixed(2)} · ${completedAt}`
     : `Rank ${certificate.rank} of ${certificate.totalParticipants} · Score ${Math.round(certificate.totalScore)} · Completed ${completedAt}`;
 
   return (
@@ -111,7 +112,7 @@ export default function CertificateLibrary() {
           <span className="certificate-eyebrow">YOUR ACHIEVEMENTS</span>
           <h1>Certificates</h1>
           <p>
-            Download daily challenge certificates and completed Battle Room certificates, all in one place.
+            Download daily challenge certificates, available the following day, and completed Battle Room certificates.
           </p>
         </div>
         <Award size={30} aria-hidden="true" />

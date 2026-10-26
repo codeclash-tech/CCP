@@ -141,7 +141,9 @@ export default function CodeEditorSandbox({
       wordWrap: preferencesRef.current.wordWrap ? "on" : "off",
       padding: { top: 12, bottom: 12 },
       cursorBlinking: "smooth",
-      cursorSmoothCaretAnimation: "on",
+      cursorStyle: "line",
+      cursorWidth: 2,
+      cursorSmoothCaretAnimation: "off",
       smoothScrolling: true,
       contextmenu: true, // Allow context menu inside editor
       quickSuggestions: false,

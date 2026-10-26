@@ -7,6 +7,7 @@ import weeklyAssessmentRoutes from "../src/routes/weeklyAssessmentRoutes.js";
 import {
   calculateWeeklyRankings,
   getWeeklyCycleBounds,
+  getDailyCertificateAvailableAt,
   getRecurringCycleBounds,
   getWeeklyDayIndex,
   getWeeklyRecoveryDeadline,
@@ -24,6 +25,15 @@ import {
   reserveQuestionForCycle,
   saveGlobalChallengeConfiguration,
 } from "../src/services/weeklyAssessmentService.js";
+
+test("daily challenge certificates unlock at midnight India time on the following day", () => {
+  assert.equal(
+    getDailyCertificateAvailableAt("2026-10-26").toISOString(),
+    "2026-10-26T18:30:00.000Z",
+  );
+  assert.equal(getDailyCertificateAvailableAt("2026-02-30"), null);
+  assert.equal(getDailyCertificateAvailableAt("invalid"), null);
+});
 
 test("weekly roster resolves saved organization names to active organization profiles", () => {
   const organization = {

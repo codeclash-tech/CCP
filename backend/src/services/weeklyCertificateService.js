@@ -49,11 +49,20 @@ export function streamWeeklyCertificate(certificate, response) {
       align: "center",
       width: width - 140,
     });
+  const rankLabel =
+    Number.isFinite(Number(snapshot.rank)) && Number(snapshot.rank) > 0
+      ? `Rank #${snapshot.rank}`
+      : "Participation";
   document.fillColor("#0f172a").font("Helvetica-Bold").fontSize(18)
-    .text(`Rank #${snapshot.rank}  |  Score: ${Number(snapshot.score).toFixed(2)}`, 70, 340, {
-      align: "center",
-      width: width - 140,
-    });
+    .text(
+      `${rankLabel}  |  Score: ${Number(snapshot.score).toFixed(2)}`,
+      70,
+      340,
+      {
+        align: "center",
+        width: width - 140,
+      },
+    );
   if (snapshot.organizationName && certificate.type === "INDIVIDUAL") {
     document.fillColor("#475569").font("Helvetica").fontSize(13)
       .text(`Organization: ${snapshot.organizationName}`, 70, 380, {

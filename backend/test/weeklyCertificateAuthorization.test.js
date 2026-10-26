@@ -5,6 +5,7 @@ import OrganizationProfile from "../src/models/OrganizationProfile.js";
 import WeeklyCertificate from "../src/models/WeeklyCertificate.js";
 import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
 import { downloadWeeklyCertificate } from "../src/controllers/weeklyAssessmentController.js";
+import { getWeeklyCycleBounds } from "../src/utils/weeklyAssessment.js";
 
 function responseRecorder() {
   const response = new PassThrough();
@@ -185,6 +186,36 @@ test("organization user cannot download another organization's weekly certificat
     ownerUserId: "organization-a-owner",
   });
   assert.equal(res.statusCode, 403);
+});
+
+test("daily certificate is unavailable until the following India calendar day", async () => {
+  const cycleKey = getWeeklyCycleBounds(new Date()).cycleKey;
+  const res = responseRecorder();
+  await withCertificateMocks(
+    {
+      certificateId: "DLY-locked",
+      cycleId: "cycle-1",
+      type: "INDIVIDUAL",
+      category: "PARTICIPATION",
+      userId: "candidate-a",
+      snapshot: {
+        cycleKey,
+        rank: null,
+      },
+    },
+    async () => false,
+    async () => {
+      await downloadWeeklyCertificate(
+        {
+          params: { certificateId: "DLY-locked" },
+          userId: "candidate-a",
+          user: { role: "USER", creatorType: null },
+        },
+        res,
+      );
+    },
+  );
+  assert.equal(res.statusCode, 404);
 });
 
 test("Super Admin is authorized to download an administrative weekly certificate", async () => {

@@ -33,6 +33,7 @@ import { calculateIntegrityRisk } from "../services/assessmentIntegrityService.j
 import {
   isWeeklyParticipationEligible,
   isWeeklyRankedEligible,
+  getDailyCertificateAvailableAt,
 } from "../utils/weeklyAssessment.js";
 
 function sendFailure(res, error, fallback = "Weekly assessment request failed.", additional = {}) {
@@ -844,9 +845,17 @@ export async function downloadWeeklyCertificate(req, res) {
   }
 }
 
-async function filterCurrentlyEligibleCertificates(certificates) {
+export async function filterCurrentlyEligibleCertificates(
+  certificates,
+  now = new Date(),
+) {
   const eligible = [];
   for (const certificate of certificates) {
+    const availableAt = getDailyCertificateAvailableAt(
+      certificate.snapshot?.cycleKey,
+    );
+    if (!availableAt || now < availableAt) continue;
+
     if (certificate.type === "INDIVIDUAL") {
       const rosterEntry = await WeeklyRosterEntry.findOne({
         cycleId: certificate.cycleId,

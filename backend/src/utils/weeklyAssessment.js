@@ -36,6 +36,15 @@ export function getWeeklyCycleBounds(date) {
   };
 }
 
+export function getDailyCertificateAvailableAt(cycleKey) {
+  const key = String(cycleKey || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const [year, month, day] = key.split("-").map(Number);
+  const cycleDate = new Date(Date.UTC(year, month - 1, day));
+  if (cycleDate.toISOString().slice(0, 10) !== key) return null;
+  return new Date(Date.UTC(year, month - 1, day + 1) - IST_OFFSET_MS);
+}
+
 export function getRecurringCycleBounds(startAt, date) {
   const anchor = new Date(startAt);
   const current = new Date(date);

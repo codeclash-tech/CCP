@@ -72,7 +72,9 @@ function AppLayout({ children }) {
           onToggleNavigation={() => setNavigationOpen((open) => !open)}
         />
       )}
-      <div className="app-shell-body">
+      <div
+        className={`app-shell-body${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
+      >
         {!isFullscreen && user && (
           <RoleNavigation
             open={navigationOpen}
@@ -182,7 +184,7 @@ function UnauthenticatedOnlyPage({ mode }) {
   const { isAuthenticated, sessionError, refreshProfile } = useAuth();
   if (sessionError && !isAuthenticated) {
     return (
-      <>
+      <AppLayout>
         <div
           role="status"
           style={{
@@ -206,14 +208,16 @@ function UnauthenticatedOnlyPage({ mode }) {
         <Suspense fallback={<AuthRouteSkeleton />}>
           <AuthPage mode={mode} />
         </Suspense>
-      </>
+      </AppLayout>
     );
   }
   if (isAuthenticated) return <Navigate to="/" replace />;
   return (
-    <Suspense fallback={<AuthRouteSkeleton />}>
-      <AuthPage mode={mode} />
-    </Suspense>
+    <AppLayout>
+      <Suspense fallback={<AuthRouteSkeleton />}>
+        <AuthPage mode={mode} />
+      </Suspense>
+    </AppLayout>
   );
 }
 

@@ -2020,6 +2020,10 @@ canvas {
   grid-template-columns: 252px minmax(0, 1fr);
 }
 
+.desktop-app-shell .app-shell-body.desktop-app-shell-unauthenticated {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .desktop-app-shell .role-navigation.desktop-navigation {
   position: relative;
   top: auto;

@@ -14,7 +14,7 @@ const weeklyCertificateSchema = new mongoose.Schema(
       assessmentName: { type: String, required: true },
       cycleKey: { type: String, required: true },
       score: { type: Number, required: true },
-      rank: { type: Number, required: true },
+      rank: { type: Number, default: null },
       issuedAt: { type: Date, required: true },
     },
   },

@@ -12,7 +12,9 @@ export default function BattleRoomShareModal({
   const [downloaded, setDownloaded] = useState(false);
 
   const room = result?.room || {};
-  const rank = Number(result?.rank) || 1;
+  const hasRank = result?.rank !== null && result?.rank !== undefined &&
+    Number.isFinite(Number(result.rank)) && Number(result.rank) > 0;
+  const rank = hasRank ? Number(result.rank) : null;
   const totalParticipants = Number(result?.totalParticipants) || 1;
 
   const drawCanvas = useCallback(() => {
@@ -270,7 +272,9 @@ export default function BattleRoomShareModal({
     ctx.fillStyle = "#1d4ed8";
     ctx.font = "bold 18px Arial, Helvetica, sans-serif";
     ctx.fillText(
-      `FINAL RANK #${rank} OF ${totalParticipants}`,
+      rank
+        ? `FINAL RANK #${rank} OF ${totalParticipants}`
+        : "DAILY CHALLENGE PARTICIPATION",
       600,
       520,
     );
