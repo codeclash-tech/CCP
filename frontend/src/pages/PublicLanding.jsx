@@ -1,8 +1,23 @@
+import { useState } from "react";
 import desktopPackage from "../../../desktop/package.json";
 import brandIcon from "../../../desktop/assets/codeclash.ico";
 import "./PublicLanding.css";
 
-const RELEASES_URL = "https://github.com/codeclash-tech/CCP/releases/latest";
+const DOWNLOAD_URL =
+  "https://github.com/codeclash-tech/CCP/releases/download/v1.0.0/CodeClash.Setup.exe";
+const MOBILE_DEVICE_PATTERN =
+  /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i;
+
+function isDesktopDevice() {
+  const { userAgent, userAgentData, platform, maxTouchPoints } = window.navigator;
+  const isIPadOS = platform === "MacIntel" && maxTouchPoints > 1;
+
+  return (
+    userAgentData?.mobile !== true &&
+    !MOBILE_DEVICE_PATTERN.test(userAgent) &&
+    !isIPadOS
+  );
+}
 
 const pillars = [
   {
@@ -38,6 +53,20 @@ const steps = [
 ];
 
 export default function PublicLanding() {
+  const [downloadNotice, setDownloadNotice] = useState("");
+
+  function handleDownloadClick(event) {
+    if (!isDesktopDevice()) {
+      event.preventDefault();
+      setDownloadNotice(
+        "CodeClash is available for desktop devices only. Open this page on a desktop computer to download the Windows app.",
+      );
+      return;
+    }
+
+    setDownloadNotice("");
+  }
+
   return (
     <main className="public-landing" id="home">
       <nav className="public-landing-nav" aria-label="Main navigation">
@@ -48,11 +77,20 @@ export default function PublicLanding() {
         <div className="public-landing-nav-links">
           <a href="#experience">Experience</a>
           <a href="#how-it-works">How it works</a>
-          <a className="public-landing-nav-download" href={RELEASES_URL}>
+          <a
+            className="public-landing-nav-download"
+            href={DOWNLOAD_URL}
+            onClick={handleDownloadClick}
+          >
             Download app
           </a>
         </div>
       </nav>
+      {downloadNotice && (
+        <p className="public-landing-download-notice" role="status">
+          {downloadNotice}
+        </p>
+      )}
 
       <section className="public-landing-hero" aria-labelledby="public-landing-title">
         <div className="public-landing-hero-copy">
@@ -68,7 +106,11 @@ export default function PublicLanding() {
             community — all in the CodeClash Windows app.
           </p>
           <div className="public-landing-actions">
-            <a className="public-landing-download" href={RELEASES_URL}>
+            <a
+              className="public-landing-download"
+              href={DOWNLOAD_URL}
+              onClick={handleDownloadClick}
+            >
               Download for Windows <span aria-hidden="true">↗</span>
             </a>
             <a className="public-landing-secondary-link" href="#experience">
@@ -205,7 +247,11 @@ export default function PublicLanding() {
           Download the Windows app and bring a little more purpose to your next
           coding session.
         </p>
-        <a className="public-landing-download" href={RELEASES_URL}>
+        <a
+          className="public-landing-download"
+          href={DOWNLOAD_URL}
+          onClick={handleDownloadClick}
+        >
           Get CodeClash for Windows <span aria-hidden="true">↗</span>
         </a>
         <span className="public-landing-final-version">

@@ -82,6 +82,14 @@
   background: rgba(24, 105, 213, 0.22);
 }
 
+.public-landing-download-notice {
+  width: min(100%, 1320px);
+  margin: 12px auto 0;
+  color: #ffd27a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .public-landing-hero {
   display: grid;
   width: min(100%, 1320px);
