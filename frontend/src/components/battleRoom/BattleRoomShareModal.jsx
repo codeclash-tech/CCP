@@ -5,6 +5,8 @@ export default function BattleRoomShareModal({
   onClose,
   result,
   userName,
+  autoDownload = false,
+  onAutoDownloadComplete,
 }) {
   const canvasRef = useRef(null);
   const [downloaded, setDownloaded] = useState(false);
@@ -351,32 +353,31 @@ export default function BattleRoomShareModal({
     ctx.textAlign = "left";
   }, [rank, result?.completedAt, totalParticipants, userName, room.title]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    requestAnimationFrame(() => {
-      drawCanvas();
-    });
-  }, [isOpen, drawCanvas]);
-
-  function handleDownload() {
+  const handleDownload = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const link = document.createElement("a");
-
     link.download = "codeclash-certificate-" + Date.now() + ".png";
-
     link.href = canvas.toDataURL("image/png");
-
     link.click();
 
     setDownloaded(true);
+    setTimeout(() => setDownloaded(false), 2000);
+  }, []);
 
-    setTimeout(() => {
-      setDownloaded(false);
-    }, 2000);
-  }
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const frame = requestAnimationFrame(() => {
+      drawCanvas();
+      if (autoDownload) {
+        handleDownload();
+        onAutoDownloadComplete?.();
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, drawCanvas, autoDownload, handleDownload, onAutoDownloadComplete]);
 
   if (!isOpen) return null;
 
@@ -511,7 +512,7 @@ export default function BattleRoomShareModal({
               transition: "all 0.2s ease",
             }}
           >
-            {downloaded ? "Certificate Downloaded" : "Download Certificate PNG"}
+            {downloaded ? "Certificate Downloaded" : "Download Preview PNG"}
           </button>
         </div>
       </div>

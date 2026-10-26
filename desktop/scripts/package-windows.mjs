@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { build, createTargets, Platform } from "electron-builder";
 import { access, copyFile, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -106,20 +107,23 @@ try {
   const rceditDirectory = process.env.ELECTRON_BUILDER_RCEDIT_PATH
     ? null
     : await prepareRceditDirectory();
-  const env = { ...process.env };
-  const args = [
-    path.join(desktopDirectory, "node_modules", "electron-builder", "cli.js"),
-    "--win",
-    "nsis",
-    "--x64",
-  ];
-
-  if (electronArchive) args.push("--config.electronDist", electronArchive);
-  if (rceditDirectory) env.ELECTRON_BUILDER_RCEDIT_PATH = rceditDirectory;
+  const previousRceditPath = process.env.ELECTRON_BUILDER_RCEDIT_PATH;
+  if (rceditDirectory) {
+    process.env.ELECTRON_BUILDER_RCEDIT_PATH = rceditDirectory;
+  }
 
   try {
-    run(process.execPath, args, desktopDirectory, env);
+    await build({
+      projectDir: desktopDirectory,
+      targets: createTargets([Platform.WINDOWS], "nsis", "x64"),
+      config: electronArchive ? { electronDist: electronArchive } : undefined,
+    });
   } finally {
+    if (previousRceditPath === undefined) {
+      delete process.env.ELECTRON_BUILDER_RCEDIT_PATH;
+    } else {
+      process.env.ELECTRON_BUILDER_RCEDIT_PATH = previousRceditPath;
+    }
     if (rceditDirectory) {
       await rm(rceditDirectory, { recursive: true, force: true });
     }

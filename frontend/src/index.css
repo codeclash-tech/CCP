@@ -27,13 +27,13 @@
 
   /* Difficulty Colors */
   --color-easy: #2ea043;
-  --color-medium: #d29922;
+  --color-medium: #f5c542;
   --color-hard: #da3633;
 
   /* Status Colors */
   --color-success: #2ea043;
   --color-danger: #da3633;
-  --color-warning: #d29922;
+  --color-warning: #f5c542;
   --color-info: #0d7aeb;
   --page-gutter: clamp(16px, 4vw, 56px);
   --page-gutter-compact: 16px;

@@ -69,7 +69,7 @@ export function calculateScore(passed, total, timeToSolve, executionTime, memory
 export function getDifficultyColor(difficulty) {
   const colors = {
     EASY: "#2ea043",
-    MEDIUM: "#d29922",
+    MEDIUM: "#f5c542",
     HARD: "#da3633",
   };
   return colors[difficulty] || "#7d8590";
@@ -80,18 +80,18 @@ export function getStatusColor(status) {
     PASSED: "#2ea043",
     FAILED: "#da3633",
     ERROR: "#f85149",
-    PENDING: "#d29922",
+    PENDING: "#f5c542",
     ACCEPTED: "#2ea043",
     REJECTED: "#da3633",
     DISQUALIFIED: "#f85149",
-    PROCESSING: "#d29922",
+    PROCESSING: "#f5c542",
     SYSTEM_ERROR: "#f85149",
     WRONG_ANSWER: "#da3633",
     COMPILE_ERROR: "#f85149",
     COMPILATION_ERROR: "#f85149",
     RUNTIME_ERROR: "#da3633",
-    TIME_LIMIT_EXCEEDED: "#d29922",
-    MEMORY_LIMIT_EXCEEDED: "#d29922",
+    TIME_LIMIT_EXCEEDED: "#f5c542",
+    MEMORY_LIMIT_EXCEEDED: "#f5c542",
     RUN_COMPLETED: "#2ea043",
     SUBMITTED: "#2ea043",
   };

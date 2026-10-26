@@ -26,7 +26,7 @@ export const DIFFICULTY = {
 
 export const DIFFICULTY_COLORS = {
   EASY: "#2ea043",
-  MEDIUM: "#d29922",
+  MEDIUM: "#f5c542",
   HARD: "#da3633",
 };
 
@@ -34,11 +34,11 @@ export const STATUS_COLORS = {
   PASSED: "#2ea043",
   FAILED: "#da3633",
   ERROR: "#f85149",
-  PENDING: "#d29922",
+  PENDING: "#f5c542",
   ACCEPTED: "#2ea043",
   REJECTED: "#da3633",
   DISQUALIFIED: "#f85149",
-  PROCESSING: "#d29922",
+  PROCESSING: "#f5c542",
 };
 
 export const MAX_VIOLATIONS = 3;
@@ -97,7 +97,7 @@ export const BATTLE_ROOM_STATUS = {
 };
 
 export const BATTLE_ROOM_STATUS_COLORS = {
-  UPCOMING: "#d29922",
+  UPCOMING: "#f5c542",
   ACTIVE: "#2ea043",
   CLOSED: "#da3633",
 };

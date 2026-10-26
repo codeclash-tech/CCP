@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import PageSkeleton from "../components/layout/PageSkeleton";
 
-function CertificateCard({ certificate, downloading, onDownload, onPreview }) {
+function CertificateCard({ certificate, onDownload, onPreview }) {
   const isDaily = certificate.type === "DAILY";
   const completedAt = certificate.completedAt
     ? new Date(certificate.completedAt).toLocaleDateString()
@@ -35,11 +35,10 @@ function CertificateCard({ certificate, downloading, onDownload, onPreview }) {
       <button
         className="btn-primary certificate-download"
         type="button"
-        disabled={downloading}
         onClick={() => onDownload(certificate)}
       >
         <Download size={16} />
-        {downloading ? "Preparing…" : "Download PDF"}
+        Download Preview PNG
       </button>
     </article>
   );
@@ -50,9 +49,10 @@ export default function CertificateLibrary() {
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [downloadingId, setDownloadingId] = useState("");
   const [retryAction, setRetryAction] = useState(null);
   const [previewCertificate, setPreviewCertificate] = useState(null);
+  const [autoDownloadPreview, setAutoDownloadPreview] = useState(false);
+  const completeAutoDownload = useCallback(() => setAutoDownloadPreview(false), []);
 
   const loadCertificates = useCallback(async () => {
     setLoading(true);
@@ -83,7 +83,6 @@ export default function CertificateLibrary() {
       ].map((certificate) => ({
         ...certificate,
         type: "DAILY",
-        downloadPath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}/pdf`,
       }));
       setCertificates([...battleCertificates, ...dailyCertificates]);
     } catch (loadError) {
@@ -98,28 +97,11 @@ export default function CertificateLibrary() {
     loadCertificates();
   }, [loadCertificates]);
 
-  const downloadCertificate = async (certificate) => {
-    setDownloadingId(certificate.certificateId);
+  const downloadCertificate = (certificate) => {
     setError("");
     setRetryAction(null);
-    try {
-      const { data } = await api.get(certificate.downloadPath, {
-        responseType: "blob",
-      });
-      const fileUrl = URL.createObjectURL(data);
-      const link = document.createElement("a");
-      link.href = fileUrl;
-      link.download = `codeclash-certificate-${certificate.certificateId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(fileUrl), 1000);
-    } catch (downloadError) {
-      setError(downloadError.message || "Unable to download this certificate.");
-      setRetryAction(() => () => downloadCertificate(certificate));
-    } finally {
-      setDownloadingId("");
-    }
+    setAutoDownloadPreview(true);
+    setPreviewCertificate(certificate);
   };
 
   return (
@@ -129,7 +111,7 @@ export default function CertificateLibrary() {
           <span className="certificate-eyebrow">YOUR ACHIEVEMENTS</span>
           <h1>Certificates</h1>
           <p>
-            Download             Daily challenge certificates and completed Battle Room certificates, all in one place.
+            Download daily challenge certificates and completed Battle Room certificates, all in one place.
           </p>
         </div>
         <Award size={30} aria-hidden="true" />
@@ -167,7 +149,6 @@ export default function CertificateLibrary() {
             <CertificateCard
               key={certificate.certificateId}
               certificate={certificate}
-              downloading={downloadingId === certificate.certificateId}
               onDownload={downloadCertificate}
               onPreview={setPreviewCertificate}
             />
@@ -190,6 +171,8 @@ export default function CertificateLibrary() {
           completedAt: previewCertificate.completedAt || previewCertificate.snapshot?.issuedAt,
         } : null}
         userName={previewCertificate?.snapshot?.subjectName || user?.name}
+        autoDownload={autoDownloadPreview}
+        onAutoDownloadComplete={completeAutoDownload}
       />
     </section>
   );
