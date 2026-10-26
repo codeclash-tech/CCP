@@ -27,6 +27,7 @@ import {
   takeNextQueuedQuestion,
   WEEKLY_SHRINKAGE_K,
   isWeeklyParticipationEligible,
+  resolveWeeklyOrganization,
   summarizeWeeklySubmissions,
 } from "../utils/weeklyAssessment.js";
 import {
@@ -189,6 +190,23 @@ export async function assignCandidateOrganization({ userId, organizationId, assi
     user.organizationId = organization._id;
     user.organization = organization.name;
     await user.save();
+    const activeCycles = await WeeklyCycle.find({ status: "ACTIVE" })
+      .select("_id")
+      .lean();
+    if (activeCycles.length) {
+      await WeeklyRosterEntry.updateMany(
+        {
+          cycleId: { $in: activeCycles.map((cycle) => cycle._id) },
+          candidateId: userId,
+        },
+        {
+          $set: {
+            organizationId: organization._id,
+            organizationNameSnapshot: organization.name,
+          },
+        },
+      );
+    }
     return membership;
   } catch (error) {
     if (error?.code === 11000) {
@@ -215,6 +233,23 @@ export async function removeCandidateOrganization({ userId }) {
       { _id: userId, organizationId: membership.organizationId },
       { $set: { organizationId: null, organization: "Unspecified" } },
     );
+    const activeCycles = await WeeklyCycle.find({ status: "ACTIVE" })
+      .select("_id")
+      .lean();
+    if (activeCycles.length) {
+      await WeeklyRosterEntry.updateMany(
+        {
+          cycleId: { $in: activeCycles.map((cycle) => cycle._id) },
+          candidateId: userId,
+        },
+        {
+          $set: {
+            organizationId: null,
+            organizationNameSnapshot: "",
+          },
+        },
+      );
+    }
   }
   return membership;
 }
@@ -527,7 +562,7 @@ export async function freezeWeeklyRoster(cycleId) {
     isActive: { $ne: false },
     isVerified: true,
   })
-    .select("name role organizationId")
+    .select("name role organizationId organization")
     .lean();
   const memberships = await OrganizationMembership.find({
     status: "ACTIVE",
@@ -537,15 +572,26 @@ export async function freezeWeeklyRoster(cycleId) {
   const membershipByUser = new Map(
     memberships.map((membership) => [String(membership.userId), membership]),
   );
-  const organizations = await OrganizationProfile.find({
-    _id: { $in: memberships.map((membership) => membership.organizationId) },
-  }).lean();
+  const organizations = await OrganizationProfile.find({ status: "ACTIVE" }).lean();
   const organizationById = new Map(organizations.map((organization) => [String(organization._id), organization]));
+  const organizationByName = new Map(
+    organizations.map((organization) => [
+      String(organization.normalizedName || organization.name)
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLocaleLowerCase("en-US"),
+      organization,
+    ]),
+  );
   const entries = [];
   for (const user of candidates) {
     const membership = membershipByUser.get(String(user._id));
-    const organization = membership && organizationById.get(String(membership.organizationId));
-    const eligibleOrganization = organization?.status === "ACTIVE" ? organization : null;
+    const eligibleOrganization = resolveWeeklyOrganization(
+      user,
+      membership,
+      organizationById,
+      organizationByName,
+    );
     entries.push({
       updateOne: {
         filter: { cycleId: cycle._id, candidateId: user._id },

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import cron from "node-cron";
 import mongoose from "mongoose";
+import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
 import { executionService } from "./executionService.js";
 import { composeProgram } from "./wrapperGenerator.js";
@@ -11,6 +12,7 @@ import {
   sanitizeParticipantTestResult,
 } from "./participantExecutionSerialization.js";
 import { dispatchBattleRoomCompletionEmail } from "./completionNotificationService.js";
+import { refreshBattleRoomCertificateSnapshots } from "./battleRoomCertificateSnapshotService.js";
 
 const VERIFICATION_LEASE_MS = 10 * 60 * 1000;
 const enabled = () => process.env.BATTLE_ROOM_PERF_LOGS === "true";
@@ -97,7 +99,7 @@ function buildExecutionResult(questionResult) {
 
 export async function finalizeBattleRoomSubmission(submissionId) {
   const current = await BattleRoomSubmission.findById(submissionId)
-    .select("status endRequestedAt questionResults")
+    .select("roomId status endRequestedAt questionResults")
     .lean();
   if (!current || !["PENDING", "PROCESSING"].includes(current.status)) return;
 
@@ -162,6 +164,17 @@ export async function finalizeBattleRoomSubmission(submissionId) {
         error: error.message,
       });
     });
+    try {
+      const room = await BattleRoom.findById(current.roomId)
+        .select("roomCode title questions")
+        .lean();
+      if (room) await refreshBattleRoomCertificateSnapshots(room);
+    } catch (error) {
+      console.error("[BattleRoomCertificate] Could not refresh completed room certificates:", {
+        submissionId: String(current._id),
+        error: error.message,
+      });
+    }
   }
 }
 

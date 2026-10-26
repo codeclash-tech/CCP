@@ -24,6 +24,10 @@ import CodeEditorSandbox from "../components/editor/CodeEditorSandbox";
 import Console from "../components/editor/Console";
 import ProctorGuard from "../components/editor/ProctorGuard";
 import PageSkeleton from "../components/layout/PageSkeleton";
+import {
+  formatInputWithParameters,
+  MAX_DISPLAYED_TEST_CASES,
+} from "../utils/helpers";
 import "./WeeklyAssessment.css";
 
 const STARTED_CYCLE_STORAGE_KEY = "ccp-weekly-started-cycle";
@@ -621,14 +625,16 @@ export default function WeeklyAssessment() {
                   <p>{assessment.question.constraints}</p>
                 </section>
               )}
-              {(assessment.question.examples || []).map((example, index) => (
-                <section className="weekly-example" key={`${index}-${example.input}`}>
-                  <h2>Example {index + 1}</h2>
-                  <pre><strong>Input</strong>{"\n"}{example.input}</pre>
-                  <pre><strong>Output</strong>{"\n"}{example.output}</pre>
-                  {example.explanation && <p>{example.explanation}</p>}
-                </section>
-              ))}
+              {(assessment.question.examples || [])
+                .slice(0, MAX_DISPLAYED_TEST_CASES)
+                .map((example, index) => (
+                  <section className="weekly-example" key={`${index}-${example.input}`}>
+                    <h2>Example {index + 1}</h2>
+                    <pre><strong>Input</strong>{"\n"}{formatInputWithParameters(example.input, assessment.question.signature)}</pre>
+                    <pre><strong>Output</strong>{"\n"}{example.output}</pre>
+                    {example.explanation && <p>{example.explanation}</p>}
+                  </section>
+                ))}
             </div>
           </aside>
 

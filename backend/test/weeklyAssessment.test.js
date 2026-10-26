@@ -12,6 +12,7 @@ import {
   getWeeklyRecoveryDeadline,
   isWeeklyParticipationEligible,
   isWeeklyRankedEligible,
+  resolveWeeklyOrganization,
   summarizeWeeklySubmissions,
   shouldWaitForWeeklyRecovery,
   takeNextQueuedQuestion,
@@ -23,6 +24,44 @@ import {
   reserveQuestionForCycle,
   saveGlobalChallengeConfiguration,
 } from "../src/services/weeklyAssessmentService.js";
+
+test("weekly roster resolves saved organization names to active organization profiles", () => {
+  const organization = {
+    _id: "organization-1",
+    name: "CodeClash Labs",
+    status: "ACTIVE",
+  };
+  const byId = new Map([["organization-1", organization]]);
+  const byName = new Map([["codeclash labs", organization]]);
+
+  assert.equal(
+    resolveWeeklyOrganization(
+      { organization: "  CodeClash   Labs " },
+      null,
+      byId,
+      byName,
+    ),
+    organization,
+  );
+  assert.equal(
+    resolveWeeklyOrganization(
+      { organization: "Other Company" },
+      { organizationId: "organization-1" },
+      byId,
+      byName,
+    ),
+    organization,
+  );
+  assert.equal(
+    resolveWeeklyOrganization(
+      { organization: "Unspecified" },
+      null,
+      byId,
+      byName,
+    ),
+    null,
+  );
+});
 
 test("weekly eligibility separates participation from ranking and requires finalized results", () => {
   const base = {

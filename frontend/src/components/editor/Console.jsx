@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { getStatusColor } from "../../utils/helpers";
+import {
+  getStatusColor,
+  MAX_DISPLAYED_TEST_CASES,
+} from "../../utils/helpers";
 import {
   CheckCircle2,
   XCircle,
@@ -159,8 +162,16 @@ export default function Console({
   const allPassed = status === "ACCEPTED" && passed === total && failed === 0;
   const globalError = result?.error || "";
 
-  const displayedTestCases = results
+  const failedResults = results
     .map((testCase, index) => ({ testCase, index }))
+    .filter(
+      ({ testCase }) => !["PASSED", "ACCEPTED"].includes(testCase.status),
+    );
+  const displayedTestCases = (
+    failedResults.length > 0
+      ? failedResults
+      : results.map((testCase, index) => ({ testCase, index }))
+  ).slice(0, MAX_DISPLAYED_TEST_CASES);
   const activeTestCaseEntry =
     displayedTestCases[activeTestCaseIndex] || displayedTestCases[0];
   const activeTestCase = activeTestCaseEntry?.testCase;

@@ -48,6 +48,27 @@ function validId(id) {
   return mongoose.Types.ObjectId.isValid(id);
 }
 
+async function updateActiveOrganizationRoster(organization, candidateId) {
+  const activeCycles = await WeeklyCycle.find({ status: "ACTIVE" })
+    .select("_id")
+    .lean();
+  if (!activeCycles.length) return;
+
+  const rosterFilter = {
+    cycleId: { $in: activeCycles.map((cycle) => cycle._id) },
+    $or: [
+      { organizationId: organization._id },
+      ...(candidateId ? [{ candidateId }] : []),
+    ],
+  };
+  await WeeklyRosterEntry.updateMany(rosterFilter, {
+    $set: {
+      organizationId: organization._id,
+      organizationNameSnapshot: organization.name,
+    },
+  });
+}
+
 export async function getCurrentWeeklyAssessment(req, res) {
   try {
     const state = await getCandidateWeeklyState(req.userId);
@@ -736,7 +757,9 @@ export async function createOwnOrganizationProfile(req, res) {
       ownerUserId: req.userId,
     });
     req.user.organization = organization.name;
+    req.user.organizationId = organization._id;
     await req.user.save();
+    await updateActiveOrganizationRoster(organization, req.userId);
     return res.status(201).json({ organization: organization.toPublicJSON() });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ error: "An organization name or profile already exists." });
@@ -754,7 +777,9 @@ export async function updateOwnOrganizationProfile(req, res) {
     organization.normalizedName = name.toLocaleLowerCase("en-US");
     await organization.save();
     req.user.organization = organization.name;
+    req.user.organizationId = organization._id;
     await req.user.save();
+    await updateActiveOrganizationRoster(organization, req.userId);
     return res.json({ organization: organization.toPublicJSON() });
   } catch (error) {
     if (error?.code === 11000) return res.status(409).json({ error: "An organization with this name already exists." });

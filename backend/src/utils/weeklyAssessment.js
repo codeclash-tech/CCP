@@ -84,6 +84,23 @@ export function latestEligibilityAt(user, instant) {
     .sort((left, right) => new Date(right.effectiveAt) - new Date(left.effectiveAt))[0] || null;
 }
 
+export function resolveWeeklyOrganization(
+  user,
+  membership,
+  organizationsById,
+  organizationsByName,
+) {
+  const membershipOrganization =
+    membership && organizationsById.get(String(membership.organizationId));
+  if (membershipOrganization?.status === "ACTIVE") return membershipOrganization;
+
+  const normalizedName = String(user?.organization || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("en-US");
+  return organizationsByName.get(normalizedName) || null;
+}
+
 export function isWeeklyParticipationEligible(result) {
   const finalizedAt = new Date(result?.resultFinalizedAt || result?.finalizedAt || NaN);
   const total = Number(result?.totalTestCases ?? result?.total);

@@ -1,3 +1,31 @@
+export const MAX_DISPLAYED_TEST_CASES = 3;
+
+export function formatInputWithParameters(input, signature) {
+  const rawInput = String(input ?? "");
+  const parameters = signature?.params;
+  if (
+    !Array.isArray(parameters) ||
+    parameters.length === 0 ||
+    parameters.some((parameter) => !parameter?.name)
+  ) {
+    return rawInput;
+  }
+
+  const values = rawInput.split(/\r?\n/);
+  if (values.length !== parameters.length) return rawInput;
+
+  return parameters
+    .map((parameter, index) => {
+      const equalsIndex = values[index].indexOf("=");
+      const existingName = values[index].slice(0, equalsIndex).trim();
+      const value = equalsIndex >= 0 && existingName === parameter.name
+        ? values[index].slice(equalsIndex + 1).trimStart()
+        : values[index];
+      return `${parameter.name} = ${value}`;
+    })
+    .join("\n");
+}
+
 export function formatTime(seconds) {
   if (!seconds || seconds < 0) return "0s";
   const hrs = Math.floor(seconds / 3600);

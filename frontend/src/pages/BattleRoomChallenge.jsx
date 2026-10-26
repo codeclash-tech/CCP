@@ -19,6 +19,10 @@ import {
   LANGUAGE_BY_ID,
 } from "../utils/constants";
 import {
+  formatInputWithParameters,
+  MAX_DISPLAYED_TEST_CASES,
+} from "../utils/helpers";
+import {
   beginExecutionTrace,
   finishExecutionTrace,
 } from "../utils/executionPerformance";
@@ -1633,56 +1637,58 @@ export default function BattleRoomChallenge() {
                         marginBottom: 6,
                       }}
                     >
-                      Examples ({question.examples.length})
+                      Examples ({Math.min(question.examples.length, MAX_DISPLAYED_TEST_CASES)})
                     </div>
-                    {question.examples.map((ex, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          background: "var(--bg-elevated)",
-                          border: "1px solid var(--border-color)",
-                          borderRadius: 6,
-                          padding: "8px 12px",
-                          marginBottom: 6,
-                          fontFamily: "var(--font-code)",
-                          fontSize: 12,
-                        }}
-                      >
+                    {question.examples
+                      .slice(0, MAX_DISPLAYED_TEST_CASES)
+                      .map((ex, idx) => (
                         <div
+                          key={idx}
                           style={{
-                            color: "var(--text-primary)",
-                            fontWeight: 600,
-                            marginBottom: 4,
-                            fontFamily: "var(--font-ui)",
+                            background: "var(--bg-elevated)",
+                            border: "1px solid var(--border-color)",
+                            borderRadius: 6,
+                            padding: "8px 12px",
+                            marginBottom: 6,
+                            fontFamily: "var(--font-code)",
+                            fontSize: 12,
                           }}
                         >
-                          Example {idx + 1}
-                        </div>
-                        <div style={{ color: "var(--text-muted)" }}>
-                          Input:{" "}
-                          <span style={{ color: "var(--syntax-string)" }}>
-                            {ex.input}
-                          </span>
-                        </div>
-                        <div style={{ color: "var(--text-muted)" }}>
-                          Output:{" "}
-                          <span style={{ color: "var(--syntax-keyword)" }}>
-                            {ex.output}
-                          </span>
-                        </div>
-                        {ex.explanation && (
                           <div
                             style={{
-                              color: "var(--text-muted)",
-                              marginTop: 4,
+                              color: "var(--text-primary)",
+                              fontWeight: 600,
+                              marginBottom: 4,
                               fontFamily: "var(--font-ui)",
                             }}
                           >
-                            Explanation: {ex.explanation}
+                            Example {idx + 1}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          <div style={{ color: "var(--text-muted)" }}>
+                            Input:{" "}
+                            <span style={{ color: "var(--syntax-string)" }}>
+                              {formatInputWithParameters(ex.input, question.signature)}
+                            </span>
+                          </div>
+                          <div style={{ color: "var(--text-muted)" }}>
+                            Output:{" "}
+                            <span style={{ color: "var(--syntax-keyword)" }}>
+                              {ex.output}
+                            </span>
+                          </div>
+                          {ex.explanation && (
+                            <div
+                              style={{
+                                color: "var(--text-muted)",
+                                marginTop: 4,
+                                fontFamily: "var(--font-ui)",
+                              }}
+                            >
+                              Explanation: {ex.explanation}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                   </div>
                 )}
 
