@@ -4,7 +4,7 @@ const CATEGORY_LABELS = {
   WINNER: "Daily Challenge Winner",
   RUNNER_UP: "Daily Challenge Runner-up",
   SECOND_RUNNER_UP: "Daily Challenge Second Runner-up",
-  PARTICIPATION: "Daily Challenge Completion",
+  PARTICIPATION: "Congratulations on Completing the Daily Challenge",
   ORGANIZATION_WINNER: "Organization Winner",
   ORGANIZATION_RUNNER_UP: "Organization Runner-up",
   ORGANIZATION_SECOND_RUNNER_UP: "Organization Second Runner-up",
@@ -30,22 +30,28 @@ export function streamWeeklyCertificate(certificate, response) {
   document.fillColor("#1d4ed8").font("Helvetica-Bold").fontSize(24)
     .text("CodeClash", 55, 62, { align: "center" });
   document.fillColor("#0f172a").font("Helvetica-Bold").fontSize(32)
-    .text(CATEGORY_LABELS[certificate.category] || "Daily Challenge Certificate", 60, 125, {
+    .text("Congratulations!", 60, 120, {
+      align: "center",
+      width: width - 120,
+      ellipsis: true,
+    });
+  document.fillColor("#334155").font("Helvetica-Bold").fontSize(18)
+    .text(CATEGORY_LABELS[certificate.category] || "Daily Challenge Certificate", 60, 168, {
       align: "center",
       width: width - 120,
       ellipsis: true,
     });
   document.fillColor("#334155").font("Helvetica").fontSize(15)
-    .text("This certificate is awarded to", 70, 190, { align: "center", width: width - 140 });
+    .text("This certificate is awarded to", 70, 210, { align: "center", width: width - 140 });
   document.fillColor("#1d4ed8").font("Helvetica-Bold").fontSize(30)
-    .text(snapshot.subjectName, 70, 225, {
+    .text(snapshot.subjectName, 70, 242, {
       align: "center",
       width: width - 140,
       height: 42,
       ellipsis: true,
     });
   document.fillColor("#334155").font("Helvetica").fontSize(14)
-    .text(`${snapshot.assessmentName}  |  Challenge date: ${snapshot.cycleKey}`, 70, 290, {
+    .text(`${snapshot.assessmentName}  |  Challenge date: ${snapshot.cycleKey}`, 70, 310, {
       align: "center",
       width: width - 140,
     });
@@ -57,7 +63,7 @@ export function streamWeeklyCertificate(certificate, response) {
     .text(
       `${rankLabel}  |  Score: ${Number(snapshot.score).toFixed(2)}`,
       70,
-      340,
+      355,
       {
         align: "center",
         width: width - 140,
@@ -65,17 +71,17 @@ export function streamWeeklyCertificate(certificate, response) {
     );
   if (snapshot.organizationName && certificate.type === "INDIVIDUAL") {
     document.fillColor("#475569").font("Helvetica").fontSize(13)
-      .text(`Organization: ${snapshot.organizationName}`, 70, 380, {
+      .text(`Organization: ${snapshot.organizationName}`, 70, 395, {
         align: "center",
         width: width - 140,
       });
   }
   document.fillColor("#64748b").font("Helvetica").fontSize(10)
-    .text(`Certificate ID: ${certificate.certificateId}`, 70, 435, {
+    .text(`Certificate ID: ${certificate.certificateId}`, 70, 445, {
       align: "center",
       width: width - 140,
     });
-  document.text(`Issued ${new Date(snapshot.issuedAt).toISOString().slice(0, 10)}`, 70, 455, {
+  document.text(`Issued ${new Date(snapshot.issuedAt).toISOString().slice(0, 10)}`, 70, 465, {
     align: "center",
     width: width - 140,
   });

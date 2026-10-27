@@ -181,7 +181,22 @@ export default function useProctorGuard({
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleWindowBlur);
+    const onDesktopFocusChanged =
+      window.codeClashDesktop?.window?.onAssessmentFocusChanged;
+    const removeDesktopFocusListener =
+      typeof onDesktopFocusChanged === "function"
+        ? onDesktopFocusChanged((isFocused) => {
+            if (!isFocused) {
+              recordIntegrityEvent(
+                "WINDOW_BLUR",
+                "CodeClash desktop app moved to the background",
+              );
+            }
+          })
+        : null;
+    if (!removeDesktopFocusListener) {
+      window.addEventListener("blur", handleWindowBlur);
+    }
     document.addEventListener("copy", handleCopy, true);
     document.addEventListener("paste", handlePaste, true);
     document.addEventListener("cut", handleCut, true);
@@ -192,7 +207,11 @@ export default function useProctorGuard({
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleWindowBlur);
+      if (removeDesktopFocusListener) {
+        removeDesktopFocusListener();
+      } else {
+        window.removeEventListener("blur", handleWindowBlur);
+      }
       document.removeEventListener("copy", handleCopy, true);
       document.removeEventListener("paste", handlePaste, true);
       document.removeEventListener("cut", handleCut, true);

@@ -10,6 +10,8 @@ const weeklyRosterEntrySchema = new mongoose.Schema(
     eligibilityStatus: { type: String, enum: ["ELIGIBLE"], required: true, default: "ELIGIBLE" },
     participationStatus: { type: String, enum: ["NOT_STARTED", "PARTICIPATED", "DISQUALIFIED"], required: true, default: "NOT_STARTED" },
     score: { type: Number, required: true, default: 0 },
+    executionTime: { type: Number, min: 0, default: 0 },
+    memoryUsed: { type: Number, min: 0, default: 0 },
     completedDays: { type: [Number], default: [] },
     passedTestCases: { type: Number, min: 0, default: 0 },
     totalTestCases: { type: Number, min: 0, default: 0 },

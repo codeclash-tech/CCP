@@ -50,18 +50,8 @@ function validId(id) {
 }
 
 async function updateActiveOrganizationRoster(organization, candidateId) {
-  const activeCycles = await WeeklyCycle.find({ status: "ACTIVE" })
-    .select("_id")
-    .lean();
-  if (!activeCycles.length) return;
-
-  const rosterFilter = {
-    cycleId: { $in: activeCycles.map((cycle) => cycle._id) },
-    $or: [
-      { organizationId: organization._id },
-      ...(candidateId ? [{ candidateId }] : []),
-    ],
-  };
+  const rosterFilter = { $or: [{ organizationId: organization._id }] };
+  if (candidateId) rosterFilter.$or.push({ candidateId });
   await WeeklyRosterEntry.updateMany(rosterFilter, {
     $set: {
       organizationId: organization._id,
@@ -795,7 +785,12 @@ export async function listMyWeeklyCertificates(req, res) {
       .select("certificateId cycleId type category snapshot")
       .lean();
     const certificates = await filterCurrentlyEligibleCertificates(storedCertificates);
-    return res.json({ certificates });
+    return res.json({
+      certificates: certificates.map((certificate) => ({
+        ...certificate,
+        downloadPath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}/pdf`,
+      })),
+    });
   } catch (error) {
     return sendFailure(res, error, "Could not load weekly certificates.");
   }
@@ -810,7 +805,12 @@ export async function listMyOrganizationCertificates(req, res) {
       type: "ORGANIZATION",
     }).sort({ "snapshot.issuedAt": -1 }).select("certificateId cycleId type category snapshot").lean();
     const certificates = await filterCurrentlyEligibleCertificates(storedCertificates);
-    return res.json({ certificates });
+    return res.json({
+      certificates: certificates.map((certificate) => ({
+        ...certificate,
+        downloadPath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}/pdf`,
+      })),
+    });
   } catch (error) {
     return sendFailure(res, error, "Could not load organization certificates.");
   }
@@ -839,6 +839,15 @@ export async function downloadWeeklyCertificate(req, res) {
     if (!eligibleCertificate) {
       return res.status(404).json({ error: "Weekly certificate not found." });
     }
+    res.once("finish", () => {
+      WeeklyCertificate.deleteOne({ certificateId: certificate.certificateId })
+        .catch((error) => {
+          console.error("[WeeklyCertificate] Could not delete downloaded certificate:", {
+            certificateId: certificate.certificateId,
+            error: error.message,
+          });
+        });
+    });
     return streamWeeklyCertificate(certificate, res);
   } catch (error) {
     return sendFailure(res, error, "Could not generate the weekly certificate.");

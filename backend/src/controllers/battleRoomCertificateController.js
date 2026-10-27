@@ -3,6 +3,7 @@ import {
   streamBattleRoomCertificateData,
 } from "../services/battleRoomCertificateService.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import BattleRoom from "../models/BattleRoom.js";
 import {
   isBattleRoomCertificateEligible,
 } from "../services/battleRoomScoring.js";
@@ -78,7 +79,33 @@ export async function downloadParticipantBattleRoomCertificate(req, res) {
         error: "Your certificate is not available for this battle.",
       });
     }
+    const room = await BattleRoom.findOne({
+      _id: submission.roomId,
+      status: "CLOSED",
+    })
+      .select("_id")
+      .lean();
+    if (!room) {
+      return res.status(404).json({
+        error: "Battle Room certificates are available only after the room ends.",
+      });
+    }
 
+    res.once("finish", () => {
+      BattleRoomSubmission.updateOne(
+        {
+          _id: submission._id,
+          userId: req.userId,
+          "certificateSnapshot.roomCode": req.params.roomCode.toUpperCase(),
+        },
+        { $unset: { certificateSnapshot: 1 } },
+      ).catch((error) => {
+        console.error("[BattleRoomCertificate] Could not delete downloaded certificate:", {
+          submissionId: String(submission._id),
+          error: error.message,
+        });
+      });
+    });
     streamBattleRoomCertificateData(
       {
         ...submission.certificateSnapshot,

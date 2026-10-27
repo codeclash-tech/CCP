@@ -24,6 +24,12 @@ contextBridge.exposeInMainWorld(
         return () =>
           ipcRenderer.removeListener("codeclash:window-maximized", handler);
       },
+      onAssessmentFocusChanged: (listener) => {
+        const handler = (_event, isFocused) => listener(isFocused);
+        ipcRenderer.on("codeclash:assessment-window-focus", handler);
+        return () =>
+          ipcRenderer.removeListener("codeclash:assessment-window-focus", handler);
+      },
     }),
     auth: Object.freeze({
       getTokens: () => ipcRenderer.invoke("codeclash:auth-get-tokens"),

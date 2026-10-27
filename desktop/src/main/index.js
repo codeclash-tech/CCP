@@ -111,6 +111,12 @@ async function createMainWindow() {
   mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
     console.error(`Failed to load the CodeClash preload (${preloadPath}):`, error);
   });
+  mainWindow.on("blur", () => {
+    mainWindow?.webContents.send("codeclash:assessment-window-focus", false);
+  });
+  mainWindow.on("focus", () => {
+    mainWindow?.webContents.send("codeclash:assessment-window-focus", true);
+  });
   mainWindow.on("maximize", () => {
     mainWindow?.webContents.send("codeclash:window-maximized", true);
   });

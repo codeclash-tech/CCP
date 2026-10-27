@@ -5,6 +5,7 @@ import Challenge from "../src/models/Challenge.js";
 import GlobalChallenge from "../src/models/GlobalChallenge.js";
 import weeklyAssessmentRoutes from "../src/routes/weeklyAssessmentRoutes.js";
 import {
+  calculateDailyScore,
   calculateWeeklyRankings,
   getWeeklyCycleBounds,
   getDailyCertificateAvailableAt,
@@ -33,6 +34,12 @@ test("daily challenge certificates unlock at midnight India time on the followin
   );
   assert.equal(getDailyCertificateAvailableAt("2026-02-30"), null);
   assert.equal(getDailyCertificateAvailableAt("invalid"), null);
+});
+
+test("daily challenge marks equal the percentage of test cases passed", () => {
+  assert.equal(calculateDailyScore(2, 5), 40);
+  assert.equal(calculateDailyScore(0, 5), 0);
+  assert.equal(calculateDailyScore(5, 5), 100);
 });
 
 test("weekly roster resolves saved organization names to active organization profiles", () => {
@@ -73,7 +80,7 @@ test("weekly roster resolves saved organization names to active organization pro
   );
 });
 
-test("weekly eligibility separates participation from ranking and requires finalized results", () => {
+test("weekly participation requires a passing case while ranking accepts every finalized score", () => {
   const base = {
     participationStatus: "PARTICIPATED",
     resultFinalizedAt: new Date("2026-10-25T10:00:00.000Z"),
@@ -81,7 +88,7 @@ test("weekly eligibility separates participation from ranking and requires final
   };
 
   assert.equal(isWeeklyParticipationEligible({ ...base, passedTestCases: 0 }), false);
-  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 0 }), false);
+  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 0 }), true);
   assert.equal(
     isWeeklyParticipationEligible({ ...base, passedTestCases: 6 }),
     false,
@@ -91,7 +98,7 @@ test("weekly eligibility separates participation from ranking and requires final
     false,
   );
   assert.equal(isWeeklyParticipationEligible({ ...base, passedTestCases: 1 }), true);
-  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 1 }), false);
+  assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 1 }), true);
   assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 5 }), true);
   assert.equal(
     isWeeklyParticipationEligible({
@@ -115,6 +122,8 @@ test("live roster summary synchronizes test counts and finalization for ranking 
       score: 100,
       passed: 7,
       total: 7,
+      executionTime: 120,
+      memoryUsed: 64,
       finalizedAt,
     },
   ]);
@@ -127,6 +136,8 @@ test("live roster summary synchronizes test counts and finalization for ranking 
     score: 100,
     passedTestCases: 7,
     totalTestCases: 7,
+    executionTime: 120,
+    memoryUsed: 64,
     completedDays: [0],
     resultFinalizedAt: finalizedAt,
     participationStatus: "PARTICIPATED",
@@ -418,7 +429,7 @@ test("organization score uses completed participants and k=5", () => {
         participationStatus: "PARTICIPATED",
         completedDays: [0],
         passedTestCases: 4,
-        totalTestCases: 4,
+        totalTestCases: 5,
         resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
         score: 20,
         lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
@@ -449,7 +460,7 @@ test("incomplete and disqualified candidates do not appear in individual or orga
       participationStatus: "PARTICIPATED",
       completedDays: [0],
       passedTestCases: 4,
-      totalTestCases: 4,
+      totalTestCases: 5,
       resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
       score: 20,
       lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
@@ -524,7 +535,7 @@ test("daily leaderboards start empty until an eligible participant completes a q
   assert.deepEqual(results.organizationRankings, []);
 });
 
-test("individual ranking tie-breaking is deterministic", () => {
+test("individual rankings include partial marks and efficiency tie-breakers without first-come ranks", () => {
   const candidates = [
     {
       candidateId: "z-candidate",
@@ -534,9 +545,11 @@ test("individual ranking tie-breaking is deterministic", () => {
       participationStatus: "PARTICIPATED",
       completedDays: [0],
       passedTestCases: 4,
-      totalTestCases: 4,
+      totalTestCases: 5,
       resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
-      score: 10,
+      score: 80,
+      executionTime: 100,
+      memoryUsed: 30,
       lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
     },
     {
@@ -547,9 +560,11 @@ test("individual ranking tie-breaking is deterministic", () => {
       participationStatus: "PARTICIPATED",
       completedDays: [0],
       passedTestCases: 4,
-      totalTestCases: 4,
+      totalTestCases: 5,
       resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
-      score: 10,
+      score: 80,
+      executionTime: 100,
+      memoryUsed: 30,
       lastSubmittedAt: new Date("2024-01-08T10:00:00.000Z"),
     },
     {
@@ -560,16 +575,71 @@ test("individual ranking tie-breaking is deterministic", () => {
       participationStatus: "PARTICIPATED",
       completedDays: [0],
       passedTestCases: 4,
-      totalTestCases: 4,
+      totalTestCases: 5,
       resultFinalizedAt: new Date("2024-01-08T09:00:00.000Z"),
-      score: 10,
+      score: 80,
+      executionTime: 90,
+      memoryUsed: 100,
       lastSubmittedAt: new Date("2024-01-08T09:00:00.000Z"),
     },
   ];
 
+  const ranked = calculateWeeklyRankings([
+    ...candidates,
+    {
+      candidateId: "partial",
+      candidateNameSnapshot: "Partial",
+      organizationId: "org",
+      organizationNameSnapshot: "Org",
+      participationStatus: "PARTICIPATED",
+      completedDays: [0],
+      passedTestCases: 2,
+      totalTestCases: 5,
+      resultFinalizedAt: new Date("2024-01-08T11:00:00.000Z"),
+      score: 40,
+      executionTime: 80,
+      memoryUsed: 10,
+    },
+  ]).individualRankings;
+
   assert.deepEqual(
-    calculateWeeklyRankings(candidates).individualRankings.map((candidate) => candidate.candidateId),
-    ["earlier", "a-candidate", "z-candidate"],
+    ranked.map(({ candidateId, rank }) => [candidateId, rank]),
+    [
+      ["earlier", 1],
+      ["a-candidate", 2],
+      ["z-candidate", 2],
+      ["partial", 4],
+    ],
+  );
+});
+
+test("daily marks use passed-test percentage, including zero and partial marks", () => {
+  const ranked = calculateWeeklyRankings([
+    {
+      candidateId: "partial",
+      candidateNameSnapshot: "Partial",
+      participationStatus: "PARTICIPATED",
+      completedDays: [0],
+      passedTestCases: 2,
+      totalTestCases: 5,
+      resultFinalizedAt: new Date("2024-01-08T10:00:00.000Z"),
+      score: 40,
+    },
+    {
+      candidateId: "zero",
+      candidateNameSnapshot: "Zero",
+      participationStatus: "PARTICIPATED",
+      completedDays: [0],
+      passedTestCases: 0,
+      totalTestCases: 5,
+      resultFinalizedAt: new Date("2024-01-08T10:01:00.000Z"),
+      score: 0,
+    },
+  ]).individualRankings;
+
+  assert.deepEqual(
+    ranked.map(({ candidateId, score, rank }) => [candidateId, score, rank]),
+    [["partial", 40, 1], ["zero", 0, 2]],
   );
 });
 

@@ -2,14 +2,9 @@ import Submission from "../models/Submission.js";
 import Challenge from "../models/Challenge.js";
 import User from "../models/User.js";
 
-function calculateScore(passed, total, timeToSolve, executionTime, memoryUsed) {
-  const passRatio = total > 0 ? passed / total : 0;
-  const timePenalty = timeToSolve * 0.5;
-  const executionPenalty = executionTime * 0.1;
-  const memoryPenalty = memoryUsed * 0.05;
-
-  const score = passRatio * 1000 - timePenalty - executionPenalty - memoryPenalty;
-  return Math.max(0, Math.round(score * 100) / 100);
+function calculateScore(passed, total) {
+  const passRatio = total > 0 ? Math.min(1, Math.max(0, passed / total)) : 0;
+  return Math.round(passRatio * 10000) / 100;
 }
 
 function parseExecutionResult(result) {

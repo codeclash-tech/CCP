@@ -429,7 +429,7 @@ export default function WeeklyRankings() {
                       <div className="weekly-ranking-table-wrap">
                         <table className="weekly-ranking-table">
                           <thead>
-                            <tr><th>Rank</th><th>Participant</th><th>Organization</th><th>Score</th><th>Completed</th><th>Status</th></tr>
+                            <tr><th>Rank</th><th>Name</th><th>Organisation</th></tr>
                           </thead>
                           <tbody>
                             {rankings.individualRankings.map((candidate) => {
@@ -459,9 +459,6 @@ export default function WeeklyRankings() {
                                     {isCurrentUser ? " (you)" : ""}
                                   </td>
                                   <td>{candidate.organizationNameSnapshot || "—"}</td>
-                                  <td>{Number(candidate.score || 0).toFixed(2)}</td>
-                                  <td>{candidate.completedQuestions}/1</td>
-                                  <td>{candidate.status}</td>
                                 </tr>
                               );
                             })}

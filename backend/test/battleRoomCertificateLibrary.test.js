@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
+import BattleRoom from "../src/models/BattleRoom.js";
 import BattleRoomSubmission from "../src/models/BattleRoomSubmission.js";
 import { streamBattleRoomCertificateData } from "../src/services/battleRoomCertificateService.js";
 import {
   listParticipantBattleRoomCertificates,
+  downloadParticipantBattleRoomCertificate,
   toParticipantCertificate,
 } from "../src/controllers/battleRoomCertificateController.js";
 import battleRoomRoutes from "../src/routes/battleRoomRoutes.js";
@@ -174,4 +176,73 @@ test("certificate download generates a PDF with server-issued certificate metada
   assert.match(headers["Content-Type"], /^application\/pdf/);
   assert.equal(headers["Cache-Control"], "private, no-store");
   assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+});
+
+test("battle certificate download is gated on room closure and removes the certificate after streaming", async () => {
+  const originalSubmissionFindOne = BattleRoomSubmission.findOne;
+  const originalSubmissionUpdateOne = BattleRoomSubmission.updateOne;
+  const originalRoomFindOne = BattleRoom.findOne;
+  const submission = {
+    _id: "submission-id",
+    roomId: "room-id",
+    totalScore: 40,
+    totalPassed: 2,
+    totalFailed: 3,
+    status: "COMPLETED",
+    participantName: "Candidate",
+    certificateSnapshot: {
+      roomCode: "ROOM-1",
+      roomTitle: "Daily Battle",
+      rank: 2,
+      totalParticipants: 4,
+      totalTestCases: 5,
+      completedAt: new Date("2026-10-25T10:00:00.000Z"),
+    },
+  };
+  let roomFilter;
+  let deletion;
+  BattleRoomSubmission.findOne = () => ({ lean: async () => submission });
+  BattleRoomSubmission.updateOne = async (filter, update) => {
+    deletion = { filter, update };
+    return { matchedCount: 1 };
+  };
+  BattleRoom.findOne = (filter) => {
+    roomFilter = filter;
+    return {
+      select() {
+        return this;
+      },
+      lean: async () => ({ _id: "room-id" }),
+    };
+  };
+
+  try {
+    const response = new PassThrough();
+    response.setHeader = () => {};
+    response.on("data", () => {});
+    const completed = new Promise((resolve, reject) => {
+      response.once("end", resolve);
+      response.once("error", reject);
+    });
+    await downloadParticipantBattleRoomCertificate(
+      { params: { roomCode: "room-1" }, userId: "candidate-id" },
+      response,
+    );
+    await completed;
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(roomFilter, { _id: "room-id", status: "CLOSED" });
+    assert.deepEqual(deletion, {
+      filter: {
+        _id: "submission-id",
+        userId: "candidate-id",
+        "certificateSnapshot.roomCode": "ROOM-1",
+      },
+      update: { $unset: { certificateSnapshot: 1 } },
+    });
+  } finally {
+    BattleRoomSubmission.findOne = originalSubmissionFindOne;
+    BattleRoomSubmission.updateOne = originalSubmissionUpdateOne;
+    BattleRoom.findOne = originalRoomFindOne;
+  }
 });

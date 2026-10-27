@@ -57,15 +57,15 @@ test("completed eligible submissions receive current certificate snapshots and r
       roomCode: "ABC123",
       roomTitle: "Sample Battle",
       rank: 1,
-      totalParticipants: 1,
+      totalParticipants: 3,
       totalTestCases: 2,
       completedAt: submissions[0].submittedAt,
     });
     assert.deepEqual(updates.get("partially-solved"), {
       roomCode: "ABC123",
       roomTitle: "Sample Battle",
-      rank: null,
-      totalParticipants: 1,
+      rank: 2,
+      totalParticipants: 3,
       totalTestCases: 2,
       completedAt: submissions[1].submittedAt,
     });

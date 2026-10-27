@@ -6,6 +6,7 @@ import {
 } from "./battleRoomScoring.js";
 import {
   RANKED_SUBMISSION_STATUSES,
+  getRoomRank,
   sortRoomSubmissions,
 } from "./battleRoomRanking.js";
 
@@ -23,7 +24,7 @@ export async function refreshBattleRoomCertificateSnapshots(room) {
   const rankedById = new Map(
     rankedSubmissions.map((submission, index) => [
       String(submission._id),
-      index + 1,
+      getRoomRank(rankedSubmissions, index),
     ]),
   );
 

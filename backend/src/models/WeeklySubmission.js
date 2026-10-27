@@ -71,6 +71,7 @@ const weeklySubmissionSchema = new mongoose.Schema(
     passed: { type: Number, default: 0 },
     total: { type: Number, default: 0 },
     executionTime: { type: Number, default: 0 },
+    memoryUsed: { type: Number, default: 0 },
     finalizedAt: { type: Date, default: null },
     judgeLeaseAt: { type: Date, required: true, default: Date.now },
   },

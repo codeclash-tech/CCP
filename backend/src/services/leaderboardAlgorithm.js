@@ -8,13 +8,37 @@ const TOP_K = 5;
 
 function isRankedSubmission(submission) {
   return Boolean(
-    submission?.status === "ACCEPTED" &&
+    ["ACCEPTED", "REJECTED"].includes(submission?.status) &&
     submission.isDisqualified !== true &&
     Number.isFinite(Number(submission.passed)) &&
     Number.isFinite(Number(submission.total)) &&
     Number(submission.total) > 0 &&
-    Number(submission.passed) === Number(submission.total),
+    Number(submission.passed) >= 0 &&
+    Number(submission.passed) <= Number(submission.total),
   );
+}
+
+function getAccuracyScore(submission) {
+  return Math.round((Number(submission.passed) / Number(submission.total)) * 10000) / 100;
+}
+
+function compareSubmissionMetrics(left, right) {
+  return (
+    getAccuracyScore(right) - getAccuracyScore(left) ||
+    (Number(left.executionTime) || 0) - (Number(right.executionTime) || 0) ||
+    (Number(left.memoryUsed) || 0) - (Number(right.memoryUsed) || 0)
+  );
+}
+
+function rankAt(sortedSubmissions, index) {
+  let first = index;
+  while (
+    first > 0 &&
+    compareSubmissionMetrics(sortedSubmissions[first - 1], sortedSubmissions[index]) === 0
+  ) {
+    first -= 1;
+  }
+  return first + 1;
 }
 
 export async function calculateUserScores(challengeId) {
@@ -24,16 +48,26 @@ export async function calculateUserScores(challengeId) {
     isDisqualified: false,
   })
     .populate("userId", "name email organization")
-    .sort({ score: -1 })
     .lean();
 
-  const rankedSubmissions = submissions.filter(isRankedSubmission).map((sub, index) => ({
-    rank: index + 1,
+  const rankedSubmissions = submissions
+    .filter(isRankedSubmission)
+    .sort((left, right) =>
+      compareSubmissionMetrics(left, right) ||
+      String(left.userId?.name || "").localeCompare(
+        String(right.userId?.name || ""),
+        undefined,
+        { sensitivity: "base" },
+      ) ||
+      String(left._id).localeCompare(String(right._id)),
+    )
+    .map((sub, index, sorted) => ({
+    rank: rankAt(sorted, index),
     userId: sub.userId?._id,
     name: sub.userId?.name || "Unknown",
     email: sub.userId?.email || "",
     organization: sub.userId?.organization || "Unknown",
-    score: sub.score,
+    score: getAccuracyScore(sub),
     passed: sub.passed,
     total: sub.total,
     executionTime: sub.executionTime,
@@ -60,16 +94,22 @@ export async function calculateOrganizationScores(challengeId) {
     if (!orgGroups[orgName]) {
       orgGroups[orgName] = [];
     }
-    orgGroups[orgName].push(sub.score);
+    orgGroups[orgName].push(sub);
   }
 
   const orgScores = [];
   for (const [orgName, scores] of Object.entries(orgGroups)) {
-    scores.sort((a, b) => b - a);
+    scores.sort(compareSubmissionMetrics);
     const participants = scores.length;
     const k = Math.min(participants, TOP_K);
     const topKScores = scores.slice(0, k);
-    const topKAverage = topKScores.reduce((sum, s) => sum + s, 0) / k;
+    const topKAverage = topKScores.reduce((sum, s) => sum + getAccuracyScore(s), 0) / k;
+    const averageExecutionTime =
+      scores.reduce((sum, submission) => sum + (Number(submission.executionTime) || 0), 0) /
+      participants;
+    const averageMemoryUsed =
+      scores.reduce((sum, submission) => sum + (Number(submission.memoryUsed) || 0), 0) /
+      participants;
 
     const participationMultiplier =
       0.85 + 0.15 * (Math.log(participants) / Math.log(participants + 5));
@@ -81,14 +121,31 @@ export async function calculateOrganizationScores(challengeId) {
       participants,
       topKAverage: Math.round(topKAverage * 100) / 100,
       bayesianScore: Math.round(bayesianScore * 100) / 100,
+      averageExecutionTime,
+      averageMemoryUsed,
     });
   }
 
-  orgScores.sort((a, b) => b.bayesianScore - a.bayesianScore);
-  const rankedOrgs = orgScores.map((org, index) => ({
-    rank: index + 1,
-    ...org,
-  }));
+  orgScores.sort((a, b) =>
+    b.bayesianScore - a.bayesianScore ||
+    b.topKAverage - a.topKAverage ||
+    a.averageExecutionTime - b.averageExecutionTime ||
+    a.averageMemoryUsed - b.averageMemoryUsed ||
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  );
+  const rankedOrgs = orgScores.map((org, index) => {
+    let first = index;
+    while (
+      first > 0 &&
+      orgScores[first - 1].bayesianScore === org.bayesianScore &&
+      orgScores[first - 1].topKAverage === org.topKAverage &&
+      orgScores[first - 1].averageExecutionTime === org.averageExecutionTime &&
+      orgScores[first - 1].averageMemoryUsed === org.averageMemoryUsed
+    ) {
+      first -= 1;
+    }
+    return { rank: first + 1, ...org };
+  });
 
   await persistOrganizationScores(rankedOrgs);
 
@@ -141,7 +198,6 @@ export async function getGlobalUserLeaderboard(limit = 100) {
     isDisqualified: false,
   })
     .populate("userId", "name email organization")
-    .sort({ score: -1 })
     .lean();
 
   // Filter out NaN scores and disqualified users.
@@ -154,14 +210,23 @@ export async function getGlobalUserLeaderboard(limit = 100) {
         return false;
       return true;
     })
+    .sort((left, right) =>
+      compareSubmissionMetrics(left, right) ||
+      String(left.userId.name || "").localeCompare(
+        String(right.userId.name || ""),
+        undefined,
+        { sensitivity: "base" },
+      ) ||
+      String(left._id).localeCompare(String(right._id)),
+    )
     .slice(0, limit)
-    .map((sub, index) => ({
-      rank: index + 1,
+    .map((sub, index, sorted) => ({
+      rank: rankAt(sorted, index),
       _id: sub.userId._id,
       name: sub.userId.name || "Unknown",
       email: sub.userId.email || "",
       organization: sub.userId.organization || "Unknown",
-      totalScore: sub.score,
+      totalScore: getAccuracyScore(sub),
       challengesCompleted: sub.status === "ACCEPTED" ? 1 : 0,
       lastActiveDate: sub.createdAt,
     }));
@@ -180,10 +245,14 @@ export async function getTodayUserRank(userId, todayChallengeId) {
     status: { $in: ["ACCEPTED", "REJECTED"] },
   })
     .populate("userId", "name email")
-    .sort({ score: -1 })
     .lean();
 
-  const rankedSubmissions = submissions.filter(isRankedSubmission);
+  const rankedSubmissions = submissions
+    .filter(isRankedSubmission)
+    .sort((left, right) =>
+      compareSubmissionMetrics(left, right) ||
+      String(left.userId?._id || "").localeCompare(String(right.userId?._id || "")),
+    );
   const userEntry = rankedSubmissions.find(
     (sub) => sub.userId?._id?.toString() === userId.toString(),
   );
@@ -192,14 +261,15 @@ export async function getTodayUserRank(userId, todayChallengeId) {
     return { rank: null, totalScore: 0, challengesCompleted: 0 };
   }
 
-  const rank =
+  const rankIndex =
     rankedSubmissions.findIndex((sub) =>
       sub.userId?._id?.toString() === userId.toString(),
     ) + 1;
+  const rank = rankAt(rankedSubmissions, rankIndex - 1);
 
   return {
     rank,
-    totalScore: userEntry.score || 0,
+    totalScore: getAccuracyScore(userEntry),
     challengesCompleted: userEntry.status === "ACCEPTED" ? 1 : 0,
   };
 }

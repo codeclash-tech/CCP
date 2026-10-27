@@ -11,8 +11,19 @@ export function countRoomTestCases(questions = []) {
 }
 
 export function calculateQuestionScore(points, passedTestCases, totalTestCases) {
-  if (totalTestCases <= 0) return 0;
-  return Math.round((points * passedTestCases * 100) / totalTestCases) / 100;
+  const total = Number(totalTestCases);
+  const mark = Number(points);
+  const passed = Number(passedTestCases);
+  if (
+    !Number.isFinite(total) ||
+    total <= 0 ||
+    !Number.isFinite(mark) ||
+    mark < 0 ||
+    !Number.isFinite(passed)
+  ) {
+    return 0;
+  }
+  return Math.round((mark * Math.min(total, Math.max(0, passed)) * 100) / total) / 100;
 }
 
 export function isBattleRoomSubmissionComplete(submission, totalTestCases) {
@@ -36,6 +47,5 @@ export function isBattleRoomCertificateEligible(submission, totalTestCases) {
 }
 
 export function isBattleRoomRankedEligible(submission, totalTestCases) {
-  return isBattleRoomSubmissionComplete(submission, totalTestCases) &&
-    Number(submission.totalPassed) === totalTestCases;
+  return isBattleRoomSubmissionComplete(submission, totalTestCases);
 }

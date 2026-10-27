@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import PageSkeleton from "../components/layout/PageSkeleton";
 
-function CertificateCard({ certificate, onDownload, onPreview }) {
+function CertificateCard({ certificate, onDownload, onPreview, downloading }) {
   const isDaily = certificate.type === "DAILY";
   const completedAt = certificate.completedAt
     ? new Date(certificate.completedAt).toLocaleDateString()
@@ -37,9 +37,10 @@ function CertificateCard({ certificate, onDownload, onPreview }) {
         className="btn-primary certificate-download"
         type="button"
         onClick={() => onDownload(certificate)}
+        disabled={downloading}
       >
         <Download size={16} />
-        Download Preview PNG
+        {downloading ? "Downloading…" : "Download certificate"}
       </button>
     </article>
   );
@@ -52,8 +53,7 @@ export default function CertificateLibrary() {
   const [error, setError] = useState("");
   const [retryAction, setRetryAction] = useState(null);
   const [previewCertificate, setPreviewCertificate] = useState(null);
-  const [autoDownloadPreview, setAutoDownloadPreview] = useState(false);
-  const completeAutoDownload = useCallback(() => setAutoDownloadPreview(false), []);
+  const [downloadingCertificateId, setDownloadingCertificateId] = useState("");
 
   const loadCertificates = useCallback(async () => {
     setLoading(true);
@@ -98,11 +98,32 @@ export default function CertificateLibrary() {
     loadCertificates();
   }, [loadCertificates]);
 
-  const downloadCertificate = (certificate) => {
+  const downloadCertificate = async (certificate) => {
     setError("");
     setRetryAction(null);
-    setAutoDownloadPreview(true);
-    setPreviewCertificate(certificate);
+    setDownloadingCertificateId(certificate.certificateId);
+    try {
+      const { data } = await api.get(certificate.downloadPath, {
+        responseType: "blob",
+      });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${certificate.certificateId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setCertificates((current) =>
+        current.filter(
+          (item) => item.certificateId !== certificate.certificateId,
+        ),
+      );
+    } catch (downloadError) {
+      setError(downloadError.message || "Unable to download this certificate.");
+    } finally {
+      setDownloadingCertificateId("");
+    }
   };
 
   return (
@@ -152,6 +173,7 @@ export default function CertificateLibrary() {
               certificate={certificate}
               onDownload={downloadCertificate}
               onPreview={setPreviewCertificate}
+              downloading={downloadingCertificateId === certificate.certificateId}
             />
           ))}
         </div>
@@ -172,8 +194,6 @@ export default function CertificateLibrary() {
           completedAt: previewCertificate.completedAt || previewCertificate.snapshot?.issuedAt,
         } : null}
         userName={previewCertificate?.snapshot?.subjectName || user?.name}
-        autoDownload={autoDownloadPreview}
-        onAutoDownloadComplete={completeAutoDownload}
       />
     </section>
   );

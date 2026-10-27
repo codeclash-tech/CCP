@@ -18,6 +18,7 @@ import { executionService } from "./executionService.js";
 import { composeProgram } from "./wrapperGenerator.js";
 import { generateStarterCodeForChallenge } from "./challengeAuthoringService.js";
 import {
+  calculateDailyScore,
   calculateWeeklyRankings,
   getWeeklyCycleBounds,
   getWeeklyDayIndex,
@@ -37,7 +38,6 @@ import {
 import { dispatchWeeklyCompletionEmail } from "./completionNotificationService.js";
 
 const RETRY_LEASE_MS = 6 * 60 * 1000;
-const DAILY_POINTS = 100;
 const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
 const DESKTOP_ENGINE_VERSION = process.env.CODECLASH_ENGINE_VERSION || "1.0.0";
 let weeklyVerificationWorkerStarted = false;
@@ -1206,8 +1206,7 @@ export async function finalizeWeeklyLocalExecution({
   }
 
   try {
-    const score =
-      Math.round((DAILY_POINTS * validation.passed / validation.total) * 100) / 100;
+    const score = calculateDailyScore(validation.passed, validation.total);
     const finalizedAt = new Date(now);
     const update = {
       cycleId: cycle._id,
@@ -1237,6 +1236,7 @@ export async function finalizeWeeklyLocalExecution({
       passed: validation.passed,
       total: validation.total,
       executionTime: validation.durationMs,
+      memoryUsed: getPeakMemoryUsed(validation),
       finalizedAt,
       judgeLeaseAt: finalizedAt,
     };
@@ -1305,6 +1305,13 @@ function sanitizedResult(result, score) {
     score,
     executionTime: result.executionTime,
   };
+}
+
+function getPeakMemoryUsed(result) {
+  return (result.results || []).reduce(
+    (peak, item) => Math.max(peak, Number(item.memoryUsed) || 0),
+    Number(result.memoryUsed) || 0,
+  );
 }
 
 async function claimWeeklySubmission(submission, now) {
@@ -1418,9 +1425,7 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
     error.submissionId = String(submission._id);
     throw error;
   }
-  const score = Math.round(
-    (DAILY_POINTS * (Number(result.passed) || 0) / (Number(result.total) || 1)) * 100,
-  ) / 100;
+  const score = calculateDailyScore(result.passed, result.total);
   const databaseStartedAt = performance.now();
   const finalized = await WeeklySubmission.findOneAndUpdate(
     {
@@ -1436,6 +1441,7 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
         passed: Number(result.passed) || 0,
         total: Number(result.total) || cases.length,
         executionTime: Number(result.executionTime) || 0,
+        memoryUsed: getPeakMemoryUsed(result),
         finalizedAt: new Date(),
         verificationCompletedAt: new Date(),
         verificationError: "",
@@ -1583,7 +1589,7 @@ async function synchronizeRosterScore(rosterEntryId) {
   const submissions = await WeeklySubmission.find({
     rosterEntryId,
     status: "FINALIZED",
-  }).select("dayIndex score passed total finalizedAt");
+  }).select("dayIndex score passed total executionTime memoryUsed finalizedAt");
   const result = summarizeWeeklySubmissions(submissions);
   await WeeklyRosterEntry.updateOne(
     { _id: rosterEntryId, participationStatus: { $ne: "DISQUALIFIED" } },
@@ -1607,6 +1613,8 @@ async function refreshCycleRosterScores(cycleId) {
           score: { $sum: "$score" },
           passedTestCases: { $sum: "$passed" },
           totalTestCases: { $sum: "$total" },
+          executionTime: { $sum: "$executionTime" },
+          memoryUsed: { $max: "$memoryUsed" },
           completedDays: { $addToSet: "$dayIndex" },
           lastSubmittedAt: { $max: "$finalizedAt" },
         },
@@ -1628,6 +1636,8 @@ async function refreshCycleRosterScores(cycleId) {
               completedDays,
               passedTestCases: Number(aggregate?.passedTestCases) || 0,
               totalTestCases: Number(aggregate?.totalTestCases) || 0,
+              executionTime: Number(aggregate?.executionTime) || 0,
+              memoryUsed: Number(aggregate?.memoryUsed) || 0,
               resultFinalizedAt: aggregate?.lastSubmittedAt || null,
               participationStatus: completedDays.length ? "PARTICIPATED" : "NOT_STARTED",
               lastSubmittedAt: aggregate?.lastSubmittedAt || null,

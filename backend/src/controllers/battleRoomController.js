@@ -38,6 +38,9 @@ import {
 } from "../services/localExecutionProtocol.js";
 import {
   RANKED_SUBMISSION_STATUSES,
+  getRoomExecutionTime,
+  getRoomMemoryUsed,
+  getRoomRank,
   getRoomSubmissionTime,
   sortRoomSubmissions,
 } from "../services/battleRoomRanking.js";
@@ -58,6 +61,15 @@ import {
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
 const DESKTOP_ENGINE_VERSION = process.env.CODECLASH_ENGINE_VERSION || "1.0.0";
+
+function getLeaderboardOrganization(submission) {
+  const currentOrganization = submission.userId?.organization;
+  if (typeof currentOrganization === "string") {
+    const normalized = currentOrganization.trim();
+    return normalized && normalized !== "Unspecified" ? normalized : "—";
+  }
+  return String(submission.participantOrganization || "").trim() || "—";
+}
 
 function hashVersion(value) {
   return createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
@@ -2831,11 +2843,10 @@ export async function getRoomLeaderboard(req, res) {
       const isCurrentUser =
         submissionUserId?.toString() === userId.toString();
       return {
-        rank: index + 1,
+        rank: getRoomRank(rankedSubmissions, index),
         userId: submissionUserId,
         name: sub.participantName || sub.userId?.name || "Unknown",
-        organization:
-          sub.participantOrganization || sub.userId?.organization || "Unknown",
+        organization: getLeaderboardOrganization(sub),
         totalScore: sub.totalScore,
         totalPassed: sub.totalPassed,
         totalFailed: sub.totalFailed,
@@ -2911,10 +2922,9 @@ export async function getUserResult(req, res) {
     );
     sortRoomSubmissions(rankedSubmissions);
 
-    const rank =
-      rankedSubmissions.findIndex(
-        (s) => s.userId.toString() === userId.toString(),
-      );
+    const rankIndex = rankedSubmissions.findIndex(
+      (s) => s.userId.toString() === userId.toString(),
+    );
     return res.status(200).json({
       room: {
         title: room.title,
@@ -2927,7 +2937,7 @@ export async function getUserResult(req, res) {
         questionCount: room.questions.length,
       },
       submission: submission.toPublicJSON(),
-      rank: rank < 0 ? null : rank + 1,
+      rank: rankIndex < 0 ? null : getRoomRank(rankedSubmissions, rankIndex),
       totalParticipants: rankedSubmissions.length,
     });
   } catch (error) {
@@ -3088,31 +3098,12 @@ export async function getLeaderboardByRoomCodePublic(req, res) {
     const rankedSubmissions = submissions.filter((submission) =>
       isBattleRoomRankedEligible(submission, totalTestCases),
     );
-    rankedSubmissions.sort((a, b) => {
-      if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore;
-      if (b.totalPassed !== a.totalPassed) return b.totalPassed - a.totalPassed;
-      if (a.totalFailed !== b.totalFailed) return a.totalFailed - b.totalFailed;
-      const aTime = a.questionResults.reduce(
-        (s, q) => s + (q.timeToSolve || 0),
-        0,
-      );
-      const bTime = b.questionResults.reduce(
-        (s, q) => s + (q.timeToSolve || 0),
-        0,
-      );
-      const timeDifference = aTime - bTime;
-      if (timeDifference !== 0) return timeDifference;
-      return (a.participantName || a.userId?.name || "").localeCompare(
-        b.participantName || b.userId?.name || "",
-        undefined,
-        { sensitivity: "base" },
-      );
-    });
+    sortRoomSubmissions(rankedSubmissions);
 
     const leaderboard = rankedSubmissions.map((sub, index) => ({
-      rank: index + 1,
+      rank: getRoomRank(rankedSubmissions, index),
       name: sub.participantName || sub.userId?.name || "Unknown",
-      organization: sub.participantOrganization || sub.userId?.organization || "Unknown",
+      organization: getLeaderboardOrganization(sub),
       totalScore: sub.totalScore,
       totalPassed: sub.totalPassed,
       totalFailed: sub.totalFailed,
@@ -3123,6 +3114,8 @@ export async function getLeaderboardByRoomCodePublic(req, res) {
         (s, q) => s + (q.timeToSolve || 0),
         0,
       ),
+      executionTime: getRoomExecutionTime(sub),
+      memoryUsed: getRoomMemoryUsed(sub),
     }));
 
     return res.status(200).json({

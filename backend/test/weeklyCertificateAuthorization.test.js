@@ -39,9 +39,15 @@ async function withCertificateMocks(
   },
 ) {
   const originalFindOne = WeeklyCertificate.findOne;
+  const originalDeleteOne = WeeklyCertificate.deleteOne;
   const originalExists = OrganizationProfile.exists;
   const originalRosterFindOne = WeeklyRosterEntry.findOne;
+  const deletedCertificates = [];
   WeeklyCertificate.findOne = () => ({ lean: async () => certificate });
+  WeeklyCertificate.deleteOne = async (filter) => {
+    deletedCertificates.push(filter);
+    return { deletedCount: 1 };
+  };
   OrganizationProfile.exists = organizationExists;
   WeeklyRosterEntry.findOne = () => ({
     select() {
@@ -51,8 +57,10 @@ async function withCertificateMocks(
   });
   try {
     await run();
+    return deletedCertificates;
   } finally {
     WeeklyCertificate.findOne = originalFindOne;
+    WeeklyCertificate.deleteOne = originalDeleteOne;
     OrganizationProfile.exists = originalExists;
     WeeklyRosterEntry.findOne = originalRosterFindOne;
   }
@@ -226,7 +234,7 @@ test("Super Admin is authorized to download an administrative weekly certificate
     res.once("end", resolve);
     res.once("error", reject);
   });
-  await withCertificateMocks(
+  const deletedCertificates = await withCertificateMocks(
     {
       certificateId: "WK-admin-download",
       cycleId: "cycle-1",
@@ -253,10 +261,14 @@ test("Super Admin is authorized to download an administrative weekly certificate
         },
         res,
       );
+      await completed;
     },
   );
-  await completed;
   assert.equal(res.statusCode, 200);
   assert.equal(chunks.length > 0, true);
   assert.match(Buffer.concat(chunks).subarray(0, 5).toString(), /^%PDF-/);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(deletedCertificates, [
+    { certificateId: "WK-admin-download" },
+  ]);
 });

@@ -4,6 +4,23 @@ export const WEEKLY_TIMEZONE = "Asia/Kolkata";
 export const WEEKLY_SHRINKAGE_K = 5;
 export const WEEKLY_RECOVERY_GRACE_MS = 24 * 60 * 60 * 1000;
 
+export function calculateDailyScore(passed, total, points = 100) {
+  const caseCount = Number(total);
+  const passedCount = Number(passed);
+  const maxPoints = Number(points);
+  if (
+    !Number.isFinite(caseCount) ||
+    caseCount <= 0 ||
+    !Number.isFinite(passedCount) ||
+    !Number.isFinite(maxPoints) ||
+    maxPoints < 0
+  ) {
+    return 0;
+  }
+  const verifiedPassed = Math.min(caseCount, Math.max(0, passedCount));
+  return Math.round((maxPoints * verifiedPassed / caseCount) * 100) / 100;
+}
+
 export function getWeeklyRecoveryDeadline(endAt) {
   return new Date(new Date(endAt).getTime() + WEEKLY_RECOVERY_GRACE_MS);
 }
@@ -127,9 +144,19 @@ export function isWeeklyParticipationEligible(result) {
 }
 
 export function isWeeklyRankedEligible(result) {
-  if (!isWeeklyParticipationEligible(result)) return false;
-  return Number(result.passedTestCases ?? result.passed) ===
-    Number(result.totalTestCases ?? result.total);
+  const finalizedAt = new Date(result?.resultFinalizedAt || result?.finalizedAt || NaN);
+  const total = Number(result?.totalTestCases ?? result?.total);
+  const passed = Number(result?.passedTestCases ?? result?.passed);
+  return Boolean(
+    result?.participationStatus !== "DISQUALIFIED" &&
+    !result?.disqualifiedAt &&
+    Number.isFinite(finalizedAt.getTime()) &&
+    Number.isFinite(total) &&
+    total > 0 &&
+    Number.isFinite(passed) &&
+    passed >= 0 &&
+    passed <= total,
+  );
 }
 
 export function summarizeWeeklySubmissions(submissions) {
@@ -139,6 +166,11 @@ export function summarizeWeeklySubmissions(submissions) {
       result.score += Number(submission.score) || 0;
       result.passedTestCases += Number(submission.passed) || 0;
       result.totalTestCases += Number(submission.total) || 0;
+      result.executionTime += Number(submission.executionTime) || 0;
+      result.memoryUsed = Math.max(
+        result.memoryUsed,
+        Number(submission.memoryUsed) || 0,
+      );
       result.completedDays.add(submission.dayIndex);
       if (Number.isFinite(finalizedAt.getTime()) && finalizedAt > result.resultFinalizedAt) {
         result.resultFinalizedAt = finalizedAt;
@@ -149,6 +181,8 @@ export function summarizeWeeklySubmissions(submissions) {
       score: 0,
       passedTestCases: 0,
       totalTestCases: 0,
+      executionTime: 0,
+      memoryUsed: 0,
       completedDays: new Set(),
       resultFinalizedAt: new Date(0),
     },
@@ -159,6 +193,8 @@ export function summarizeWeeklySubmissions(submissions) {
     score: Math.round(summary.score * 100) / 100,
     passedTestCases: summary.passedTestCases,
     totalTestCases: summary.totalTestCases,
+    executionTime: summary.executionTime,
+    memoryUsed: summary.memoryUsed,
     completedDays,
     resultFinalizedAt:
       summary.resultFinalizedAt.getTime() > 0 ? summary.resultFinalizedAt : null,
@@ -181,14 +217,25 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
   const cycleMean = rows.length
     ? rows.reduce((sum, row) => sum + row.score, 0) / rows.length
     : 0;
-  const orderedIndividuals = [...rows].sort((left, right) =>
+  const compareIndividualMetrics = (left, right) =>
     right.score - left.score ||
-    right.completedQuestions - left.completedQuestions ||
-    (new Date(left.lastSubmittedAt || 0) - new Date(right.lastSubmittedAt || 0)) ||
+    (Number(left.executionTime) || 0) - (Number(right.executionTime) || 0) ||
+    (Number(left.memoryUsed) || 0) - (Number(right.memoryUsed) || 0);
+  const orderedIndividuals = [...rows].sort((left, right) =>
+    compareIndividualMetrics(left, right) ||
+    String(left.candidateNameSnapshot || "").localeCompare(
+      String(right.candidateNameSnapshot || ""),
+      undefined,
+      { sensitivity: "base" },
+    ) ||
     String(left.candidateId).localeCompare(String(right.candidateId)),
   );
   const individualRankings = orderedIndividuals.map((entry, index) => ({
-    rank: index + 1,
+    rank:
+      index > 0 &&
+      compareIndividualMetrics(orderedIndividuals[index - 1], entry) === 0
+        ? individualRankingsRank(orderedIndividuals, index, compareIndividualMetrics)
+        : index + 1,
     candidateId: entry.candidateId,
     candidateNameSnapshot: entry.candidateNameSnapshot,
     organizationId: entry.organizationId,
@@ -208,12 +255,16 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
         organizationId: entry.organizationId,
         organizationNameSnapshot: entry.organizationNameSnapshot,
         scores: [],
+        executionTimes: [],
+        memoryUses: [],
         completedEligibleCandidates: 0,
         participatingEligibleCandidates: 0,
       });
     }
     const organization = organizations.get(key);
     organization.scores.push(entry.score);
+    organization.executionTimes.push(Number(entry.executionTime) || 0);
+    organization.memoryUses.push(Number(entry.memoryUsed) || 0);
     if (entry.completedQuestions > 0) {
       organization.participatingEligibleCandidates += 1;
     }
@@ -226,6 +277,12 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
     .map((organization) => {
       const eligibleCandidates = organization.scores.length;
       const organizationMean = organization.scores.reduce((sum, score) => sum + score, 0) / eligibleCandidates;
+      const averageExecutionTime =
+        organization.executionTimes.reduce((sum, value) => sum + value, 0) /
+        eligibleCandidates;
+      const averageMemoryUsed =
+        organization.memoryUses.reduce((sum, value) => sum + value, 0) /
+        eligibleCandidates;
       return {
         organizationId: organization.organizationId,
         organizationNameSnapshot: organization.organizationNameSnapshot,
@@ -233,6 +290,8 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
         completedEligibleCandidates: organization.completedEligibleCandidates,
         participatingEligibleCandidates: organization.participatingEligibleCandidates,
         organizationMean,
+        averageExecutionTime,
+        averageMemoryUsed,
         cycleMean,
         shrinkageK,
         finalScore:
@@ -244,10 +303,46 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
     .sort((left, right) =>
       right.finalScore - left.finalScore ||
       right.organizationMean - left.organizationMean ||
-      left.organizationNameSnapshot.localeCompare(right.organizationNameSnapshot) ||
+      left.averageExecutionTime - right.averageExecutionTime ||
+      left.averageMemoryUsed - right.averageMemoryUsed ||
+      String(left.organizationNameSnapshot || "").localeCompare(
+        String(right.organizationNameSnapshot || ""),
+      ) ||
       String(left.organizationId).localeCompare(String(right.organizationId)),
     )
-    .map((entry, index) => ({ ...entry, rank: index + 1 }));
+    .map((entry, index, sorted) => ({
+      ...entry,
+      rank:
+        index > 0 &&
+        compareOrganizationMetrics(sorted[index - 1], entry) === 0
+          ? organizationRank(sorted, index)
+          : index + 1,
+    }));
 
   return { cycleMean, individualRankings, organizationRankings };
+}
+
+function individualRankingsRank(rows, index, compareMetrics) {
+  let first = index - 1;
+  while (first > 0 && compareMetrics(rows[first - 1], rows[index]) === 0) {
+    first -= 1;
+  }
+  return first + 1;
+}
+
+function compareOrganizationMetrics(left, right) {
+  return (
+    right.finalScore - left.finalScore ||
+    right.organizationMean - left.organizationMean ||
+    left.averageExecutionTime - right.averageExecutionTime ||
+    left.averageMemoryUsed - right.averageMemoryUsed
+  );
+}
+
+function organizationRank(rows, index) {
+  let first = index - 1;
+  while (first > 0 && compareOrganizationMetrics(rows[first - 1], rows[index]) === 0) {
+    first -= 1;
+  }
+  return first + 1;
 }

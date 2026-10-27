@@ -12,6 +12,8 @@ import {
   revokeAllUserSessions,
 } from "../services/tokenService.js";
 import { normalizeOrganizationProfileName } from "../utils/organizationProfile.js";
+import OrganizationProfile from "../models/OrganizationProfile.js";
+import WeeklyRosterEntry from "../models/WeeklyRosterEntry.js";
 
 /**
  * Password-based authentication controller with email-verified registration.
@@ -399,6 +401,23 @@ export async function updateProfile(req, res) {
     req.user.name = name;
     if (hasOrganization) req.user.organization = organization || "Unspecified";
     await req.user.save();
+    if (hasOrganization) {
+      const organizationProfile = organization
+        ? await OrganizationProfile.findOne({
+            normalizedName: organization.toLocaleLowerCase("en-US"),
+            status: "ACTIVE",
+          }).select("_id")
+        : null;
+      await WeeklyRosterEntry.updateMany(
+        { candidateId: req.userId },
+        {
+          $set: {
+            organizationId: organizationProfile?._id || null,
+            organizationNameSnapshot: organization || "",
+          },
+        },
+      );
+    }
 
     return res.status(200).json({ user: req.user.toPublicJSON() });
   } catch (error) {
