@@ -15,7 +15,10 @@ function CertificateCard({ certificate, onPreview }) {
   const title = isDaily
     ? certificate.snapshot.assessmentName
     : certificate.roomTitle;
-  const dailyRank = Number(certificate.snapshot?.rank);
+  const dailyRank =
+    certificate.category !== "PARTICIPATION"
+      ? Number(certificate.snapshot?.rank)
+      : null;
   const description = isDaily
     ? `${certificate.category.replaceAll("_", " ")} · ${dailyRank > 0 ? `Rank ${dailyRank}` : "Participation"} · Score ${Number(certificate.snapshot.score || 0).toFixed(2)} · ${completedAt}`
     : `Rank ${certificate.rank} of ${certificate.totalParticipants} · Score ${Math.round(certificate.totalScore)} · Completed ${completedAt}`;
@@ -177,7 +180,9 @@ export default function CertificateLibrary() {
             ? previewCertificate.snapshot.score
             : null,
           rank: previewCertificate.type === "DAILY"
-            ? previewCertificate.snapshot.rank
+            ? previewCertificate.category === "PARTICIPATION"
+              ? null
+              : previewCertificate.snapshot.rank
             : previewCertificate.rank,
           totalParticipants: previewCertificate.totalParticipants || 1,
           completedAt: previewCertificate.completedAt || previewCertificate.snapshot?.issuedAt,

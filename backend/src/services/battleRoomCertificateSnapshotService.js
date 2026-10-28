@@ -11,6 +11,8 @@ import {
 } from "./battleRoomRanking.js";
 
 export async function refreshBattleRoomCertificateSnapshots(room) {
+  if (room.status !== "CLOSED") return 0;
+
   const submissions = await BattleRoomSubmission.find({
     roomId: room._id,
     status: { $in: RANKED_SUBMISSION_STATUSES },

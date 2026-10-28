@@ -911,6 +911,12 @@ export async function filterCurrentlyEligibleCertificates(
       ) {
         continue;
       }
+      if (certificate.category !== "PARTICIPATION") {
+        const cycle = await WeeklyCycle.findById(certificate.cycleId)
+          .select("status")
+          .lean();
+        if (cycle?.status !== "FINALIZED") continue;
+      }
       eligible.push(certificate);
       continue;
     }

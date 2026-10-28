@@ -34,12 +34,20 @@ export async function listParticipantBattleRoomCertificates(req, res) {
       "certificateSnapshot.roomCode": { $exists: true, $nin: ["", null] },
       "certificateSnapshot.completedAt": { $ne: null },
     })
-      .select("_id certificateSnapshot totalScore totalPassed totalFailed status")
+      .select("_id roomId certificateSnapshot totalScore totalPassed totalFailed status")
       .sort({ "certificateSnapshot.completedAt": -1 })
       .lean();
+    const rooms = await BattleRoom.find({
+      _id: { $in: submissions.map((submission) => submission.roomId) },
+      status: "CLOSED",
+    })
+      .select("_id")
+      .lean();
+    const closedRoomIds = new Set(rooms.map((room) => String(room._id)));
 
     return res.json({
       certificates: submissions
+        .filter((submission) => closedRoomIds.has(String(submission.roomId)))
         .filter((submission) => isBattleRoomCertificateEligible(
           submission,
           Number(submission.certificateSnapshot?.totalTestCases),

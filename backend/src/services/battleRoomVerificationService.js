@@ -12,7 +12,6 @@ import {
   sanitizeParticipantTestResult,
 } from "./participantExecutionSerialization.js";
 import { dispatchBattleRoomCompletionEmail } from "./completionNotificationService.js";
-import { refreshBattleRoomCertificateSnapshots } from "./battleRoomCertificateSnapshotService.js";
 
 const VERIFICATION_LEASE_MS = 10 * 60 * 1000;
 const enabled = () => process.env.BATTLE_ROOM_PERF_LOGS === "true";
@@ -164,17 +163,6 @@ export async function finalizeBattleRoomSubmission(submissionId) {
         error: error.message,
       });
     });
-    try {
-      const room = await BattleRoom.findById(current.roomId)
-        .select("roomCode title questions")
-        .lean();
-      if (room) await refreshBattleRoomCertificateSnapshots(room);
-    } catch (error) {
-      console.error("[BattleRoomCertificate] Could not refresh completed room certificates:", {
-        submissionId: String(current._id),
-        error: error.message,
-      });
-    }
   }
 }
 

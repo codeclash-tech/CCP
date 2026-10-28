@@ -14,6 +14,7 @@ import battleRoomRoutes from "../src/routes/battleRoomRoutes.js";
 
 test("certificate library returns only the authenticated user's completed certificate metadata", async () => {
   const originalFind = BattleRoomSubmission.find;
+  const originalRoomFind = BattleRoom.find;
   const completedAt = new Date("2026-10-19T12:00:00.000Z");
   const submission = {
     _id: "507f1f77bcf86cd799439011",
@@ -21,6 +22,7 @@ test("certificate library returns only the authenticated user's completed certif
     totalPassed: 12,
     totalFailed: 0,
     status: "COMPLETED",
+    roomId: "room-id",
     participantName: "Candidate Name",
     questionResults: [{ code: "private source" }],
     certificateSnapshot: {
@@ -71,6 +73,18 @@ test("certificate library returns only the authenticated user's completed certif
     };
     return chain;
   };
+  BattleRoom.find = (query) => {
+    assert.deepEqual(query, {
+      _id: { $in: ["room-id", "room-id", "room-id"] },
+      status: "CLOSED",
+    });
+    return {
+      select() {
+        return this;
+      },
+      lean: async () => [{ _id: "room-id" }],
+    };
+  };
 
   try {
     let responseBody;
@@ -92,7 +106,7 @@ test("certificate library returns only the authenticated user's completed certif
     });
     assert.equal(
       selectedFields,
-      "_id certificateSnapshot totalScore totalPassed totalFailed status",
+      "_id roomId certificateSnapshot totalScore totalPassed totalFailed status",
     );
     assert.deepEqual(sort, { "certificateSnapshot.completedAt": -1 });
     assert.deepEqual(responseBody, {
@@ -116,6 +130,58 @@ test("certificate library returns only the authenticated user's completed certif
     );
   } finally {
     BattleRoomSubmission.find = originalFind;
+    BattleRoom.find = originalRoomFind;
+  }
+});
+
+test("certificate library hides snapshots until their battle room is closed", async () => {
+  const originalFind = BattleRoomSubmission.find;
+  const originalRoomFind = BattleRoom.find;
+  BattleRoomSubmission.find = () => ({
+    select() {
+      return this;
+    },
+    sort() {
+      return this;
+    },
+    lean: async () => [{
+      _id: "submission-id",
+      roomId: "open-room",
+      status: "COMPLETED",
+      totalPassed: 2,
+      totalFailed: 0,
+      certificateSnapshot: {
+        roomCode: "OPEN-ROOM",
+        roomTitle: "Open Battle",
+        rank: 1,
+        totalParticipants: 1,
+        totalTestCases: 2,
+        completedAt: new Date(),
+      },
+    }],
+  });
+  BattleRoom.find = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => [],
+  });
+
+  try {
+    let responseBody;
+    await listParticipantBattleRoomCertificates(
+      { userId: "candidate-id" },
+      {
+        json(body) {
+          responseBody = body;
+          return this;
+        },
+      },
+    );
+    assert.deepEqual(responseBody, { certificates: [] });
+  } finally {
+    BattleRoomSubmission.find = originalFind;
+    BattleRoom.find = originalRoomFind;
   }
 });
 

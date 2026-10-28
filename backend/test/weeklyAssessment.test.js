@@ -703,6 +703,32 @@ test("daily completion immediately creates a congratulations certificate before 
       /^DLY-20261027-I-/,
     );
     assert.equal(updates[0][2].upsert, true);
+
+    await persistIndividualWeeklyCertificate(
+      {
+        _id: "daily-cycle",
+        cycleKey: "2026-10-27",
+        name: "Daily Challenge",
+      },
+      rosterEntry,
+      { rank: 4 },
+    );
+    assert.equal(updates[1][1].$set.category, "PARTICIPATION");
+    assert.equal(updates[1][1].$set.snapshot.rank, null);
+
+    await persistIndividualWeeklyCertificate(
+      {
+        _id: "daily-cycle",
+        cycleKey: "2026-10-27",
+        name: "Daily Challenge",
+      },
+      {
+        ...rosterEntry,
+        participationStatus: "DISQUALIFIED",
+        disqualifiedAt: new Date("2026-10-27T11:00:00.000Z"),
+      },
+    );
+    assert.equal(updates.length, 2);
   } finally {
     WeeklyCertificate.updateOne = originalUpdateOne;
   }

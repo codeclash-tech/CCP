@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 import test from "node:test";
 import OrganizationProfile from "../src/models/OrganizationProfile.js";
 import WeeklyCertificate from "../src/models/WeeklyCertificate.js";
+import WeeklyCycle from "../src/models/WeeklyCycle.js";
 import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
 import {
   deleteWeeklyCertificate,
@@ -41,11 +42,13 @@ async function withCertificateMocks(
     resultFinalizedAt: new Date("2026-05-04T00:00:00.000Z"),
     disqualifiedAt: null,
   },
+  cycleStatus = "FINALIZED",
 ) {
   const originalFindOne = WeeklyCertificate.findOne;
   const originalDeleteOne = WeeklyCertificate.deleteOne;
   const originalExists = OrganizationProfile.exists;
   const originalRosterFindOne = WeeklyRosterEntry.findOne;
+  const originalCycleFindById = WeeklyCycle.findById;
   const deletedCertificates = [];
   WeeklyCertificate.findOne = () => ({ lean: async () => certificate });
   WeeklyCertificate.deleteOne = async (filter) => {
@@ -59,6 +62,12 @@ async function withCertificateMocks(
     },
     lean: async () => rosterEntry,
   });
+  WeeklyCycle.findById = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => ({ status: cycleStatus }),
+  });
   try {
     await run();
     return deletedCertificates;
@@ -67,6 +76,7 @@ async function withCertificateMocks(
     WeeklyCertificate.deleteOne = originalDeleteOne;
     OrganizationProfile.exists = originalExists;
     WeeklyRosterEntry.findOne = originalRosterFindOne;
+    WeeklyCycle.findById = originalCycleFindById;
   }
 }
 
@@ -230,6 +240,41 @@ test("daily certificate can be downloaded immediately during its India calendar 
       },
   );
   assert.equal(res.statusCode, 200);
+});
+
+test("ranked daily certificates remain unavailable until the cycle is finalized", async () => {
+  const res = responseRecorder();
+  await withCertificateMocks(
+    {
+      certificateId: "DLY-winner",
+      cycleId: "cycle-1",
+      type: "INDIVIDUAL",
+      category: "WINNER",
+      userId: "candidate-a",
+      snapshot: {
+        cycleKey: "2026-05-04",
+        subjectName: "Candidate",
+        assessmentName: "Daily Challenge",
+        score: 100,
+        rank: 1,
+        issuedAt: new Date("2026-05-05T00:00:00.000Z"),
+      },
+    },
+    async () => false,
+    async () => {
+      await downloadWeeklyCertificate(
+        {
+          params: { certificateId: "DLY-winner" },
+          userId: "candidate-a",
+          user: { role: "USER", creatorType: null },
+        },
+        res,
+      );
+    },
+    undefined,
+    "ACTIVE",
+  );
+  assert.equal(res.statusCode, 404);
 });
 
 test("Super Admin can download an administrative certificate without deleting it", async () => {

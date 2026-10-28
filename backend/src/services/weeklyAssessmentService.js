@@ -1943,8 +1943,15 @@ export async function persistIndividualWeeklyCertificate(
   ranking = null,
   issuedAt = new Date(),
 ) {
-  const category = ranking
-    ? getWeeklyCertificateCategory(ranking.rank)
+  if (!isWeeklyParticipationEligible(rosterEntry)) return;
+
+  const rankedCertificate = Number.isInteger(ranking?.rank) &&
+      ranking.rank >= 1 &&
+      ranking.rank <= 3
+    ? ranking
+    : null;
+  const category = rankedCertificate
+    ? getWeeklyCertificateCategory(rankedCertificate.rank)
     : "PARTICIPATION";
   await WeeklyCertificate.updateOne(
     { cycleId: cycle._id, userId: rosterEntry.candidateId, type: "INDIVIDUAL" },
@@ -1957,7 +1964,7 @@ export async function persistIndividualWeeklyCertificate(
           assessmentName: cycle.name,
           cycleKey: cycle.cycleKey,
           score: rosterEntry.score,
-          rank: ranking?.rank ?? null,
+          rank: rankedCertificate?.rank ?? null,
           issuedAt,
         },
       },
@@ -2111,5 +2118,10 @@ export async function disqualifyWeeklyCandidate({ cycleId, candidateId, reason }
     { new: true },
   );
   if (!roster) throw requestError("Eligible roster candidate not found or already disqualified.", 404);
+  await WeeklyCertificate.deleteOne({
+    cycleId,
+    userId: candidateId,
+    type: "INDIVIDUAL",
+  });
   return roster;
 }

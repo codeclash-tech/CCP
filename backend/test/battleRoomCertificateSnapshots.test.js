@@ -47,6 +47,7 @@ test("completed eligible submissions receive current certificate snapshots and r
   try {
     const count = await refreshBattleRoomCertificateSnapshots({
       _id: "room-id",
+      status: "CLOSED",
       roomCode: "ABC123",
       title: "Sample Battle",
       questions: [{ testCases: [{}, {}] }],
@@ -70,6 +71,38 @@ test("completed eligible submissions receive current certificate snapshots and r
       completedAt: submissions[1].submittedAt,
     });
     assert.equal(updates.get("no-passing-cases"), null);
+  } finally {
+    BattleRoomSubmission.find = originalFind;
+    BattleRoomSubmission.updateOne = originalUpdateOne;
+  }
+});
+
+test("open battle rooms do not generate or update certificate snapshots", async () => {
+  const originalFind = BattleRoomSubmission.find;
+  const originalUpdateOne = BattleRoomSubmission.updateOne;
+  let queried = false;
+  let updated = false;
+  BattleRoomSubmission.find = () => {
+    queried = true;
+    return { lean: async () => [] };
+  };
+  BattleRoomSubmission.updateOne = async () => {
+    updated = true;
+    return { matchedCount: 1 };
+  };
+
+  try {
+    const count = await refreshBattleRoomCertificateSnapshots({
+      _id: "room-id",
+      status: "ACTIVE",
+      roomCode: "ABC123",
+      title: "Sample Battle",
+      questions: [],
+    });
+
+    assert.equal(count, 0);
+    assert.equal(queried, false);
+    assert.equal(updated, false);
   } finally {
     BattleRoomSubmission.find = originalFind;
     BattleRoomSubmission.updateOne = originalUpdateOne;

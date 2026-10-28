@@ -56,12 +56,14 @@ export function streamWeeklyCertificate(certificate, response) {
       width: width - 140,
     });
   const rankLabel =
-    Number.isFinite(Number(snapshot.rank)) && Number(snapshot.rank) > 0
-      ? `Rank #${snapshot.rank}`
-      : "Participation";
+    certificate.category !== "PARTICIPATION" &&
+    Number.isFinite(Number(snapshot.rank)) &&
+    Number(snapshot.rank) > 0
+      ? `Rank #${snapshot.rank}  |  `
+      : "";
   document.fillColor("#0f172a").font("Helvetica-Bold").fontSize(18)
     .text(
-      `${rankLabel}  |  Score: ${Number(snapshot.score).toFixed(2)}`,
+      `${rankLabel}Score: ${Number(snapshot.score).toFixed(2)}`,
       70,
       355,
       {
