@@ -1,17 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { Award, Download, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Award, RefreshCw } from "lucide-react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import PageSkeleton from "../components/layout/PageSkeleton";
 
-function CertificateCard({
-  certificate,
-  onDownload,
-  onPreview,
-  downloading,
-  downloadDisabled,
-}) {
+function CertificateCard({ certificate, onPreview }) {
   const isDaily = certificate.type === "DAILY";
   const completedAt = certificate.completedAt
     ? new Date(certificate.completedAt).toLocaleDateString()
@@ -39,15 +33,6 @@ function CertificateCard({
       <button className="btn-secondary certificate-preview" type="button" onClick={() => onPreview(certificate)}>
         Preview
       </button>
-      <button
-        className="btn-primary certificate-download"
-        type="button"
-        onClick={() => onDownload(certificate)}
-        disabled={downloading || downloadDisabled}
-      >
-        <Download size={16} />
-        {downloading ? "Downloading…" : "Download certificate"}
-      </button>
     </article>
   );
 }
@@ -59,9 +44,7 @@ export default function CertificateLibrary() {
   const [error, setError] = useState("");
   const [retryAction, setRetryAction] = useState(null);
   const [previewCertificate, setPreviewCertificate] = useState(null);
-  const [pendingDeletionCertificate, setPendingDeletionCertificate] = useState(null);
-  const [downloadingCertificateId, setDownloadingCertificateId] = useState("");
-  const [deletingCertificateId, setDeletingCertificateId] = useState("");
+  const downloadedCertificateRef = useRef(null);
 
   const loadCertificates = useCallback(async () => {
     setLoading(true);
@@ -106,34 +89,9 @@ export default function CertificateLibrary() {
     loadCertificates();
   }, [loadCertificates]);
 
-  const downloadCertificate = async (certificate) => {
-    setError("");
-    setRetryAction(null);
-    setDownloadingCertificateId(certificate.certificateId);
-    try {
-      const { data } = await api.get(certificate.downloadPath, {
-        responseType: "blob",
-      });
-      const url = URL.createObjectURL(data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${certificate.certificateId}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setPendingDeletionCertificate(certificate);
-    } catch (downloadError) {
-      setError(downloadError.message || "Unable to download this certificate.");
-    } finally {
-      setDownloadingCertificateId("");
-    }
-  };
-
   const deleteCertificate = async (certificate) => {
     setError("");
     setRetryAction(null);
-    setDeletingCertificateId(certificate.certificateId);
     try {
       await api.delete(certificate.deletePath);
       setCertificates((current) =>
@@ -141,19 +99,21 @@ export default function CertificateLibrary() {
           (item) => item.certificateId !== certificate.certificateId,
         ),
       );
-      setPendingDeletionCertificate(null);
     } catch (deleteError) {
       setError(deleteError.message || "Unable to delete this certificate.");
       setRetryAction(() => () => deleteCertificate(certificate));
-    } finally {
-      setDeletingCertificateId("");
     }
   };
 
-  const keepCertificate = () => {
-    setPendingDeletionCertificate(null);
+  const closePreview = () => {
+    const downloadedCertificate = downloadedCertificateRef.current;
+    downloadedCertificateRef.current = null;
+    setPreviewCertificate(null);
     setError("");
     setRetryAction(null);
+    if (downloadedCertificate) {
+      void deleteCertificate(downloadedCertificate);
+    }
   };
 
   return (
@@ -163,7 +123,7 @@ export default function CertificateLibrary() {
           <span className="certificate-eyebrow">YOUR ACHIEVEMENTS</span>
           <h1>Certificates</h1>
           <p>
-            Download daily challenge certificates, available the following day, and completed Battle Room certificates.
+            Preview and download certificates as soon as your Daily Challenge or Battle Room result is finalized.
           </p>
         </div>
         <Award size={30} aria-hidden="true" />
@@ -190,9 +150,7 @@ export default function CertificateLibrary() {
           <div className="certificate-empty-state">
             <Award size={28} aria-hidden="true" />
             <h2>No certificates available</h2>
-            <p>
-              Certificates appear here after you complete a daily challenge or an eligible Battle Room.
-            </p>
+            <p>Certificates appear here as soon as your result is finalized.</p>
           </div>
         )
       ) : (
@@ -201,57 +159,23 @@ export default function CertificateLibrary() {
             <CertificateCard
               key={certificate.certificateId}
               certificate={certificate}
-              onDownload={downloadCertificate}
               onPreview={setPreviewCertificate}
-              downloading={downloadingCertificateId === certificate.certificateId}
-              downloadDisabled={Boolean(pendingDeletionCertificate)}
             />
           ))}
         </div>
       )}
-      {pendingDeletionCertificate && (
-        <div className="certificate-confirmation-backdrop">
-          <section
-            className="certificate-confirmation"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="certificate-delete-title"
-          >
-            <h2 id="certificate-delete-title">Delete downloaded certificate?</h2>
-            <p>
-              Your certificate has downloaded. Delete it from your account? This
-              cannot be undone.
-            </p>
-            <div className="certificate-confirmation-actions">
-              <button
-                className="btn-secondary"
-                type="button"
-                onClick={keepCertificate}
-                disabled={Boolean(deletingCertificateId)}
-              >
-                Keep certificate
-              </button>
-              <button
-                className="btn-primary"
-                type="button"
-                onClick={() => deleteCertificate(pendingDeletionCertificate)}
-                disabled={Boolean(deletingCertificateId)}
-              >
-                {deletingCertificateId ? "Deleting…" : "Delete certificate"}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
       <BattleRoomShareModal
         isOpen={Boolean(previewCertificate)}
-        onClose={() => setPreviewCertificate(null)}
+        onClose={closePreview}
         result={previewCertificate ? {
           room: {
             title: previewCertificate.type === "DAILY"
               ? previewCertificate.snapshot.assessmentName
               : previewCertificate.roomTitle,
           },
+          score: previewCertificate.type === "DAILY"
+            ? previewCertificate.snapshot.score
+            : null,
           rank: previewCertificate.type === "DAILY"
             ? previewCertificate.snapshot.rank
             : previewCertificate.rank,
@@ -259,6 +183,11 @@ export default function CertificateLibrary() {
           completedAt: previewCertificate.completedAt || previewCertificate.snapshot?.issuedAt,
         } : null}
         userName={previewCertificate?.snapshot?.subjectName || user?.name}
+        dailyChallenge={previewCertificate?.type === "DAILY"}
+        confirmDownload
+        onCertificateDownload={() => {
+          downloadedCertificateRef.current = previewCertificate;
+        }}
       />
     </section>
   );

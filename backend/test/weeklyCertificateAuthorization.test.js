@@ -70,7 +70,7 @@ async function withCertificateMocks(
   }
 }
 
-test("weekly certificate download rejects disqualified, incomplete, zero-pass, and unranked results", async () => {
+test("weekly certificate download rejects disqualified, incomplete, and unranked results", async () => {
   const ineligibleResults = [
     {
       category: "PARTICIPATION",
@@ -89,16 +89,6 @@ test("weekly certificate download rejects disqualified, incomplete, zero-pass, a
         passedTestCases: 1,
         totalTestCases: 4,
         resultFinalizedAt: null,
-        disqualifiedAt: null,
-      },
-    },
-    {
-      category: "PARTICIPATION",
-      rosterEntry: {
-        participationStatus: "PARTICIPATED",
-        passedTestCases: 0,
-        totalTestCases: 4,
-        resultFinalizedAt: new Date("2026-05-04T00:00:00.000Z"),
         disqualifiedAt: null,
       },
     },
@@ -200,7 +190,7 @@ test("organization user cannot download another organization's weekly certificat
   assert.equal(res.statusCode, 403);
 });
 
-test("daily certificate is unavailable until the following India calendar day", async () => {
+test("daily certificate can be downloaded immediately during its India calendar day", async () => {
   const cycleKey = getWeeklyCycleBounds(new Date()).cycleKey;
   const res = responseRecorder();
   await withCertificateMocks(
@@ -212,7 +202,11 @@ test("daily certificate is unavailable until the following India calendar day", 
       userId: "candidate-a",
       snapshot: {
         cycleKey,
+        subjectName: "Candidate",
+        assessmentName: "Daily Challenge",
+        score: 0,
         rank: null,
+        issuedAt: new Date(),
       },
     },
     async () => false,
@@ -225,9 +219,17 @@ test("daily certificate is unavailable until the following India calendar day", 
         },
         res,
       );
-    },
+        await new Promise((resolve) => setImmediate(resolve));
+      },
+      {
+        participationStatus: "PARTICIPATED",
+        passedTestCases: 0,
+        totalTestCases: 4,
+        resultFinalizedAt: new Date(),
+        disqualifiedAt: null,
+      },
   );
-  assert.equal(res.statusCode, 404);
+  assert.equal(res.statusCode, 200);
 });
 
 test("Super Admin can download an administrative certificate without deleting it", async () => {

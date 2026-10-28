@@ -7,9 +7,19 @@ export default function BattleRoomShareModal({
   userName,
   autoDownload = false,
   onAutoDownloadComplete,
+  confirmDownload = false,
+  onCertificateDownload,
+  dailyChallenge = false,
 }) {
   const canvasRef = useRef(null);
   const [downloaded, setDownloaded] = useState(false);
+  const [showDownloadConfirmation, setShowDownloadConfirmation] = useState(false);
+  const [skipDownloadConfirmation, setSkipDownloadConfirmation] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("ccp-skip-certificate-download-confirmation") ===
+        "true",
+  );
 
   const room = result?.room || {};
   const hasRank = result?.rank !== null && result?.rank !== undefined &&
@@ -159,7 +169,11 @@ export default function BattleRoomShareModal({
     ctx.font = "600 13px Arial, Helvetica, sans-serif";
     ctx.letterSpacing = "2px";
 
-    ctx.fillText("CERTIFICATE OF EXCELLENCE", 108, 151);
+    ctx.fillText(
+      dailyChallenge ? "DAILY CHALLENGE CERTIFICATE" : "CERTIFICATE OF EXCELLENCE",
+      108,
+      151,
+    );
 
     // Reset letter spacing
     ctx.letterSpacing = "0px";
@@ -198,7 +212,11 @@ export default function BattleRoomShareModal({
     ctx.fillStyle = "#94a3b8";
     ctx.font = "20px Georgia, 'Times New Roman', serif";
 
-    ctx.fillText("This certificate is proudly presented to", 600, 255);
+    ctx.fillText(
+      dailyChallenge ? "Congratulations!" : "This certificate is proudly presented to",
+      600,
+      255,
+    );
 
     // =========================================================
     // PARTICIPANT NAME
@@ -235,7 +253,13 @@ export default function BattleRoomShareModal({
     ctx.fillStyle = "#64748b";
     ctx.font = "19px Arial, Helvetica, sans-serif";
 
-    ctx.fillText("For successfully competing in the coding battle", 600, 380);
+    ctx.fillText(
+      dailyChallenge
+        ? "For successfully completing the Daily Challenge"
+        : "For successfully competing in the coding battle",
+      600,
+      380,
+    );
 
     ctx.fillStyle = "#1e293b";
     ctx.font = "bold 30px Georgia, 'Times New Roman', serif";
@@ -259,12 +283,16 @@ export default function BattleRoomShareModal({
     ctx.font = "17px Arial, Helvetica, sans-serif";
 
     ctx.fillText(
-      "In recognition of your dedication, technical ability and commitment",
+      dailyChallenge
+        ? `Score: ${Number(result?.score || 0).toFixed(2)}%`
+        : "In recognition of your dedication, technical ability and commitment",
       600,
       465,
     );
 
-    ctx.fillText("demonstrated throughout the challenge.", 600, 490);
+    if (!dailyChallenge) {
+      ctx.fillText("demonstrated throughout the challenge.", 600, 490);
+    }
 
     // =========================================================
     // RANK
@@ -274,7 +302,9 @@ export default function BattleRoomShareModal({
     ctx.fillText(
       rank
         ? `FINAL RANK #${rank} OF ${totalParticipants}`
-        : "DAILY CHALLENGE PARTICIPATION",
+        : dailyChallenge
+          ? "DAILY CHALLENGE COMPLETION"
+          : "DAILY CHALLENGE PARTICIPATION",
       600,
       520,
     );
@@ -355,20 +385,48 @@ export default function BattleRoomShareModal({
     ctx.fillText("CODECLASH • COMPETE • CODE • CONQUER", 600, 695);
 
     ctx.textAlign = "left";
-  }, [rank, result?.completedAt, totalParticipants, userName, room.title]);
+  }, [
+    dailyChallenge,
+    rank,
+    result?.completedAt,
+    result?.score,
+    totalParticipants,
+    userName,
+    room.title,
+  ]);
 
-  const handleDownload = useCallback(() => {
+  const saveCertificate = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const link = document.createElement("a");
-    link.download = "codeclash-certificate-" + Date.now() + ".png";
+    link.download = `codeclash-certificate-${Date.now()}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
 
+    setShowDownloadConfirmation(false);
     setDownloaded(true);
+    onCertificateDownload?.();
     setTimeout(() => setDownloaded(false), 2000);
-  }, []);
+  }, [onCertificateDownload]);
+
+  const handleDownload = useCallback(() => {
+    if (confirmDownload && !skipDownloadConfirmation) {
+      setShowDownloadConfirmation(true);
+      return;
+    }
+    saveCertificate();
+  }, [confirmDownload, saveCertificate, skipDownloadConfirmation]);
+
+  const confirmCertificateDownload = useCallback(() => {
+    if (skipDownloadConfirmation) {
+      window.localStorage.setItem(
+        "ccp-skip-certificate-download-confirmation",
+        "true",
+      );
+    }
+    saveCertificate();
+  }, [saveCertificate, skipDownloadConfirmation]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -376,12 +434,12 @@ export default function BattleRoomShareModal({
     const frame = requestAnimationFrame(() => {
       drawCanvas();
       if (autoDownload) {
-        handleDownload();
+        saveCertificate();
         onAutoDownloadComplete?.();
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [isOpen, drawCanvas, autoDownload, handleDownload, onAutoDownloadComplete]);
+  }, [isOpen, drawCanvas, autoDownload, saveCertificate, onAutoDownloadComplete]);
 
   if (!isOpen) return null;
 
@@ -444,7 +502,9 @@ export default function BattleRoomShareModal({
                 margin: "2px 0 0",
               }}
             >
-              Your battle achievement certificate
+              {dailyChallenge
+                ? "Your Daily Challenge completion certificate"
+                : "Your battle achievement certificate"}
             </p>
           </div>
 
@@ -519,6 +579,51 @@ export default function BattleRoomShareModal({
             {downloaded ? "Certificate Downloaded" : "Download Preview PNG"}
           </button>
         </div>
+        {showDownloadConfirmation && (
+          <div
+            className="certificate-download-confirmation-backdrop"
+            role="presentation"
+            onClick={() => setShowDownloadConfirmation(false)}
+          >
+            <section
+              className="certificate-download-confirmation"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="certificate-download-confirmation-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h3 id="certificate-download-confirmation-title">
+                Save your certificate
+              </h3>
+              <p>
+                Download and save your certificate now. When you close this
+                preview and return to your certificates, it will be deleted from
+                your account.
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={skipDownloadConfirmation}
+                  onChange={(event) =>
+                    setSkipDownloadConfirmation(event.target.checked)
+                  }
+                />
+                Don&apos;t show me this message again
+              </label>
+              <div className="certificate-download-confirmation-actions">
+                <button
+                  type="button"
+                  onClick={() => setShowDownloadConfirmation(false)}
+                >
+                  Cancel
+                </button>
+                <button type="button" onClick={confirmCertificateDownload}>
+                  Download and continue
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
       </div>
     </div>
   );

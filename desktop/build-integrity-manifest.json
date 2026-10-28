@@ -1,0 +1,12 @@
+{
+  "protocolVersion": 1,
+  "applicationVersion": "1.0.0",
+  "engineVersion": "1.0.0",
+  "files": {
+    "engineJar": "bc068bf6c6eddd0dacd5fcc4162f586fc362fcb14b2cb1858f6a111cc50558e8",
+    "java": "5e0fab9f07952ceb6e71eb9fd33e1ed69959904ca00cf70869b7baf516a98016",
+    "javac": "2df52e1bcb1256e09734c12939eec114997082ea4c3e7898d19c7a35fea34281",
+    "runtimeModules": "2363ca8a01fb10f9996fe6f125e694ba389e9f10017cc3cdbf938c7d849f0c3a",
+    "runtimeRelease": "d2d5e99702bf2423b8aca6689d401b165efb6443c05c861200c05ddf6b4af5dc"
+  }
+}

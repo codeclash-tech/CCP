@@ -1591,7 +1591,7 @@ async function synchronizeRosterScore(rosterEntryId) {
     status: "FINALIZED",
   }).select("dayIndex score passed total executionTime memoryUsed finalizedAt");
   const result = summarizeWeeklySubmissions(submissions);
-  await WeeklyRosterEntry.updateOne(
+  const rosterEntry = await WeeklyRosterEntry.findOneAndUpdate(
     { _id: rosterEntryId, participationStatus: { $ne: "DISQUALIFIED" } },
     {
       $set: {
@@ -1599,7 +1599,21 @@ async function synchronizeRosterScore(rosterEntryId) {
         lastSubmittedAt: result.resultFinalizedAt,
       },
     },
-  );
+    { new: true },
+  ).lean();
+  if (!rosterEntry || !isWeeklyParticipationEligible(rosterEntry)) return;
+
+  const cycle = await WeeklyCycle.findById(rosterEntry.cycleId)
+    .select("cycleKey name status individualRankings")
+    .lean();
+  if (!cycle) throw new Error("Daily challenge cycle not found for completed roster entry.");
+
+  const ranking = cycle.status === "FINALIZED"
+    ? cycle.individualRankings.find(
+        (entry) => String(entry.candidateId) === String(rosterEntry.candidateId),
+      )
+    : null;
+  await persistIndividualWeeklyCertificate(cycle, rosterEntry, ranking);
 }
 
 async function refreshCycleRosterScores(cycleId) {
@@ -1892,31 +1906,7 @@ async function persistWeeklyCertificates(cycle, rankings, roster) {
   for (const [candidateId, rosterEntry] of rosterById) {
     if (!isWeeklyParticipationEligible(rosterEntry)) continue;
     const ranking = rankedById.get(candidateId);
-    const category = ranking
-      ? getWeeklyCertificateCategory(ranking.rank)
-      : "PARTICIPATION";
-    await WeeklyCertificate.updateOne(
-      { cycleId: cycle._id, userId: rosterEntry.candidateId, type: "INDIVIDUAL" },
-      {
-        $setOnInsert: {
-          certificateId: `DLY-${cycle.cycleKey.replaceAll("-", "")}-I-${randomUUID().toUpperCase()}`,
-          cycleId: cycle._id,
-          type: "INDIVIDUAL",
-          category,
-          userId: rosterEntry.candidateId,
-          snapshot: {
-            subjectName: rosterEntry.candidateNameSnapshot,
-            organizationName: rosterEntry.organizationNameSnapshot,
-            assessmentName: cycle.name,
-            cycleKey: cycle.cycleKey,
-            score: rosterEntry.score,
-            rank: ranking?.rank ?? null,
-            issuedAt,
-          },
-        },
-      },
-      { upsert: true },
-    );
+    await persistIndividualWeeklyCertificate(cycle, rosterEntry, ranking, issuedAt);
   }
 
   for (const ranking of rankings.organizationRankings.slice(0, 3)) {
@@ -1945,6 +1935,41 @@ async function persistWeeklyCertificates(cycle, rankings, roster) {
       { upsert: true },
     );
   }
+}
+
+export async function persistIndividualWeeklyCertificate(
+  cycle,
+  rosterEntry,
+  ranking = null,
+  issuedAt = new Date(),
+) {
+  const category = ranking
+    ? getWeeklyCertificateCategory(ranking.rank)
+    : "PARTICIPATION";
+  await WeeklyCertificate.updateOne(
+    { cycleId: cycle._id, userId: rosterEntry.candidateId, type: "INDIVIDUAL" },
+    {
+      $set: {
+        category,
+        snapshot: {
+          subjectName: rosterEntry.candidateNameSnapshot,
+          organizationName: rosterEntry.organizationNameSnapshot,
+          assessmentName: cycle.name,
+          cycleKey: cycle.cycleKey,
+          score: rosterEntry.score,
+          rank: ranking?.rank ?? null,
+          issuedAt,
+        },
+      },
+      $setOnInsert: {
+        certificateId: `DLY-${cycle.cycleKey.replaceAll("-", "")}-I-${randomUUID().toUpperCase()}`,
+        cycleId: cycle._id,
+        type: "INDIVIDUAL",
+        userId: rosterEntry.candidateId,
+      },
+    },
+    { upsert: true },
+  );
 }
 
 export async function finalizeWeeklyCycle(cycleId, now = new Date()) {

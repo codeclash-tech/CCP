@@ -25,16 +25,17 @@ import {
 import {
   getWeeklyCertificateCategory,
   finalizeWeeklyCycle,
+  persistIndividualWeeklyCertificate,
   publishGlobalChallengeConfiguration,
   resolveDailyQuestion,
   reserveQuestionForCycle,
   saveGlobalChallengeConfiguration,
 } from "../src/services/weeklyAssessmentService.js";
 
-test("daily challenge certificates unlock at midnight India time on the following day", () => {
+test("daily challenge certificates unlock at midnight India time on the challenge day", () => {
   assert.equal(
     getDailyCertificateAvailableAt("2026-10-26").toISOString(),
-    "2026-10-26T18:30:00.000Z",
+    "2026-10-25T18:30:00.000Z",
   );
   assert.equal(getDailyCertificateAvailableAt("2026-02-30"), null);
   assert.equal(getDailyCertificateAvailableAt("invalid"), null);
@@ -84,14 +85,14 @@ test("weekly roster resolves saved organization names to active organization pro
   );
 });
 
-test("weekly participation requires a passing case while ranking accepts every finalized score", () => {
+test("weekly participation and rankings accept every valid finalized score", () => {
   const base = {
     participationStatus: "PARTICIPATED",
     resultFinalizedAt: new Date("2026-10-25T10:00:00.000Z"),
     totalTestCases: 5,
   };
 
-  assert.equal(isWeeklyParticipationEligible({ ...base, passedTestCases: 0 }), false);
+  assert.equal(isWeeklyParticipationEligible({ ...base, passedTestCases: 0 }), true);
   assert.equal(isWeeklyRankedEligible({ ...base, passedTestCases: 0 }), true);
   assert.equal(
     isWeeklyParticipationEligible({ ...base, passedTestCases: 6 }),
@@ -662,6 +663,51 @@ test("weekly certificate categories follow rank and participation policy", () =>
   assert.equal(getWeeklyCertificateCategory(4, "ORGANIZATION"), null);
 });
 
+test("daily completion immediately creates a congratulations certificate before rankings finalize", async () => {
+  const originalUpdateOne = WeeklyCertificate.updateOne;
+  const updates = [];
+  WeeklyCertificate.updateOne = async (...args) => {
+    updates.push(args);
+    return { upsertedCount: 1 };
+  };
+  const rosterEntry = {
+    candidateId: "candidate-1",
+    candidateNameSnapshot: "Candidate",
+    organizationNameSnapshot: "Organization",
+    score: 80,
+    participationStatus: "PARTICIPATED",
+    passedTestCases: 4,
+    totalTestCases: 5,
+    resultFinalizedAt: new Date("2026-10-27T10:00:00.000Z"),
+  };
+
+  try {
+    await persistIndividualWeeklyCertificate({
+      _id: "daily-cycle",
+      cycleKey: "2026-10-27",
+      name: "Daily Challenge",
+    }, rosterEntry);
+
+    assert.equal(updates.length, 1);
+    assert.deepEqual(updates[0][0], {
+      cycleId: "daily-cycle",
+      userId: "candidate-1",
+      type: "INDIVIDUAL",
+    });
+    assert.equal(updates[0][1].$set.category, "PARTICIPATION");
+    assert.equal(updates[0][1].$set.snapshot.subjectName, "Candidate");
+    assert.equal(updates[0][1].$set.snapshot.score, 80);
+    assert.equal(updates[0][1].$set.snapshot.rank, null);
+    assert.match(
+      updates[0][1].$setOnInsert.certificateId,
+      /^DLY-20261027-I-/,
+    );
+    assert.equal(updates[0][2].upsert, true);
+  } finally {
+    WeeklyCertificate.updateOne = originalUpdateOne;
+  }
+});
+
 test("finalizing a daily cycle persists certificates for participants and active organizations", async () => {
   const originalCycleFindById = WeeklyCycle.findById;
   const originalCycleUpdateOne = WeeklyCycle.updateOne;
@@ -725,7 +771,7 @@ test("finalizing a daily cycle persists certificates for participants and active
 
     assert.equal(certificateWrites.length, 2);
     assert.equal(certificateWrites[0].filter.userId, "candidate-1");
-    assert.equal(certificateWrites[0].update.$setOnInsert.category, "WINNER");
+    assert.equal(certificateWrites[0].update.$set.category, "WINNER");
     assert.equal(
       certificateWrites[1].filter.organizationId,
       "active-organization",

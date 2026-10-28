@@ -59,7 +59,7 @@ export function getDailyCertificateAvailableAt(cycleKey) {
   const [year, month, day] = key.split("-").map(Number);
   const cycleDate = new Date(Date.UTC(year, month - 1, day));
   if (cycleDate.toISOString().slice(0, 10) !== key) return null;
-  return new Date(Date.UTC(year, month - 1, day + 1) - IST_OFFSET_MS);
+  return new Date(Date.UTC(year, month - 1, day) - IST_OFFSET_MS);
 }
 
 export function getRecurringCycleBounds(startAt, date) {
@@ -138,7 +138,7 @@ export function isWeeklyParticipationEligible(result) {
     Number.isFinite(total) &&
     total > 0 &&
     Number.isFinite(passed) &&
-    passed >= 1 &&
+    passed >= 0 &&
     passed <= total,
   );
 }

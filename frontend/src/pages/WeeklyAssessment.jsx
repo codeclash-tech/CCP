@@ -405,8 +405,9 @@ export default function WeeklyAssessment() {
           <section className="weekly-completion-card">
             <p className="weekly-eyebrow">DAILY CHALLENGE</p>
             <h2>Daily challenge completed</h2>
-            <p>Your submission is complete. Your certificate will be available tomorrow. Visit the leaderboard to see the standings.</p>
+            <p>Your congratulations certificate is ready. Open Certificates to preview and download it, or visit the leaderboard to see the standings.</p>
             <div className="weekly-completion-actions">
+              <Link className="weekly-completion-primary" to="/certificates">View certificate</Link>
               <Link className="weekly-completion-primary" to="/rankings">See leaderboard</Link>
             </div>
           </section>
@@ -488,7 +489,7 @@ export default function WeeklyAssessment() {
           </h1>
           <p>
             {isComplete
-              ? "Your submission is complete. Your certificate will be available tomorrow. Visit the leaderboard to see the standings."
+              ? "Your congratulations certificate is ready. Open Certificates to preview and download it, or visit the leaderboard to see the standings."
               : isDisqualified
                 ? "This challenge attempt has ended."
                 : isRetryable
@@ -511,6 +512,9 @@ export default function WeeklyAssessment() {
             </button>
           )}
           <div className="weekly-completion-actions">
+            {isComplete && (
+              <Link className="weekly-completion-primary" to="/certificates">View certificate</Link>
+            )}
             <Link className="weekly-completion-primary" to="/rankings">See leaderboard</Link>
           </div>
         </section>
