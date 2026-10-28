@@ -38,6 +38,7 @@ import {
 } from "../controllers/battleRoomAuthoringController.js";
 import {
   downloadBattleRoomCertificate,
+  deleteParticipantBattleRoomCertificate,
   listParticipantBattleRoomCertificates,
   downloadParticipantBattleRoomCertificate,
 } from "../controllers/battleRoomCertificateController.js";
@@ -70,6 +71,11 @@ router.get(
   "/:roomCode/certificate",
   authenticate,
   downloadParticipantBattleRoomCertificate,
+);
+router.delete(
+  "/:roomCode/certificate",
+  authenticate,
+  deleteParticipantBattleRoomCertificate,
 );
 router.post("/create", ...creatorAuth, createRoom);
 router.get("/:roomCode/edit", ...creatorAuth, getRoomForEdit);

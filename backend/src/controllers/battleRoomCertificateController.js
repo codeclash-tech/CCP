@@ -22,6 +22,7 @@ export function toParticipantCertificate(submission) {
     totalScore: submission.totalScore,
     completedAt: snapshot.completedAt,
     downloadPath: `/battle-rooms/${encodeURIComponent(roomCode)}/certificate`,
+    deletePath: `/battle-rooms/${encodeURIComponent(roomCode)}/certificate`,
   };
 }
 
@@ -91,21 +92,6 @@ export async function downloadParticipantBattleRoomCertificate(req, res) {
       });
     }
 
-    res.once("finish", () => {
-      BattleRoomSubmission.updateOne(
-        {
-          _id: submission._id,
-          userId: req.userId,
-          "certificateSnapshot.roomCode": req.params.roomCode.toUpperCase(),
-        },
-        { $unset: { certificateSnapshot: 1 } },
-      ).catch((error) => {
-        console.error("[BattleRoomCertificate] Could not delete downloaded certificate:", {
-          submissionId: String(submission._id),
-          error: error.message,
-        });
-      });
-    });
     streamBattleRoomCertificateData(
       {
         ...submission.certificateSnapshot,
@@ -118,5 +104,27 @@ export async function downloadParticipantBattleRoomCertificate(req, res) {
   } catch (error) {
     console.error("[BattleRoomCertificate] Participant download failed:", error.message);
     return res.status(500).json({ error: "Failed to download certificate." });
+  }
+}
+
+export async function deleteParticipantBattleRoomCertificate(req, res) {
+  try {
+    const result = await BattleRoomSubmission.updateOne(
+      {
+        userId: req.userId,
+        "certificateSnapshot.roomCode": req.params.roomCode.toUpperCase(),
+        status: "COMPLETED",
+      },
+      { $unset: { certificateSnapshot: 1 } },
+    );
+    if (result.matchedCount !== 1) {
+      return res.status(404).json({
+        error: "Your certificate is not available for this battle.",
+      });
+    }
+    return res.json({ message: "Battle Room certificate deleted." });
+  } catch (error) {
+    console.error("[BattleRoomCertificate] Certificate deletion failed:", error.message);
+    return res.status(500).json({ error: "Failed to delete certificate." });
   }
 }

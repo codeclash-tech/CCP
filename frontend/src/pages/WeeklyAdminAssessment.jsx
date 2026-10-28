@@ -553,7 +553,7 @@ function RankingTable({ view, rankings = [], cycle }) {
       <thead>
         {view === "individual"
           ? <tr><th>Rank</th><th>Participant</th><th>Organization snapshot</th><th>Score</th><th>Completed</th><th>Status</th></tr>
-          : <tr><th>Rank</th><th>Organization</th><th>Mean</th><th>Bayesian score</th><th>Eligible</th><th>Completed</th><th>Completion</th></tr>}
+          : <tr><th>Rank</th><th>Organization</th><th>Average score</th></tr>}
       </thead>
       <tbody>{rankings.map((item) => (
         <tr key={`${item.rank}-${item.candidateId || item.organizationId}`}>
@@ -566,9 +566,7 @@ function RankingTable({ view, rankings = [], cycle }) {
             </>
           ) : (
             <>
-              <td>{item.organizationMean.toFixed(2)}</td><td>{item.finalScore.toFixed(2)}</td>
-              <td>{item.eligibleCandidates}</td><td>{item.completedEligibleCandidates}</td>
-              <td>{item.completionRate.toFixed(2)}%</td>
+              <td>{item.finalScore.toFixed(2)}</td>
             </>
           )}
         </tr>

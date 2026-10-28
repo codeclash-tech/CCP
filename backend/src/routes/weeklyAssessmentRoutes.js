@@ -10,6 +10,7 @@ import {
   createWeeklyCycleHandler,
   disqualifyWeeklyCandidateHandler,
   disqualifyCurrentWeeklyCandidateHandler,
+  deleteWeeklyCertificate,
   downloadWeeklyCertificate,
   finalizeWeeklyCycleHandler,
   finalizeDesktopWeeklyExecution,
@@ -70,6 +71,7 @@ router.get("/cycles/:cycleId/rankings", authenticate, getWeeklyRankings);
 
 router.get("/certificates/mine", authenticate, listMyWeeklyCertificates);
 router.get("/certificates/organization", ...organizationUser, listMyOrganizationCertificates);
+router.delete("/certificates/:certificateId", authenticate, deleteWeeklyCertificate);
 router.get("/certificates/:certificateId/pdf", authenticate, downloadWeeklyCertificate);
 
 router.get("/organization/profile", ...organizationUser, getOrganizationProfile);

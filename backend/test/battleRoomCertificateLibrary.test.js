@@ -7,6 +7,7 @@ import { streamBattleRoomCertificateData } from "../src/services/battleRoomCerti
 import {
   listParticipantBattleRoomCertificates,
   downloadParticipantBattleRoomCertificate,
+  deleteParticipantBattleRoomCertificate,
   toParticipantCertificate,
 } from "../src/controllers/battleRoomCertificateController.js";
 import battleRoomRoutes from "../src/routes/battleRoomRoutes.js";
@@ -105,6 +106,7 @@ test("certificate library returns only the authenticated user's completed certif
           totalScore: 85,
           completedAt,
           downloadPath: "/battle-rooms/ROOM-123/certificate",
+          deletePath: "/battle-rooms/ROOM-123/certificate",
         },
       ],
     });
@@ -144,6 +146,17 @@ test("certificate library route requires authentication before listing records",
   assert.equal(layer.route.stack[0].name, "authenticate");
 });
 
+test("battle certificate deletion route requires authentication", () => {
+  const layer = battleRoomRoutes.stack.find(
+    (routeLayer) =>
+      routeLayer.route?.path === "/:roomCode/certificate" &&
+      routeLayer.route.methods.delete,
+  );
+
+  assert.ok(layer, "certificate deletion route should be registered");
+  assert.equal(layer.route.stack[0].name, "authenticate");
+});
+
 test("certificate download generates a PDF with server-issued certificate metadata", async () => {
   const response = new PassThrough();
   const headers = {};
@@ -178,7 +191,7 @@ test("certificate download generates a PDF with server-issued certificate metada
   assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
 });
 
-test("battle certificate download is gated on room closure and removes the certificate after streaming", async () => {
+test("battle certificate download is gated on room closure and preserves the certificate", async () => {
   const originalSubmissionFindOne = BattleRoomSubmission.findOne;
   const originalSubmissionUpdateOne = BattleRoomSubmission.updateOne;
   const originalRoomFindOne = BattleRoom.findOne;
@@ -232,17 +245,49 @@ test("battle certificate download is gated on room closure and removes the certi
     await new Promise((resolve) => setImmediate(resolve));
 
     assert.deepEqual(roomFilter, { _id: "room-id", status: "CLOSED" });
-    assert.deepEqual(deletion, {
-      filter: {
-        _id: "submission-id",
-        userId: "candidate-id",
-        "certificateSnapshot.roomCode": "ROOM-1",
-      },
-      update: { $unset: { certificateSnapshot: 1 } },
-    });
+    assert.equal(deletion, undefined);
   } finally {
     BattleRoomSubmission.findOne = originalSubmissionFindOne;
     BattleRoomSubmission.updateOne = originalSubmissionUpdateOne;
     BattleRoom.findOne = originalRoomFindOne;
+  }
+});
+
+test("battle certificate is deleted only by an explicit authenticated request", async () => {
+  const originalSubmissionUpdateOne = BattleRoomSubmission.updateOne;
+  let deletion;
+  BattleRoomSubmission.updateOne = async (filter, update) => {
+    deletion = { filter, update };
+    return { matchedCount: 1 };
+  };
+
+  try {
+    const res = {
+      statusCode: 200,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body) {
+        this.body = body;
+        return this;
+      },
+    };
+    await deleteParticipantBattleRoomCertificate(
+      { params: { roomCode: "room-1" }, userId: "candidate-id" },
+      res,
+    );
+
+    assert.deepEqual(deletion, {
+      filter: {
+        userId: "candidate-id",
+        "certificateSnapshot.roomCode": "ROOM-1",
+        status: "COMPLETED",
+      },
+      update: { $unset: { certificateSnapshot: 1 } },
+    });
+    assert.equal(res.statusCode, 200);
+  } finally {
+    BattleRoomSubmission.updateOne = originalSubmissionUpdateOne;
   }
 });

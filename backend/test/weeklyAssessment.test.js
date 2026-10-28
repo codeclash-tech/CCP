@@ -3,6 +3,9 @@ import test from "node:test";
 import mongoose from "mongoose";
 import Challenge from "../src/models/Challenge.js";
 import GlobalChallenge from "../src/models/GlobalChallenge.js";
+import WeeklyCertificate from "../src/models/WeeklyCertificate.js";
+import WeeklyCycle from "../src/models/WeeklyCycle.js";
+import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
 import weeklyAssessmentRoutes from "../src/routes/weeklyAssessmentRoutes.js";
 import {
   calculateDailyScore,
@@ -21,6 +24,7 @@ import {
 } from "../src/utils/weeklyAssessment.js";
 import {
   getWeeklyCertificateCategory,
+  finalizeWeeklyCycle,
   publishGlobalChallengeConfiguration,
   resolveDailyQuestion,
   reserveQuestionForCycle,
@@ -413,7 +417,7 @@ test("weekly recovery deadline is 24 hours after close and delays finalization o
   }), false);
 });
 
-test("organization score uses completed participants and k=5", () => {
+test("organization score is the average across all eligible roster candidates", () => {
   const roster = [];
   for (const [organizationId, organizationName, count] of [
     ["org-a", "A", 1],
@@ -450,7 +454,7 @@ test("organization score uses completed participants and k=5", () => {
   assert.ok(results.organizationRankings.every((ranking) => ranking.shrinkageK === 5));
 });
 
-test("incomplete and disqualified candidates do not appear in individual or organization rankings", () => {
+test("organization average includes nonparticipants as zero while excluding disqualified candidates", () => {
   const roster = [
     {
       candidateId: "participating",
@@ -501,15 +505,16 @@ test("incomplete and disqualified candidates do not appear in individual or orga
   assert.equal(results.individualRankings.length, 1);
   assert.equal(results.individualRankings[0].candidateId, "participating");
   assert.equal(results.individualRankings[0].rank, 1);
-  assert.equal(smallOrganization.eligibleCandidates, 1);
-  assert.equal(smallOrganization.organizationMean, 20);
+  assert.equal(smallOrganization.eligibleCandidates, 2);
+  assert.equal(smallOrganization.organizationMean, 10);
+  assert.equal(smallOrganization.finalScore, 10);
   assert.equal(smallOrganization.completedEligibleCandidates, 1);
   assert.equal(smallOrganization.participatingEligibleCandidates, 1);
-  assert.equal(smallOrganization.completionRate, 100);
+  assert.equal(smallOrganization.completionRate, 50);
   assert.equal(largeOrganization, undefined);
 });
 
-test("daily leaderboards start empty until an eligible participant completes a question", () => {
+test("organization leaderboard shows the average for an eligible roster with no submissions", () => {
   const results = calculateWeeklyRankings([
     {
       candidateId: "incomplete",
@@ -532,7 +537,10 @@ test("daily leaderboards start empty until an eligible participant completes a q
   ]);
 
   assert.deepEqual(results.individualRankings, []);
-  assert.deepEqual(results.organizationRankings, []);
+  assert.equal(results.organizationRankings.length, 1);
+  assert.equal(results.organizationRankings[0].organizationId, "org");
+  assert.equal(results.organizationRankings[0].eligibleCandidates, 1);
+  assert.equal(results.organizationRankings[0].finalScore, 0);
 });
 
 test("individual rankings include partial marks and efficiency tie-breakers without first-come ranks", () => {
@@ -652,6 +660,92 @@ test("weekly certificate categories follow rank and participation policy", () =>
   assert.equal(getWeeklyCertificateCategory(2, "ORGANIZATION"), "ORGANIZATION_RUNNER_UP");
   assert.equal(getWeeklyCertificateCategory(3, "ORGANIZATION"), "ORGANIZATION_SECOND_RUNNER_UP");
   assert.equal(getWeeklyCertificateCategory(4, "ORGANIZATION"), null);
+});
+
+test("finalizing a daily cycle persists certificates for participants and active organizations", async () => {
+  const originalCycleFindById = WeeklyCycle.findById;
+  const originalCycleUpdateOne = WeeklyCycle.updateOne;
+  const originalRosterFind = WeeklyRosterEntry.find;
+  const originalCertificateUpdateOne = WeeklyCertificate.updateOne;
+  const cycle = {
+    _id: "daily-cycle",
+    cycleKey: "2026-10-27",
+    name: "Daily Challenge",
+    status: "FINALIZED",
+    certificatesIssuedAt: null,
+    individualRankings: [
+      { candidateId: "candidate-1", rank: 1 },
+    ],
+    organizationRankings: [
+      {
+        organizationId: "active-organization",
+        organizationNameSnapshot: "Active Organization",
+        rank: 1,
+        finalScore: 80,
+        eligibleCandidates: 2,
+        participatingEligibleCandidates: 1,
+      },
+      {
+        organizationId: "inactive-organization",
+        organizationNameSnapshot: "Inactive Organization",
+        rank: 2,
+        finalScore: 0,
+        eligibleCandidates: 4,
+        participatingEligibleCandidates: 0,
+      },
+    ],
+  };
+  const roster = [
+    {
+      candidateId: "candidate-1",
+      candidateNameSnapshot: "Candidate",
+      organizationNameSnapshot: "Active Organization",
+      participationStatus: "PARTICIPATED",
+      passedTestCases: 4,
+      totalTestCases: 5,
+      resultFinalizedAt: new Date("2026-10-27T10:00:00.000Z"),
+      score: 80,
+    },
+  ];
+  const certificateWrites = [];
+  let issuedAtUpdate;
+  WeeklyCycle.findById = async () => cycle;
+  WeeklyCycle.updateOne = async (filter, update) => {
+    issuedAtUpdate = { filter, update };
+    return { modifiedCount: 1 };
+  };
+  WeeklyRosterEntry.find = () => ({ lean: async () => roster });
+  WeeklyCertificate.updateOne = async (filter, update, options) => {
+    certificateWrites.push({ filter, update, options });
+    return { upsertedCount: 1 };
+  };
+
+  try {
+    await finalizeWeeklyCycle(cycle._id);
+
+    assert.equal(certificateWrites.length, 2);
+    assert.equal(certificateWrites[0].filter.userId, "candidate-1");
+    assert.equal(certificateWrites[0].update.$setOnInsert.category, "WINNER");
+    assert.equal(
+      certificateWrites[1].filter.organizationId,
+      "active-organization",
+    );
+    assert.equal(
+      certificateWrites[1].update.$setOnInsert.category,
+      "ORGANIZATION_WINNER",
+    );
+    assert.deepEqual(issuedAtUpdate.filter, {
+      _id: cycle._id,
+      status: "FINALIZED",
+      certificatesIssuedAt: null,
+    });
+    assert.ok(issuedAtUpdate.update.$set.certificatesIssuedAt instanceof Date);
+  } finally {
+    WeeklyCycle.findById = originalCycleFindById;
+    WeeklyCycle.updateOne = originalCycleUpdateOne;
+    WeeklyRosterEntry.find = originalRosterFind;
+    WeeklyCertificate.updateOne = originalCertificateUpdateOne;
+  }
 });
 
 test("weekly admin APIs require Super Admin authorization", () => {

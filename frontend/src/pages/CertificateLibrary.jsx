@@ -5,7 +5,13 @@ import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import PageSkeleton from "../components/layout/PageSkeleton";
 
-function CertificateCard({ certificate, onDownload, onPreview, downloading }) {
+function CertificateCard({
+  certificate,
+  onDownload,
+  onPreview,
+  downloading,
+  downloadDisabled,
+}) {
   const isDaily = certificate.type === "DAILY";
   const completedAt = certificate.completedAt
     ? new Date(certificate.completedAt).toLocaleDateString()
@@ -37,7 +43,7 @@ function CertificateCard({ certificate, onDownload, onPreview, downloading }) {
         className="btn-primary certificate-download"
         type="button"
         onClick={() => onDownload(certificate)}
-        disabled={downloading}
+        disabled={downloading || downloadDisabled}
       >
         <Download size={16} />
         {downloading ? "Downloading…" : "Download certificate"}
@@ -53,7 +59,9 @@ export default function CertificateLibrary() {
   const [error, setError] = useState("");
   const [retryAction, setRetryAction] = useState(null);
   const [previewCertificate, setPreviewCertificate] = useState(null);
+  const [pendingDeletionCertificate, setPendingDeletionCertificate] = useState(null);
   const [downloadingCertificateId, setDownloadingCertificateId] = useState("");
+  const [deletingCertificateId, setDeletingCertificateId] = useState("");
 
   const loadCertificates = useCallback(async () => {
     setLoading(true);
@@ -114,16 +122,38 @@ export default function CertificateLibrary() {
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setCertificates((current) =>
-        current.filter(
-          (item) => item.certificateId !== certificate.certificateId,
-        ),
-      );
+      setPendingDeletionCertificate(certificate);
     } catch (downloadError) {
       setError(downloadError.message || "Unable to download this certificate.");
     } finally {
       setDownloadingCertificateId("");
     }
+  };
+
+  const deleteCertificate = async (certificate) => {
+    setError("");
+    setRetryAction(null);
+    setDeletingCertificateId(certificate.certificateId);
+    try {
+      await api.delete(certificate.deletePath);
+      setCertificates((current) =>
+        current.filter(
+          (item) => item.certificateId !== certificate.certificateId,
+        ),
+      );
+      setPendingDeletionCertificate(null);
+    } catch (deleteError) {
+      setError(deleteError.message || "Unable to delete this certificate.");
+      setRetryAction(() => () => deleteCertificate(certificate));
+    } finally {
+      setDeletingCertificateId("");
+    }
+  };
+
+  const keepCertificate = () => {
+    setPendingDeletionCertificate(null);
+    setError("");
+    setRetryAction(null);
   };
 
   return (
@@ -174,8 +204,43 @@ export default function CertificateLibrary() {
               onDownload={downloadCertificate}
               onPreview={setPreviewCertificate}
               downloading={downloadingCertificateId === certificate.certificateId}
+              downloadDisabled={Boolean(pendingDeletionCertificate)}
             />
           ))}
+        </div>
+      )}
+      {pendingDeletionCertificate && (
+        <div className="certificate-confirmation-backdrop">
+          <section
+            className="certificate-confirmation"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="certificate-delete-title"
+          >
+            <h2 id="certificate-delete-title">Delete downloaded certificate?</h2>
+            <p>
+              Your certificate has downloaded. Delete it from your account? This
+              cannot be undone.
+            </p>
+            <div className="certificate-confirmation-actions">
+              <button
+                className="btn-secondary"
+                type="button"
+                onClick={keepCertificate}
+                disabled={Boolean(deletingCertificateId)}
+              >
+                Keep certificate
+              </button>
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={() => deleteCertificate(pendingDeletionCertificate)}
+                disabled={Boolean(deletingCertificateId)}
+              >
+                {deletingCertificateId ? "Deleting…" : "Delete certificate"}
+              </button>
+            </div>
+          </section>
         </div>
       )}
       <BattleRoomShareModal

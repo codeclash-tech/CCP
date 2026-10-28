@@ -789,6 +789,7 @@ export async function listMyWeeklyCertificates(req, res) {
       certificates: certificates.map((certificate) => ({
         ...certificate,
         downloadPath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}/pdf`,
+        deletePath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}`,
       })),
     });
   } catch (error) {
@@ -809,6 +810,7 @@ export async function listMyOrganizationCertificates(req, res) {
       certificates: certificates.map((certificate) => ({
         ...certificate,
         downloadPath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}/pdf`,
+        deletePath: `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}`,
       })),
     });
   } catch (error) {
@@ -839,18 +841,46 @@ export async function downloadWeeklyCertificate(req, res) {
     if (!eligibleCertificate) {
       return res.status(404).json({ error: "Weekly certificate not found." });
     }
-    res.once("finish", () => {
-      WeeklyCertificate.deleteOne({ certificateId: certificate.certificateId })
-        .catch((error) => {
-          console.error("[WeeklyCertificate] Could not delete downloaded certificate:", {
-            certificateId: certificate.certificateId,
-            error: error.message,
-          });
-        });
-    });
     return streamWeeklyCertificate(certificate, res);
   } catch (error) {
     return sendFailure(res, error, "Could not generate the weekly certificate.");
+  }
+}
+
+export async function deleteWeeklyCertificate(req, res) {
+  try {
+    const certificate = await WeeklyCertificate.findOne({
+      certificateId: req.params.certificateId,
+    }).select("_id type userId organizationId");
+    if (!certificate) {
+      return res.status(404).json({ error: "Weekly certificate not found." });
+    }
+
+    const isIndividualOwner =
+      certificate.type === "INDIVIDUAL" &&
+      String(certificate.userId) === String(req.userId);
+    const isOrganizationOwner =
+      certificate.type === "ORGANIZATION" &&
+      Boolean(await OrganizationProfile.exists({
+        _id: certificate.organizationId,
+        ownerUserId: req.userId,
+      }));
+    if (req.user.role !== "ADMIN" && !isIndividualOwner && !isOrganizationOwner) {
+      return res.status(403).json({
+        error: "You are not authorized to delete this certificate.",
+      });
+    }
+
+    const result = await WeeklyCertificate.deleteOne({
+      _id: certificate._id,
+      certificateId: req.params.certificateId,
+    });
+    if (result.deletedCount !== 1) {
+      return res.status(404).json({ error: "Weekly certificate not found." });
+    }
+    return res.json({ message: "Weekly certificate deleted." });
+  } catch (error) {
+    return sendFailure(res, error, "Could not delete the weekly certificate.");
   }
 }
 

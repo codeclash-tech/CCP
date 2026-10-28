@@ -1840,6 +1840,45 @@ canvas {
   margin: 0;
 }
 
+.certificate-confirmation-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(2 6 23 / 70%);
+}
+
+.certificate-confirmation {
+  width: min(100%, 440px);
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 35%);
+}
+
+.certificate-confirmation h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+
+.certificate-confirmation p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.certificate-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
 @media (max-width: 900px) {
   .app-navbar {
     flex: 0 0 56px;

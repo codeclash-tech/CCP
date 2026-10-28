@@ -207,15 +207,21 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
     throw new Error("Weekly ranking shrinkage k must remain 5.");
   }
 
-  const rows = roster
-    .filter(isWeeklyRankedEligible)
+  const eligibleRoster = roster
+    .filter(
+      (entry) =>
+        entry.participationStatus !== "DISQUALIFIED" && !entry.disqualifiedAt,
+    )
     .map((entry) => ({
       ...entry,
-      score: Number(entry.score) || 0,
+      score: isWeeklyRankedEligible(entry) ? Number(entry.score) || 0 : 0,
       completedQuestions: (entry.completedDays || []).length,
     }));
-  const cycleMean = rows.length
-    ? rows.reduce((sum, row) => sum + row.score, 0) / rows.length
+  const rows = eligibleRoster
+    .filter(isWeeklyRankedEligible);
+  const cycleMean = eligibleRoster.length
+    ? eligibleRoster.reduce((sum, row) => sum + row.score, 0) /
+      eligibleRoster.length
     : 0;
   const compareIndividualMetrics = (left, right) =>
     right.score - left.score ||
@@ -247,7 +253,7 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
   }));
 
   const organizations = new Map();
-  for (const entry of rows) {
+  for (const entry of eligibleRoster) {
     const key = String(entry.organizationId);
     if (!entry.organizationId) continue;
     if (!organizations.has(key)) {
@@ -257,14 +263,18 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
         scores: [],
         executionTimes: [],
         memoryUses: [],
+        rankedCandidates: 0,
         completedEligibleCandidates: 0,
         participatingEligibleCandidates: 0,
       });
     }
     const organization = organizations.get(key);
     organization.scores.push(entry.score);
-    organization.executionTimes.push(Number(entry.executionTime) || 0);
-    organization.memoryUses.push(Number(entry.memoryUsed) || 0);
+    if (isWeeklyRankedEligible(entry)) {
+      organization.executionTimes.push(Number(entry.executionTime) || 0);
+      organization.memoryUses.push(Number(entry.memoryUsed) || 0);
+      organization.rankedCandidates += 1;
+    }
     if (entry.completedQuestions > 0) {
       organization.participatingEligibleCandidates += 1;
     }
@@ -278,11 +288,15 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
       const eligibleCandidates = organization.scores.length;
       const organizationMean = organization.scores.reduce((sum, score) => sum + score, 0) / eligibleCandidates;
       const averageExecutionTime =
-        organization.executionTimes.reduce((sum, value) => sum + value, 0) /
-        eligibleCandidates;
+        organization.rankedCandidates
+          ? organization.executionTimes.reduce((sum, value) => sum + value, 0) /
+            organization.rankedCandidates
+          : 0;
       const averageMemoryUsed =
-        organization.memoryUses.reduce((sum, value) => sum + value, 0) /
-        eligibleCandidates;
+        organization.rankedCandidates
+          ? organization.memoryUses.reduce((sum, value) => sum + value, 0) /
+            organization.rankedCandidates
+          : 0;
       return {
         organizationId: organization.organizationId,
         organizationNameSnapshot: organization.organizationNameSnapshot,
@@ -294,9 +308,7 @@ export function calculateWeeklyRankings(roster, shrinkageK = WEEKLY_SHRINKAGE_K)
         averageMemoryUsed,
         cycleMean,
         shrinkageK,
-        finalScore:
-          (eligibleCandidates * organizationMean + shrinkageK * cycleMean) /
-          (eligibleCandidates + shrinkageK),
+        finalScore: organizationMean,
         completionRate: organization.completedEligibleCandidates / eligibleCandidates * 100,
       };
     })

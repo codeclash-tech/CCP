@@ -1920,7 +1920,7 @@ async function persistWeeklyCertificates(cycle, rankings, roster) {
   }
 
   for (const ranking of rankings.organizationRankings.slice(0, 3)) {
-    if (ranking.eligibleCandidates === 0) continue;
+    if (ranking.participatingEligibleCandidates === 0) continue;
     const category = getWeeklyCertificateCategory(ranking.rank, "ORGANIZATION");
     await WeeklyCertificate.updateOne(
       { cycleId: cycle._id, organizationId: ranking.organizationId, type: "ORGANIZATION" },

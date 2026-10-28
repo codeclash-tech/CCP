@@ -4,8 +4,12 @@ import test from "node:test";
 import OrganizationProfile from "../src/models/OrganizationProfile.js";
 import WeeklyCertificate from "../src/models/WeeklyCertificate.js";
 import WeeklyRosterEntry from "../src/models/WeeklyRosterEntry.js";
-import { downloadWeeklyCertificate } from "../src/controllers/weeklyAssessmentController.js";
+import {
+  deleteWeeklyCertificate,
+  downloadWeeklyCertificate,
+} from "../src/controllers/weeklyAssessmentController.js";
 import { getWeeklyCycleBounds } from "../src/utils/weeklyAssessment.js";
+import weeklyAssessmentRoutes from "../src/routes/weeklyAssessmentRoutes.js";
 
 function responseRecorder() {
   const response = new PassThrough();
@@ -226,7 +230,7 @@ test("daily certificate is unavailable until the following India calendar day", 
   assert.equal(res.statusCode, 404);
 });
 
-test("Super Admin is authorized to download an administrative weekly certificate", async () => {
+test("Super Admin can download an administrative certificate without deleting it", async () => {
   const res = responseRecorder();
   const chunks = [];
   res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
@@ -268,7 +272,61 @@ test("Super Admin is authorized to download an administrative weekly certificate
   assert.equal(chunks.length > 0, true);
   assert.match(Buffer.concat(chunks).subarray(0, 5).toString(), /^%PDF-/);
   await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(deletedCertificates, [
-    { certificateId: "WK-admin-download" },
-  ]);
+  assert.deepEqual(deletedCertificates, []);
+});
+
+test("weekly certificate deletion requires an explicit owner request", async () => {
+  const certificate = {
+    _id: "certificate-record",
+    type: "INDIVIDUAL",
+    userId: "candidate-a",
+    organizationId: null,
+  };
+  const originalFindOne = WeeklyCertificate.findOne;
+  const originalDeleteOne = WeeklyCertificate.deleteOne;
+  let lookupFilter;
+  let deletionFilter;
+  WeeklyCertificate.findOne = (filter) => {
+    lookupFilter = filter;
+    return {
+      select: () => Promise.resolve(certificate),
+    };
+  };
+  WeeklyCertificate.deleteOne = async (filter) => {
+    deletionFilter = filter;
+    return { deletedCount: 1 };
+  };
+
+  try {
+    const res = responseRecorder();
+    await deleteWeeklyCertificate(
+      {
+        params: { certificateId: "WK-owned" },
+        userId: "candidate-a",
+        user: { role: "USER" },
+      },
+      res,
+    );
+
+    assert.deepEqual(lookupFilter, { certificateId: "WK-owned" });
+    assert.deepEqual(deletionFilter, {
+      _id: "certificate-record",
+      certificateId: "WK-owned",
+    });
+    assert.equal(res.statusCode, 200);
+  } finally {
+    WeeklyCertificate.findOne = originalFindOne;
+    WeeklyCertificate.deleteOne = originalDeleteOne;
+  }
+});
+
+test("weekly certificate deletion route requires authentication", () => {
+  const layer = weeklyAssessmentRoutes.stack.find(
+    (routeLayer) =>
+      routeLayer.route?.path === "/certificates/:certificateId" &&
+      routeLayer.route.methods.delete,
+  );
+
+  assert.ok(layer, "weekly certificate deletion route should be registered");
+  assert.equal(layer.route.stack[0].name, "authenticate");
 });

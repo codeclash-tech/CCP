@@ -477,17 +477,13 @@ export default function WeeklyRankings() {
                             "Your organization"} · #{currentOrganizationRanking.rank}
                         </strong>
                         <span>{Number(currentOrganizationRanking.finalScore || 0).toFixed(2)} points</span>
-                        <span>
-                          {currentOrganizationRanking.completedEligibleCandidates}/
-                          {currentOrganizationRanking.eligibleCandidates} attended
-                        </span>
                       </div>
                     )}
                     {globalRankingType === "organization" && rankings.organizationRankings?.length ? (
                       <div className="weekly-ranking-table-wrap">
                         <table className="weekly-ranking-table">
                           <thead>
-                            <tr><th>Rank</th><th>Organisation</th><th>Score</th><th>Attended</th><th>Completion</th></tr>
+                            <tr><th>Rank</th><th>Organisation</th><th>Average score</th></tr>
                           </thead>
                           <tbody>
                             {rankings.organizationRankings.map((organization) => {
@@ -511,11 +507,6 @@ export default function WeeklyRankings() {
                                   <td>{organization.rank}</td>
                                   <td>{organization.organizationNameSnapshot || "—"}</td>
                                   <td>{Number(organization.finalScore || 0).toFixed(2)}</td>
-                                  <td>
-                                    {organization.completedEligibleCandidates}/
-                                    {organization.eligibleCandidates}
-                                  </td>
-                                  <td>{Number(organization.completionRate || 0).toFixed(1)}%</td>
                                 </tr>
                               );
                             })}
