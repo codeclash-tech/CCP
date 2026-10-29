@@ -6,6 +6,9 @@ export async function sendChallengeCompletionEmail({
   userName,
   challengeName,
   challengeType,
+  certificatePdf,
+  certificateFilename = "codeclash-certificate.pdf",
+  certificateRank = null,
 }) {
   const recipient = sanitizeEmail(email);
   if (!recipient) {
@@ -14,25 +17,36 @@ export async function sendChallengeCompletionEmail({
   if (
     typeof challengeName !== "string" ||
     !challengeName.trim() ||
-    !["DAILY_CHALLENGE", "BATTLE_ROOM"].includes(challengeType)
+    !["DAILY_CHALLENGE", "DAILY_CHALLENGE_RANK", "BATTLE_ROOM"].includes(challengeType)
   ) {
     return { success: false, error: "A valid completed challenge is required." };
+  }
+  if (!Buffer.isBuffer(certificatePdf) || certificatePdf.length === 0) {
+    return { success: false, error: "A certificate PDF is required." };
   }
 
   const safeName = escapeHtml(userName || "there");
   const safeChallengeName = escapeHtml(challengeName.trim());
   const completionLabel =
-    challengeType === "DAILY_CHALLENGE" ? "Daily Challenge" : "Battle Room";
+    challengeType === "BATTLE_ROOM"
+      ? "Battle Room"
+      : challengeType === "DAILY_CHALLENGE_RANK"
+        ? `Daily Challenge Rank #${Number(certificateRank) || ""}`
+        : "Daily Challenge";
+  const subject = challengeType === "DAILY_CHALLENGE_RANK"
+    ? `Your ${completionLabel} Certificate`
+    : `${completionLabel} completed`;
 
   try {
     const { resend, from } = getResendClient();
     const { data, error } = await resend.emails.send({
       from,
       to: [recipient],
-      subject: `${completionLabel} completed`,
+      subject,
       text:
         `Congratulations, ${userName || "there"}!\n\n` +
         `You successfully completed ${challengeName.trim()}.\n\n` +
+        "Your certificate is attached as a PDF.\n\n" +
         "Thank you for taking part in CodeClash.",
       html: `<!doctype html>
 <html lang="en">
@@ -42,10 +56,16 @@ export async function sendChallengeCompletionEmail({
       <p style="margin:0 0 18px;color:#60a5fa;font-size:12px;font-weight:700;letter-spacing:2px;">CODECLASH</p>
       <h1 style="margin:0 0 14px;font-size:25px;line-height:1.3;">Well done, ${safeName}!</h1>
       <p style="margin:0;color:#aebed2;font-size:15px;line-height:1.7;">You successfully completed <strong style="color:#fff;">${safeChallengeName}</strong>.</p>
+      <p style="margin:18px 0 0;color:#aebed2;font-size:14px;line-height:1.6;">Your certificate is attached as a PDF.</p>
       <p style="margin:22px 0 0;color:#8498b2;font-size:13px;line-height:1.6;">Thank you for taking part in CodeClash.</p>
     </main>
   </body>
 </html>`,
+      attachments: [{
+        filename: certificateFilename,
+        content: certificatePdf.toString("base64"),
+        contentType: "application/pdf",
+      }],
     });
 
     if (error) {

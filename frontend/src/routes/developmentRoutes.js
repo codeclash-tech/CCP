@@ -17,17 +17,6 @@ export const DEVELOPMENT_ROUTES = {
     relatedPath: "/battle-room",
     relatedLabel: "View Battle Room results",
   },
-  "/certificates": {
-    title: "Certificates",
-    summary:
-      "The library displays persisted Battle Room and weekly certificates, with server-side ownership checks and PDF downloads.",
-    backend:
-      "Battle Room and weekly certificate listing/download APIs return persisted server-authoritative snapshots.",
-    nextStep:
-      "Validate certificate generation and downloads using real finalized results in the packaged application.",
-    relatedPath: "/battle-room",
-    relatedLabel: "Open Battle Rooms",
-  },
   "/settings": {
     title: "Settings",
     summary:

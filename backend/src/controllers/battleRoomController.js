@@ -2977,7 +2977,9 @@ export async function closeRoom(req, res) {
 
     return res.status(200).json({
       message:
-        "Battle Room closed. Participants receive a confirmation email after they complete their challenge.",
+        result.emailFailures > 0
+          ? `Battle Room closed. ${result.emailsSent} certificate emails sent; ${result.emailFailures} failed and will be retried.`
+          : `Battle Room closed. Certificate PDFs emailed to ${result.emailsSent} participants.`,
       totalParticipants: result.totalParticipants,
       emailsSent: result.emailsSent,
       emailFailures: result.emailFailures,
@@ -3003,18 +3005,18 @@ export async function getRoomResultDelivery(req, res) {
     const submissions = await BattleRoomSubmission.find({
       roomId: room._id,
       status: "COMPLETED",
-      "completionEmail.eligible": true,
+      "certificateEmail.eligible": true,
     })
-      .select("participantName completionEmail.status completionEmail.attempts completionEmail.attemptedAt completionEmail.sentAt completionEmail.error")
+      .select("participantName certificateEmail.status certificateEmail.attempts certificateEmail.attemptedAt certificateEmail.sentAt certificateEmail.error")
       .sort({ totalScore: -1, totalPassed: -1, submittedAt: 1, _id: 1 })
       .lean();
     const participants = submissions.map((submission) => ({
       name: submission.participantName,
-      status: submission.completionEmail?.status || "PENDING",
-      attempts: submission.completionEmail?.attempts || 0,
-      attemptedAt: submission.completionEmail?.attemptedAt || null,
-      sentAt: submission.completionEmail?.sentAt || null,
-      error: submission.completionEmail?.error || "",
+      status: submission.certificateEmail?.status || "PENDING",
+      attempts: submission.certificateEmail?.attempts || 0,
+      attemptedAt: submission.certificateEmail?.attemptedAt || null,
+      sentAt: submission.certificateEmail?.sentAt || null,
+      error: submission.certificateEmail?.error || "",
     }));
     const counts = participants.reduce(
       (summary, participant) => {
@@ -3057,8 +3059,8 @@ export async function retryRoomResultDelivery(req, res) {
     return res.status(200).json({
       message:
         result.emailFailures > 0
-          ? "Completion email retry finished; some messages could not be delivered."
-          : "Completion email retry finished.",
+          ? "Certificate email retry finished; some messages could not be delivered."
+          : "Certificate email retry finished.",
       ...result,
     });
   } catch (error) {

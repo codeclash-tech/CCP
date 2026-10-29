@@ -11,6 +11,7 @@ const { sendVerificationEmail } = await import(
 const { sendChallengeCompletionEmail } = await import(
   "../src/services/emailService.js"
 );
+const certificatePdf = Buffer.from("%PDF-certificate-test");
 
 test("sends the existing verification email through Resend", async () => {
   const originalFetch = globalThis.fetch;
@@ -148,6 +149,8 @@ test("sends concise completion email without results or question details", async
       userName: "Developer",
       challengeName: "Algorithms Room",
       challengeType: "BATTLE_ROOM",
+      certificatePdf,
+      certificateFilename: "battle-room.pdf",
     });
 
     assert.equal(result.success, true);
@@ -159,6 +162,13 @@ test("sends concise completion email without results or question details", async
     );
     assert.match(requestBody.text, /Congratulations, Developer!/);
     assert.match(requestBody.text, /successfully completed Algorithms Room/);
+    assert.match(requestBody.text, /certificate is attached as a PDF/);
+    assert.equal(requestBody.attachments[0].filename, "battle-room.pdf");
+    assert.equal(requestBody.attachments[0].content_type, "application/pdf");
+    assert.equal(
+      Buffer.from(requestBody.attachments[0].content, "base64").toString(),
+      certificatePdf.toString(),
+    );
     assert.doesNotMatch(requestBody.text, /score|rank|question|test case|result/i);
     assert.doesNotMatch(requestBody.html, /score|rank|question|test case|result/i);
   } finally {
@@ -214,10 +224,12 @@ test("identifies a daily challenge without exposing its problem or result", asyn
       userName: "Developer",
       challengeName: "Daily Challenge",
       challengeType: "DAILY_CHALLENGE",
+      certificatePdf,
     });
 
     assert.equal(result.success, true);
     assert.equal(requestBody.subject, "Daily Challenge completed");
+    assert.equal(requestBody.attachments[0].content_type, "application/pdf");
     assert.match(requestBody.text, /successfully completed Daily Challenge/);
     assert.doesNotMatch(requestBody.text, /score|rank|question|test case|result/i);
     assert.doesNotMatch(requestBody.html, /score|rank|question|test case|result/i);

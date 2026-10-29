@@ -1,5 +1,4 @@
 import {
-  Award,
   BarChart3,
   CalendarDays,
   FileQuestion,
@@ -16,7 +15,6 @@ export const ROLE_NAVIGATION = {
     { path: "/battle-room", label: "Battle Rooms", icon: Swords },
     { path: "/weekly-assessment", label: "Daily Challenge", icon: LockKeyhole },
     { path: "/rankings", label: "Rankings", icon: BarChart3 },
-    { path: "/certificates", label: "Certificates", icon: Award },
     { path: "/profile", label: "Profile", icon: UserRound },
   ],
   [ASSESSMENT_ROLES.ORGANIZATION_USER]: [
@@ -24,7 +22,6 @@ export const ROLE_NAVIGATION = {
     { path: "/battle-room", label: "My Battle Rooms", icon: Swords },
     { path: "/weekly-assessment", label: "Daily Challenge", icon: LockKeyhole },
     { path: "/rankings", label: "Rankings", icon: BarChart3 },
-    { path: "/certificates", label: "Certificates", icon: Award },
     { path: "/profile", label: "Profile", icon: UserRound },
   ],
   [ASSESSMENT_ROLES.SUPER_ADMIN]: [

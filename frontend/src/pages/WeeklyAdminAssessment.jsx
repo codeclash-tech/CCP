@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Download, RefreshCw, Save } from "lucide-react";
+import { RefreshCw, Save } from "lucide-react";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
 import "./WeeklyAdminAssessment.css";
@@ -10,7 +10,6 @@ const ADMIN_VIEWS = [
   ["individual", "Individual rankings", "/admin/rankings/individual"],
   ["organizations", "Organization rankings", "/admin/rankings/organizations"],
   ["history", "Daily history", "/admin/weekly-history"],
-  ["certificates", "Certificates", "/admin/certificates"],
   ["participants", "Participant organizations", "/admin/participants"],
   ["questions", "Question pool", "/admin/questions"],
 ];
@@ -34,7 +33,6 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
   const [cycleId, setCycleId] = useState("");
   const [roster, setRoster] = useState([]);
   const [results, setResults] = useState(null);
-  const [certificates, setCertificates] = useState([]);
   const [cycleKey, setCycleKey] = useState("");
   const [cycleName, setCycleName] = useState("");
   const [questionIds, setQuestionIds] = useState([""]);
@@ -79,7 +77,6 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
     if (!cycleId) {
       setRoster([]);
       setResults(null);
-      setCertificates([]);
       return;
     }
     setError("");
@@ -90,19 +87,11 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
       } else if (view === "individual" || view === "organizations") {
         const { data } = await api.get(`/weekly-assessments/admin/cycles/${cycleId}/results`);
         setResults(data);
-      } else if (view === "certificates") {
-        const { data } = await api.get(`/weekly-assessments/admin/cycles/${cycleId}/certificates`);
-        setCertificates(data.certificates || []);
       }
     } catch (requestError) {
       setRoster([]);
       setResults(null);
-      setCertificates([]);
-      if (requestError.message === "Certificates are available only after cycle finalization.") {
-        setNotice("Certificates are issued after the daily challenge is finalized.");
-      } else {
-        setError(requestError.message || "Could not load this challenge.");
-      }
+      setError(requestError.message || "Could not load this challenge.");
     }
   }, [cycleId, view]);
 
@@ -229,31 +218,13 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
     setError("");
     try {
       await api.post(`/weekly-assessments/admin/cycles/${cycleId}/finalize`);
-      setNotice("Daily challenge finalized and certificates issued from saved results.");
+      setNotice("Daily challenge finalized. Top-three ranking certificates will be emailed.");
       await loadBase();
       await loadCycleData();
     } catch (requestError) {
       setError(requestError.message || "Could not finalize this cycle.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const downloadCertificate = async (certificate) => {
-    setError("");
-    try {
-      const { data } = await api.get(
-        `/weekly-assessments/certificates/${encodeURIComponent(certificate.certificateId)}/pdf`,
-        { responseType: "blob" },
-      );
-      const url = URL.createObjectURL(data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${certificate.certificateId}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (requestError) {
-      setError(requestError.message || "Could not download the certificate.");
     }
   };
 
@@ -266,7 +237,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
         <div>
           <p className="weekly-eyebrow">ADMINISTRATION</p>
           <h1>{title}</h1>
-          <p>Each challenge has one question, one daily score reset and its own certificates.</p>
+          <p>Each challenge has one question and one daily score reset.</p>
         </div>
         <button type="button" className="btn-secondary" onClick={loadBase} disabled={loading}>
           <RefreshCw size={15} /> Refresh
@@ -415,7 +386,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
             </section>
           )}
 
-          {["roster", "individual", "organizations", "certificates"].includes(view) && (
+          {["roster", "individual", "organizations"].includes(view) && (
             <section className="weekly-admin-card">
               <div className="weekly-data-toolbar">
                 <label>
@@ -520,16 +491,6 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
                   rankings={view === "individual" ? results?.individualRankings : results?.organizationRankings}
                   cycle={results?.cycle}
                 />
-              )}
-              {view === "certificates" && (
-                certificates.length ? (
-                  <div className="weekly-cycle-list">{certificates.map((certificate) => (
-                    <div className="weekly-cycle-row" key={certificate.certificateId}>
-                      <span><strong>{certificate.snapshot.subjectName}</strong><small>{certificate.category} · Rank {certificate.snapshot.rank} · {certificate.certificateId}</small></span>
-                      <button type="button" className="btn-secondary" onClick={() => downloadCertificate(certificate)}><Download size={15} /> PDF</button>
-                    </div>
-                  ))}</div>
-                ) : <p>No certificates are available for this challenge.</p>
               )}
               {view === "roster" && activeCycle?.status === "ACTIVE" && new Date(activeCycle.endAt) <= new Date() && (
                 <button type="button" className="btn-primary" onClick={finalizeCycle} disabled={saving}>Finalize results</button>

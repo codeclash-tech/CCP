@@ -35,7 +35,10 @@ import {
   LOCAL_EXECUTION_PROTOCOL_VERSION,
   validateLocalExecutionTranscript,
 } from "./localExecutionProtocol.js";
-import { dispatchWeeklyCompletionEmail } from "./completionNotificationService.js";
+import {
+  dispatchWeeklyCompletionEmail,
+  dispatchWeeklyRankingCertificates,
+} from "./completionNotificationService.js";
 
 const RETRY_LEASE_MS = 6 * 60 * 1000;
 const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
@@ -1983,6 +1986,7 @@ export async function persistIndividualWeeklyCertificate(
     {
       $set: {
         category,
+        "rankingEmail.eligible": Boolean(rankedCertificate),
         snapshot: {
           subjectName: rosterEntry.candidateNameSnapshot,
           organizationName: rosterEntry.organizationNameSnapshot,
@@ -2019,6 +2023,7 @@ export async function finalizeWeeklyCycle(cycleId, now = new Date()) {
       { _id: cycle._id, status: "FINALIZED", certificatesIssuedAt: null },
       { $set: { certificatesIssuedAt: new Date() } },
     );
+    await dispatchWeeklyRankingCertificates(cycle._id);
     return WeeklyCycle.findById(cycle._id);
   }
   if (now < cycle.endAt) throw new Error("A weekly cycle cannot be finalized before its end.");
@@ -2112,6 +2117,7 @@ export async function finalizeWeeklyCycle(cycleId, now = new Date()) {
     { _id: finalized._id, status: "FINALIZED", certificatesIssuedAt: null },
     { $set: { certificatesIssuedAt: new Date() } },
   );
+  await dispatchWeeklyRankingCertificates(finalized._id);
   return WeeklyCycle.findById(finalized._id);
 }
 

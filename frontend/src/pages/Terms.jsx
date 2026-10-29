@@ -62,7 +62,7 @@ const TERMS = [
   {
     title: "9. Results, certificates, and room retention",
     paragraphs: [
-      "Scores, rankings, and certificates are generated from the information available to the platform and are not guaranteed to be error-free or permanently available. After a battle ends, its room and associated room data may be deleted after the retention period shown in the platform or in the result email. Download any result or certificate promptly and keep your own copy.",
+      "Scores, rankings, and certificates are generated from the information available to the platform and are not guaranteed to be error-free or permanently available. Certificates are sent to the email address associated with your account. After a battle ends, its room and associated room data may be deleted after the retention period shown in the platform or in the result email. Keep your own copy of any certificate or result you need.",
     ],
   },
   {

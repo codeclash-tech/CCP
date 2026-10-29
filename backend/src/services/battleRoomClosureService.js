@@ -1,7 +1,7 @@
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
 import { refreshBattleRoomCertificateSnapshots } from "./battleRoomCertificateSnapshotService.js";
-import { dispatchBattleRoomCompletionEmail } from "./completionNotificationService.js";
+import { dispatchBattleRoomCompletionEmails } from "./completionNotificationService.js";
 
 async function finalizePendingSubmissions(room) {
   const pendingSubmissions = await BattleRoomSubmission.find({
@@ -38,8 +38,7 @@ async function finalizePendingSubmissions(room) {
 }
 
 /**
- * Closes a room and preserves eligible certificate snapshots without emailing
- * participants. Completion emails are sent when each participant finishes.
+ * Closes a room, finalizes participant rankings, and emails certificates.
  */
 export async function closeBattleRoomAndNotify(roomId) {
   const attemptedAt = new Date();
@@ -71,6 +70,7 @@ export async function closeBattleRoomAndNotify(roomId) {
 
   await finalizePendingSubmissions(room);
   const totalParticipants = await refreshBattleRoomCertificateSnapshots(room);
+  const delivery = await dispatchBattleRoomCompletionEmails(room._id);
   await BattleRoom.updateOne(
     { _id: room._id },
     { $set: { resultEmailsCompletedAt: new Date() } },
@@ -78,9 +78,9 @@ export async function closeBattleRoomAndNotify(roomId) {
 
   return {
     closed: true,
-    emailsSent: 0,
-    emailFailures: 0,
-    emailsSkipped: 0,
+    emailsSent: delivery.emailsSent,
+    emailFailures: delivery.emailFailures,
+    emailsSkipped: Math.max(0, totalParticipants - delivery.totalParticipants),
     totalParticipants,
   };
 }
@@ -100,8 +100,9 @@ export async function retryBattleRoomResultDelivery(roomId) {
   const pending = await BattleRoomSubmission.find({
     roomId: room._id,
     status: "COMPLETED",
-    "completionEmail.eligible": true,
-    "completionEmail.status": "FAILED",
+    "certificateEmail.eligible": true,
+    "certificateEmail.status": "FAILED",
+    "certificateSnapshot.completedAt": { $ne: null },
   })
     .select("_id")
     .limit(100)

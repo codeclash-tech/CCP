@@ -263,6 +263,14 @@ const battleRoomSubmissionSchema = new mongoose.Schema(
       sentAt: { type: Date, default: null },
       error: { type: String, default: "" },
     },
+    certificateEmail: {
+      eligible: { type: Boolean, default: false },
+      status: { type: String, enum: ["PENDING", "SENDING", "SENT", "FAILED"], default: "PENDING" },
+      attempts: { type: Number, default: 0 },
+      attemptedAt: { type: Date, default: null },
+      sentAt: { type: Date, default: null },
+      error: { type: String, default: "" },
+    },
     certificateSnapshot: {
       roomCode: { type: String, default: "" },
       roomTitle: { type: String, default: "" },

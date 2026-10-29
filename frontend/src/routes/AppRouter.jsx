@@ -31,9 +31,6 @@ const BattleRoomLeaderboard = lazy(
 );
 const AuthPage = lazy(() => import("../pages/AuthPage"));
 const Profile = lazy(() => import("../pages/Profile"));
-const CertificateLibrary = lazy(
-  () => import("../pages/CertificateLibrary"),
-);
 const WeeklyAssessment = lazy(() => import("../pages/WeeklyAssessment"));
 const GlobalChallengeAdmin = lazy(() => import("../pages/GlobalChallengeAdmin"));
 const WeeklyRankings = lazy(() => import("../pages/WeeklyRankings"));
@@ -334,14 +331,7 @@ export default function AppRouter() {
               </ProtectedLayout>
             }
           />
-          <Route
-            path="/certificates"
-            element={
-              <ProtectedLayout>
-                <CertificateLibrary />
-              </ProtectedLayout>
-            }
-          />
+          <Route path="/certificates" element={<Navigate to="/rankings" replace />} />
           <Route
             path="/settings"
             element={<Navigate to="/" replace />}

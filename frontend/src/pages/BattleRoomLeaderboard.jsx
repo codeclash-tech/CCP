@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 // REMOVED: getPublicLeaderboard
 import {
   getRoomLeaderboard,
   downloadRoomResultsExcel,
-  downloadBattleRoomCertificate,
   closeRoom,
   getRoomResultDelivery,
   retryRoomResultDelivery,
@@ -20,7 +18,6 @@ import {
   XCircle,
   FileSpreadsheet,
   RefreshCw,
-  Download,
 } from "lucide-react";
 
 function readLeaderboardCache(roomCode, userId) {
@@ -129,15 +126,12 @@ export default function BattleRoomLeaderboard() {
   );
   const [loading, setLoading] = useState(!cachedLeaderboard);
   const [error, setError] = useState("");
-  const [roomUnavailable, setRoomUnavailable] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [isCreator, setIsCreator] = useState(
     cachedLeaderboard?.isCreator || false,
   );
   const [closing, setClosing] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
-  const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [retryingDelivery, setRetryingDelivery] = useState(false);
   const [resultDelivery, setResultDelivery] = useState(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -159,7 +153,6 @@ export default function BattleRoomLeaderboard() {
       setIsCreator(cached?.isCreator || false);
       setResultDelivery(null);
       setError("");
-      setRoomUnavailable(false);
       setLoading(!cached);
     }
     let interval;
@@ -191,11 +184,8 @@ export default function BattleRoomLeaderboard() {
         }
       } catch (err) {
         if (active && /not found/i.test(err.message || "")) {
-          setRoomUnavailable(true);
           if (!hasLoadedDataRef.current) {
-            setError(
-              "This battle room is no longer available. You can still download your certificate if you completed the battle.",
-            );
+            setError("This battle room is no longer available.");
           }
           return;
         }
@@ -256,39 +246,6 @@ export default function BattleRoomLeaderboard() {
       setError(err.message || "Failed to retry result delivery.");
     } finally {
       setRetryingDelivery(false);
-    }
-  };
-
-  const handleOpenCertificate = () => {
-    const participant = leaderboard.find(
-      (row) => row.isCurrentUser && row.status === "COMPLETED",
-    );
-    if (!participant || !room) return;
-    setSelectedCertificate({
-      room,
-      rank: participant.rank,
-      totalParticipants: leaderboard.length,
-      completedAt: participant.submittedAt,
-    });
-  };
-
-  const handleDownloadCertificate = async () => {
-    setDownloadingCertificate(true);
-    setError("");
-    try {
-      const file = await downloadBattleRoomCertificate(roomCode);
-      const url = URL.createObjectURL(file);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `codeclash-certificate-${roomCode}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (err) {
-      setError(err.message || "Failed to download your certificate.");
-    } finally {
-      setDownloadingCertificate(false);
     }
   };
 
@@ -476,7 +433,7 @@ export default function BattleRoomLeaderboard() {
                   }}
                   aria-live="polite"
                 >
-                  Completion emails:{" "}
+                  Certificate emails:{" "}
                   {resultDelivery.counts?.SENT || 0} sent,{" "}
                   {resultDelivery.counts?.FAILED || 0} failed.
                 </span>
@@ -493,26 +450,10 @@ export default function BattleRoomLeaderboard() {
                   }}
                 >
                   <RefreshCw size={13} />
-                  {retryingDelivery ? "Retrying..." : "Retry failed completion emails"}
+                  {retryingDelivery ? "Retrying..." : "Retry failed certificate emails"}
                 </button>
               ) : null}
             </>
-          ) : null}
-          {room?.status === "CLOSED" &&
-          leaderboard.some(
-            (row) => row.isCurrentUser && row.status === "COMPLETED",
-          ) ? (
-            <button
-              onClick={handleOpenCertificate}
-              className="btn-primary"
-              style={{
-                padding: "8px 16px",
-                fontSize: 12,
-              }}
-            >
-              <Download size={13} />
-              Certificates
-            </button>
           ) : null}
           <button
             onClick={() => {
@@ -559,25 +500,6 @@ export default function BattleRoomLeaderboard() {
       ) : error ? (
         <div style={{ color: "var(--color-danger)" }}>
           {error}
-          {roomUnavailable ? (
-            <button
-              onClick={handleDownloadCertificate}
-              disabled={downloadingCertificate}
-              className="btn-primary"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 12,
-                padding: "8px 16px",
-                fontSize: 12,
-                opacity: downloadingCertificate ? 0.65 : 1,
-              }}
-            >
-              <Download size={13} />
-              {downloadingCertificate ? "Downloading..." : "Certificates"}
-            </button>
-          ) : null}
         </div>
       ) : (
         <div
@@ -765,14 +687,6 @@ export default function BattleRoomLeaderboard() {
         </div>
       )}
 
-      <BattleRoomShareModal
-        isOpen={Boolean(selectedCertificate)}
-        onClose={() => setSelectedCertificate(null)}
-        result={selectedCertificate}
-        userName={
-          leaderboard.find((row) => row.isCurrentUser)?.name || user?.name
-        }
-      />
     </div>
   );
 }

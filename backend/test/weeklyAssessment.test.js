@@ -739,6 +739,7 @@ test("finalizing a daily cycle persists certificates for participants and active
   const originalCycleUpdateOne = WeeklyCycle.updateOne;
   const originalRosterFind = WeeklyRosterEntry.find;
   const originalCertificateUpdateOne = WeeklyCertificate.updateOne;
+  const originalCertificateFind = WeeklyCertificate.find;
   const cycle = {
     _id: "daily-cycle",
     cycleKey: "2026-10-27",
@@ -787,6 +788,12 @@ test("finalizing a daily cycle persists certificates for participants and active
     return { modifiedCount: 1 };
   };
   WeeklyRosterEntry.find = () => ({ lean: async () => roster });
+  WeeklyCertificate.find = () => ({
+    select() {
+      return this;
+    },
+    lean: async () => [],
+  });
   WeeklyCertificate.updateOne = async (filter, update, options) => {
     certificateWrites.push({ filter, update, options });
     return { upsertedCount: 1 };
@@ -798,6 +805,7 @@ test("finalizing a daily cycle persists certificates for participants and active
     assert.equal(certificateWrites.length, 2);
     assert.equal(certificateWrites[0].filter.userId, "candidate-1");
     assert.equal(certificateWrites[0].update.$set.category, "WINNER");
+    assert.equal(certificateWrites[0].update.$set["rankingEmail.eligible"], true);
     assert.equal(
       certificateWrites[1].filter.organizationId,
       "active-organization",
@@ -817,6 +825,7 @@ test("finalizing a daily cycle persists certificates for participants and active
     WeeklyCycle.updateOne = originalCycleUpdateOne;
     WeeklyRosterEntry.find = originalRosterFind;
     WeeklyCertificate.updateOne = originalCertificateUpdateOne;
+    WeeklyCertificate.find = originalCertificateFind;
   }
 });
 
