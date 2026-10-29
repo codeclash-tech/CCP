@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Award, RefreshCw } from "lucide-react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import PageSkeleton from "../components/layout/PageSkeleton";
-
-const MAX_EMPTY_CERTIFICATE_REFRESHES = 3;
 
 function CertificateCard({ certificate, onPreview }) {
   const isDaily = certificate.type === "DAILY";
@@ -49,8 +47,6 @@ export default function CertificateLibrary() {
   const [error, setError] = useState("");
   const [retryAction, setRetryAction] = useState(null);
   const [previewCertificate, setPreviewCertificate] = useState(null);
-  const downloadedCertificateRef = useRef(null);
-  const emptyRefreshCountRef = useRef(0);
 
   const loadCertificates = useCallback(async () => {
     setLoading(true);
@@ -96,51 +92,19 @@ export default function CertificateLibrary() {
   }, [loadCertificates]);
 
   useEffect(() => {
-    if (certificates.length > 0) {
-      emptyRefreshCountRef.current = 0;
-      return undefined;
-    }
-    if (
-      loading ||
-      error ||
-      emptyRefreshCountRef.current >= MAX_EMPTY_CERTIFICATE_REFRESHES
-    ) {
-      return undefined;
-    }
-
-    const delay = emptyRefreshCountRef.current === 0 ? 1000 : 2000;
-    const timeout = setTimeout(() => {
-      emptyRefreshCountRef.current += 1;
+    const handleDailyChallengeUpdate = () => {
       void loadCertificates();
-    }, delay);
-    return () => clearTimeout(timeout);
-  }, [certificates.length, error, loadCertificates, loading]);
-
-  const deleteCertificate = async (certificate) => {
-    setError("");
-    setRetryAction(null);
-    try {
-      await api.delete(certificate.deletePath);
-      setCertificates((current) =>
-        current.filter(
-          (item) => item.certificateId !== certificate.certificateId,
-        ),
-      );
-    } catch (deleteError) {
-      setError(deleteError.message || "Unable to delete this certificate.");
-      setRetryAction(() => () => deleteCertificate(certificate));
-    }
-  };
+    };
+    window.addEventListener("ccp-daily-challenge-updated", handleDailyChallengeUpdate);
+    return () => {
+      window.removeEventListener("ccp-daily-challenge-updated", handleDailyChallengeUpdate);
+    };
+  }, [loadCertificates]);
 
   const closePreview = () => {
-    const downloadedCertificate = downloadedCertificateRef.current;
-    downloadedCertificateRef.current = null;
     setPreviewCertificate(null);
     setError("");
     setRetryAction(null);
-    if (downloadedCertificate) {
-      void deleteCertificate(downloadedCertificate);
-    }
   };
 
   return (
@@ -178,6 +142,14 @@ export default function CertificateLibrary() {
             <Award size={28} aria-hidden="true" />
             <h2>No certificates available</h2>
             <p>Certificates appear here as soon as your result is finalized.</p>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={loadCertificates}
+            >
+              <RefreshCw size={15} />
+              Refresh certificates
+            </button>
           </div>
         )
       ) : (
@@ -214,9 +186,6 @@ export default function CertificateLibrary() {
         userName={previewCertificate?.snapshot?.subjectName || user?.name}
         dailyChallenge={previewCertificate?.type === "DAILY"}
         confirmDownload
-        onCertificateDownload={() => {
-          downloadedCertificateRef.current = previewCertificate;
-        }}
       />
     </section>
   );
