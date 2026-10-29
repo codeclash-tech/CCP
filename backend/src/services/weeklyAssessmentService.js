@@ -1226,7 +1226,6 @@ export async function finalizeWeeklyLocalExecution({
       riskScore: validation.riskScore,
       riskLevel: validation.riskLevel,
       executionTranscript: transcript,
-      status: "FINALIZED",
       resultStatus: validation.status,
       verificationAttempts: 0,
       verificationStartedAt: new Date(transcript.startTime),
@@ -1255,6 +1254,19 @@ export async function finalizeWeeklyLocalExecution({
     if (!finalizedSubmission || String(finalizedSubmission._id) !== transcript.submissionId) {
       throw requestError("The authorized Daily Challenge submission is no longer available.", 409);
     }
+    await synchronizeRosterScore(roster._id, finalizedSubmission);
+    const completedSubmission = await WeeklySubmission.findOneAndUpdate(
+      {
+        _id: finalizedSubmission._id,
+        status: "AUTHORIZED",
+        sourceHash: transcript.sourceHash,
+      },
+      { $set: { status: "FINALIZED" } },
+      { new: true },
+    );
+    if (!completedSubmission) {
+      throw requestError("The Daily Challenge result could not be finalized.", 409);
+    }
     const completedGrant = await Nonce.completeDesktopSubmission(
       nonceClaim.nonce._id,
       nonceClaim.claimId,
@@ -1262,18 +1274,17 @@ export async function finalizeWeeklyLocalExecution({
     if (!completedGrant) {
       console.error("[DailyLocalSubmission] Result saved but the grant could not be finalized.", {
         executionId: transcript.executionId,
-        submissionId: String(finalizedSubmission._id),
+        submissionId: String(completedSubmission._id),
       });
     }
-    await synchronizeRosterScore(roster._id);
-    void dispatchWeeklyCompletionEmail(finalizedSubmission._id).catch((error) => {
+    void dispatchWeeklyCompletionEmail(completedSubmission._id).catch((error) => {
       console.error("[CompletionEmail] Daily Challenge notification failed:", {
-        submissionId: String(finalizedSubmission._id),
+        submissionId: String(completedSubmission._id),
         error: error.message,
       });
     });
     return {
-      submissionId: String(finalizedSubmission._id),
+      submissionId: String(completedSubmission._id),
       status: "FINALIZED",
       resultStatus: validation.status,
       score,
@@ -1435,7 +1446,6 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
     },
     {
       $set: {
-        status: "FINALIZED",
         resultStatus: String(result.status || "SYSTEM_ERROR"),
         score,
         passed: Number(result.passed) || 0,
@@ -1456,13 +1466,25 @@ async function judgeWeeklySubmission({ submission, roster, assignment, code }) {
   }
   logWeeklyVerification("database_update", {
     submissionId: String(submission._id),
-    status: "FINALIZED",
+    status: "VERIFYING",
     durationMs: Number((performance.now() - databaseStartedAt).toFixed(3)),
   });
-  await synchronizeRosterScore(roster._id);
-  void dispatchWeeklyCompletionEmail(finalized._id).catch((error) => {
+  await synchronizeRosterScore(roster._id, finalized);
+  const completedSubmission = await WeeklySubmission.findOneAndUpdate(
+    {
+      _id: finalized._id,
+      status: "VERIFYING",
+      judgeLeaseAt: finalized.judgeLeaseAt,
+    },
+    { $set: { status: "FINALIZED" } },
+    { new: true },
+  );
+  if (!completedSubmission) {
+    throw requestError("The Daily Challenge result could not be finalized.", 409);
+  }
+  void dispatchWeeklyCompletionEmail(completedSubmission._id).catch((error) => {
     console.error("[CompletionEmail] Daily Challenge notification failed:", {
-      submissionId: String(finalized._id),
+      submissionId: String(completedSubmission._id),
       error: error.message,
     });
   });
@@ -1585,11 +1607,14 @@ export function startWeeklyVerificationWorker() {
   wakeWeeklyVerificationWorker();
 }
 
-async function synchronizeRosterScore(rosterEntryId) {
+async function synchronizeRosterScore(rosterEntryId, pendingSubmission = null) {
   const submissions = await WeeklySubmission.find({
     rosterEntryId,
     status: "FINALIZED",
   }).select("dayIndex score passed total executionTime memoryUsed finalizedAt");
+  if (pendingSubmission && String(pendingSubmission.status) !== "FINALIZED") {
+    submissions.push(pendingSubmission);
+  }
   const result = summarizeWeeklySubmissions(submissions);
   const rosterEntry = await WeeklyRosterEntry.findOneAndUpdate(
     { _id: rosterEntryId, participationStatus: { $ne: "DISQUALIFIED" } },

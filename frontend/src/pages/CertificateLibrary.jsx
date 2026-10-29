@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import BattleRoomShareModal from "../components/battleRoom/BattleRoomShareModal";
 import PageSkeleton from "../components/layout/PageSkeleton";
 
+const MAX_EMPTY_CERTIFICATE_REFRESHES = 3;
+
 function CertificateCard({ certificate, onPreview }) {
   const isDaily = certificate.type === "DAILY";
   const completedAt = certificate.completedAt
@@ -48,6 +50,7 @@ export default function CertificateLibrary() {
   const [retryAction, setRetryAction] = useState(null);
   const [previewCertificate, setPreviewCertificate] = useState(null);
   const downloadedCertificateRef = useRef(null);
+  const emptyRefreshCountRef = useRef(0);
 
   const loadCertificates = useCallback(async () => {
     setLoading(true);
@@ -91,6 +94,27 @@ export default function CertificateLibrary() {
   useEffect(() => {
     loadCertificates();
   }, [loadCertificates]);
+
+  useEffect(() => {
+    if (certificates.length > 0) {
+      emptyRefreshCountRef.current = 0;
+      return undefined;
+    }
+    if (
+      loading ||
+      error ||
+      emptyRefreshCountRef.current >= MAX_EMPTY_CERTIFICATE_REFRESHES
+    ) {
+      return undefined;
+    }
+
+    const delay = emptyRefreshCountRef.current === 0 ? 1000 : 2000;
+    const timeout = setTimeout(() => {
+      emptyRefreshCountRef.current += 1;
+      void loadCertificates();
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [certificates.length, error, loadCertificates, loading]);
 
   const deleteCertificate = async (certificate) => {
     setError("");
