@@ -115,17 +115,29 @@ function drawCertificate(document, input) {
     .text(
       dailyChallenge
         ? `Score: ${certificate.score.toFixed(2)}%`
-        : "In recognition of your dedication, technical ability and commitment",
+        : "In recognition of your dedication, technical ability, and commitment to excellence",
       0,
       336,
       { align: "center", width, lineBreak: false },
     );
   if (!dailyChallenge) {
-    document.text("demonstrated throughout the challenge.", 0, 354.75, {
-      align: "center",
-      width,
-      lineBreak: false,
-    });
+    document.text(
+      "Your problem-solving and persistence stood out throughout the challenge.",
+      0,
+      354.75,
+      {
+        align: "center",
+        width,
+        lineBreak: false,
+      },
+    );
+  } else {
+    document.text(
+      "Your focus, persistence, and problem-solving skills made this achievement possible.",
+      0,
+      354.75,
+      { align: "center", width, lineBreak: false },
+    );
   }
 
   document.fillColor("#1d4ed8").font("Helvetica-Bold").fontSize(13.5)
@@ -152,31 +164,28 @@ function drawCertificate(document, input) {
       })
     : "";
   document.fillColor("#0f172a").font("Helvetica-Bold").fontSize(10.5)
-    .text(completedDate, 135, 465.75, { lineBreak: false });
+    .text(completedDate, 135, 459, { lineBreak: false });
   document.fillColor("#64748b").font("Helvetica").fontSize(7.5)
-    .text("DATE OF COMPLETION", 135, 483.75, { lineBreak: false });
+    .text("DATE OF COMPLETION", 135, 489.75, { lineBreak: false });
 
   document.fillColor("#0f172a").font("Times-Italic").fontSize(17.25)
-    .text("CodeClash Team", 637.5, 459, {
+    .text("CodeClash Team", 637.5, 453.75, {
       align: "right",
       width: 127.5,
       lineBreak: false,
     });
   document.strokeColor("#94a3b8").lineWidth(0.375)
-    .moveTo(637.5, 489).lineTo(765, 489)
+    .moveTo(637.5, 480).lineTo(765, 480)
     .stroke();
   document.fillColor("#64748b").font("Helvetica").fontSize(7.5)
-    .text("VERIFIED SYSTEM", 637.5, 483.75, {
+    .text("VERIFIED SYSTEM", 637.5, 489.75, {
       align: "right",
       width: 127.5,
       lineBreak: false,
     });
 
-  document.strokeColor("#e2e8f0").lineWidth(0.75)
-    .moveTo(112.5, 487.5).lineTo(787.5, 487.5)
-    .stroke();
   document.fillColor("#94a3b8").font("Courier").fontSize(10.5)
-    .text("CODECLASH • COMPETE • CODE • CONQUER", 0, 510.75, {
+    .text("CODECLASH • COMPETE • CODE • CONQUER", 0, 519.75, {
       align: "center",
       width,
       lineBreak: false,
