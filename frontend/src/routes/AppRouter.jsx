@@ -34,6 +34,7 @@ const Profile = lazy(() => import("../pages/Profile"));
 const WeeklyAssessment = lazy(() => import("../pages/WeeklyAssessment"));
 const GlobalChallengeAdmin = lazy(() => import("../pages/GlobalChallengeAdmin"));
 const WeeklyRankings = lazy(() => import("../pages/WeeklyRankings"));
+const LearningCenter = lazy(() => import("../pages/LearningCenter"));
 const About = lazy(() => import("../pages/About"));
 const Terms = lazy(() => import("../pages/Terms"));
 const PublicLanding = lazy(() => import("../pages/PublicLanding"));
@@ -331,6 +332,19 @@ export default function AppRouter() {
               </ProtectedLayout>
             }
           />
+          <Route
+            path="/learning"
+            element={
+              <ProtectedLayout
+                allowedRoles={[
+                  ASSESSMENT_ROLES.CANDIDATE,
+                  ASSESSMENT_ROLES.ORGANIZATION_USER,
+                ]}
+              >
+                <LearningCenter />
+              </ProtectedLayout>
+            }
+          />
           <Route path="/certificates" element={<Navigate to="/rankings" replace />} />
           <Route
             path="/settings"
@@ -408,6 +422,16 @@ export default function AppRouter() {
                 allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
               >
                 <AdminQuestions />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/admin/learning"
+            element={
+              <ProtectedLayout
+                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
+              >
+                <LearningCenter adminView />
               </ProtectedLayout>
             }
           />

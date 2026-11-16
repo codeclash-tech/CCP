@@ -99,7 +99,17 @@ test("role navigation keeps admin links exclusive and removes settings/create sh
     ROLE_NAVIGATION[ASSESSMENT_ROLES.SUPER_ADMIN]
       .filter(({ path }) => path.startsWith("/admin"))
       .map(({ path }) => path),
-    ["/admin/weekly-assessment", "/admin/questions", "/admin/rankings"],
+    ["/admin/weekly-assessment", "/admin/questions", "/admin/rankings", "/admin/learning"],
+  );
+  assert.equal(
+    ROLE_NAVIGATION[ASSESSMENT_ROLES.CANDIDATE].find(({ path }) => path === "/learning")
+      ?.desktopOnly,
+    true,
+  );
+  assert.equal(
+    ROLE_NAVIGATION[ASSESSMENT_ROLES.SUPER_ADMIN].find(({ path }) => path === "/admin/learning")
+      ?.desktopOnly,
+    true,
   );
   for (const links of Object.values(ROLE_NAVIGATION)) {
     assert.equal(
@@ -115,6 +125,8 @@ test("every role navigation destination has an existing or explicit route", () =
     "/battle-room",
     "/battle-room/create",
     "/profile",
+    "/learning",
+    "/admin/learning",
   ]);
   for (const navigationItems of Object.values(ROLE_NAVIGATION)) {
     for (const { path } of navigationItems) {

@@ -43,6 +43,19 @@ test("battle certificates retain the battle title and rank layout in PDF format"
   assert.ok(pdf.length > 1000);
 });
 
+test("learning module certificates render a completion PDF", async () => {
+  const pdf = await createCertificatePdfBuffer({
+    challengeType: "LEARNING_MODULE",
+    participantName: "Learning Participant",
+    challengeName: "Java Module 1",
+    certificateCode: "learning-certificate-id",
+    completedAt: new Date("2026-10-29T12:00:00.000Z"),
+  });
+
+  assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+  assert.ok(pdf.length > 1000);
+});
+
 test("certificate PDF generation rejects incomplete participant details", async () => {
   await assert.rejects(
     createCertificatePdfBuffer({

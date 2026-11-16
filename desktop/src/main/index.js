@@ -87,6 +87,17 @@ function requireTrustedSender(event) {
   }
 }
 
+function allowTrustedMicrophone(webContents, permission, details) {
+  const mediaTypes = details?.mediaTypes;
+  return (
+    permission === "media" &&
+    isTrustedRendererUrl(webContents?.getURL?.() || "") &&
+    Array.isArray(mediaTypes) &&
+    mediaTypes.includes("audio") &&
+    !mediaTypes.includes("video")
+  );
+}
+
 async function createMainWindow() {
   const preloadPath = path.resolve(__dirname, "..", "preload", "index.cjs");
   mainWindow = new BrowserWindow({
@@ -111,6 +122,14 @@ async function createMainWindow() {
   mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
     console.error(`Failed to load the CodeClash preload (${preloadPath}):`, error);
   });
+  mainWindow.webContents.session.setPermissionCheckHandler(
+    (webContents, permission, _origin, details) =>
+      allowTrustedMicrophone(webContents, permission, details),
+  );
+  mainWindow.webContents.session.setPermissionRequestHandler(
+    (webContents, permission, callback, details) =>
+      callback(allowTrustedMicrophone(webContents, permission, details)),
+  );
   mainWindow.on("blur", () => {
     mainWindow?.webContents.send("codeclash:assessment-window-focus", false);
   });

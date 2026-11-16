@@ -48,6 +48,17 @@ export const reportLimiter = rateLimit({
   },
 });
 
+export const learningTutorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: skipPreflight,
+  message: {
+    error: "Too many tutor messages. Please wait a moment and try again.",
+  },
+});
+
 export function requireJudgeCallbackSecret(req, res, next) {
   const configuredSecret = config.JUDGE_CALLBACK_SECRET;
 

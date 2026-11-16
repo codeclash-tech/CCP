@@ -17,7 +17,8 @@ export default function RoleNavigation({
   const [signOutError, setSignOutError] = useState("");
   const [dailyChallengeCompleted, setDailyChallengeCompleted] = useState(false);
   const role = user ? getAssessmentRole(user) : null;
-  const links = role ? ROLE_NAVIGATION[role] || ROLE_NAVIGATION.CANDIDATE : [];
+  const links = (role ? ROLE_NAVIGATION[role] || ROLE_NAVIGATION.CANDIDATE : [])
+    .filter((link) => !link.desktopOnly || desktop);
 
   useEffect(() => {
     let mounted = true;

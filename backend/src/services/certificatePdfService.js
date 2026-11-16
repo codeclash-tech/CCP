@@ -14,6 +14,7 @@ function normalizedCertificateData(data) {
     participantName: participantName.slice(0, 160),
     challengeName: challengeName.slice(0, 200),
     challengeType: data.challengeType,
+    certificateCode: String(data?.certificateCode || "").slice(0, 100),
     rank: Number.isInteger(Number(data.rank)) && Number(data.rank) > 0
       ? Number(data.rank)
       : null,
@@ -26,6 +27,7 @@ function normalizedCertificateData(data) {
 function drawCertificate(document, input) {
   const certificate = normalizedCertificateData(input);
   const dailyChallenge = certificate.challengeType === "DAILY_CHALLENGE";
+  const learningModule = certificate.challengeType === "LEARNING_MODULE";
   const width = document.page.width;
   const height = document.page.height;
   const gradient = document.linearGradient(0, 0, width, height);
@@ -61,7 +63,11 @@ function drawCertificate(document, input) {
     .text("CodeClash", 78.75, 63, { lineBreak: false });
   document.fillColor("#64748b").font("Helvetica-Bold").fontSize(9.75)
     .text(
-      dailyChallenge ? "DAILY CHALLENGE CERTIFICATE" : "CERTIFICATE OF EXCELLENCE",
+      dailyChallenge
+        ? "DAILY CHALLENGE CERTIFICATE"
+        : learningModule
+          ? "LEARNING MODULE CERTIFICATE"
+          : "CERTIFICATE OF EXCELLENCE",
       81,
       104.25,
       { characterSpacing: 1.5, lineBreak: false },
@@ -97,7 +103,9 @@ function drawCertificate(document, input) {
     .text(
       dailyChallenge
         ? "For successfully completing the Daily Challenge"
-        : "For successfully competing in the coding battle",
+        : learningModule
+          ? "For successfully completing the learning module"
+          : "For successfully competing in the coding battle",
       0,
       270.75,
       { align: "center", width, lineBreak: false },
@@ -120,7 +128,14 @@ function drawCertificate(document, input) {
       336,
       { align: "center", width, lineBreak: false },
     );
-  if (!dailyChallenge) {
+  if (learningModule) {
+    document.text(
+      "Your commitment to learning and practicing programming made this achievement possible.",
+      0,
+      354.75,
+      { align: "center", width, lineBreak: false },
+    );
+  } else if (!dailyChallenge) {
     document.text(
       "Your problem-solving and persistence stood out throughout the challenge.",
       0,
@@ -146,7 +161,9 @@ function drawCertificate(document, input) {
         ? `FINAL RANK #${certificate.rank} OF ${certificate.totalParticipants}`
         : dailyChallenge
           ? "DAILY CHALLENGE COMPLETION"
-          : "DAILY CHALLENGE PARTICIPATION",
+          : learningModule
+            ? "LEARNING MODULE COMPLETION"
+            : "DAILY CHALLENGE PARTICIPATION",
       0,
       376.5,
       { align: "center", width, lineBreak: false },
@@ -185,11 +202,14 @@ function drawCertificate(document, input) {
     });
 
   document.fillColor("#94a3b8").font("Courier").fontSize(10.5)
-    .text("CODECLASH • COMPETE • CODE • CONQUER", 0, 519.75, {
-      align: "center",
-      width,
-      lineBreak: false,
-    });
+    .text(
+      learningModule
+        ? `CERTIFICATE ID: ${certificate.certificateCode}`
+        : "CODECLASH • COMPETE • CODE • CONQUER",
+      0,
+      519.75,
+      { align: "center", width, lineBreak: false },
+    );
 }
 
 function createCertificateDocument(data) {

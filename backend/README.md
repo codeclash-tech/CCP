@@ -23,6 +23,29 @@ Configure `VITE_API_URL` in the frontend to point to this API's `/api` base URL,
 The packaged Electron client uses the `codeclash://app` origin, which is
 explicitly allowed for credentialed API requests.
 
+## Desktop AI Learning
+
+The learning API is available only to authenticated desktop learning roles and
+Super Admin authoring routes. Configure the tutor on the backend, never in the
+desktop renderer:
+
+```env
+AI_PROVIDER=ollama
+AI_MODEL=your_model_name
+AI_BASE_URL=http://localhost:11434
+AI_API_KEY=
+AI_TIMEOUT_MS=45000
+```
+
+`AI_MODEL` and any provider credentials are supplied by the deployment
+operator. Tutor prompts include only the selected admin-authored topic and
+bounded session history. Ollama provides text responses; the desktop renderer
+uses the platform browser speech interfaces for replaceable English/Tamil
+speech recognition and synthesis. Purchase requests are recorded as pending
+until approved by a Super Admin; no payment gateway is included.
+The authoring screen can create a draft Java program with ten empty modules;
+the Super Admin supplies all official learning content before publication.
+
 ## Super Admin account
 
 Set `SUPER_ADMIN_EMAIL=hellocodeclash@gmail.com` and a private `SUPER_ADMIN_PASSWORD` in the ignored backend `.env` or deployment secret store. The password must be 8-72 UTF-8 bytes. On startup, the backend creates the account if absent; otherwise it ensures the configured account is verified and active, grants the server-side `ADMIN` role, and synchronizes its password to the configured secret. This account can sign in directly without registration. Registration and creator verification cannot grant this role based on an email address.

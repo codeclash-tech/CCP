@@ -1,0 +1,110 @@
+import mongoose from "mongoose";
+
+const exampleSchema = new mongoose.Schema(
+  {
+    title: { type: String, trim: true, maxlength: 160, default: "" },
+    explanation: { type: String, trim: true, maxlength: 5000, default: "" },
+    code: { type: String, maxlength: 20000, default: "" },
+    language: { type: String, trim: true, lowercase: true, maxlength: 40, default: "java" },
+  },
+  { _id: true },
+);
+
+const questionSchema = new mongoose.Schema(
+  {
+    prompt: { type: String, required: true, trim: true, maxlength: 3000 },
+    expectedAnswer: { type: String, required: true, trim: true, maxlength: 5000 },
+    acceptedAnswers: { type: [String], default: [] },
+  },
+  { _id: true },
+);
+
+const exerciseTestSchema = new mongoose.Schema(
+  {
+    input: { type: String, maxlength: 4000, default: "" },
+    expectedOutput: { type: String, required: true, maxlength: 4000 },
+    visible: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
+const exerciseSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, maxlength: 160 },
+    instructions: { type: String, required: true, trim: true, maxlength: 5000 },
+    starterCode: { type: String, maxlength: 20000, default: "" },
+    language: { type: String, trim: true, lowercase: true, maxlength: 40, default: "java" },
+    tests: { type: [exerciseTestSchema], default: [] },
+  },
+  { _id: true },
+);
+
+const subtopicSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, maxlength: 160 },
+    explanation: { type: String, trim: true, maxlength: 12000, default: "" },
+    objectives: { type: [String], default: [] },
+    examples: { type: [exampleSchema], default: [] },
+    questions: { type: [questionSchema], default: [] },
+    exercises: { type: [exerciseSchema], default: [] },
+  },
+  { _id: true },
+);
+
+const topicSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true, maxlength: 160 },
+    description: { type: String, trim: true, maxlength: 2000, default: "" },
+    explanation: { type: String, trim: true, maxlength: 12000, default: "" },
+    objectives: { type: [String], default: [] },
+    examples: { type: [exampleSchema], default: [] },
+    questions: { type: [questionSchema], default: [] },
+    exercises: { type: [exerciseSchema], default: [] },
+    subtopics: { type: [subtopicSchema], default: [] },
+  },
+  { _id: true },
+);
+
+const assessmentSchema = new mongoose.Schema(
+  {
+    questions: { type: [questionSchema], default: [] },
+    passingScorePercent: { type: Number, min: 1, max: 100, default: 70 },
+  },
+  { _id: false },
+);
+
+const completionRequirementsSchema = new mongoose.Schema(
+  {
+    minCompletedTopics: { type: Number, min: 0, default: 1 },
+    requiredExercises: { type: Number, min: 0, default: 0 },
+    requireAssessment: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
+const learningModuleSchema = new mongoose.Schema(
+  {
+    programId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "LearningProgram",
+      required: true,
+      index: true,
+    },
+    title: { type: String, required: true, trim: true, maxlength: 160 },
+    description: { type: String, required: true, trim: true, maxlength: 4000 },
+    objectives: { type: [String], default: [] },
+    price: { type: Number, required: true, min: 0, default: 0 },
+    difficulty: { type: String, enum: ["BEGINNER", "INTERMEDIATE", "ADVANCED"], default: "BEGINNER" },
+    sequence: { type: Number, required: true, min: 1 },
+    estimatedDurationMinutes: { type: Number, required: true, min: 1, max: 100000 },
+    prerequisites: [{ type: mongoose.Schema.Types.ObjectId, ref: "LearningModule" }],
+    topics: { type: [topicSchema], default: [] },
+    assessment: { type: assessmentSchema, default: () => ({}) },
+    completionRequirements: { type: completionRequirementsSchema, default: () => ({}) },
+  },
+  { timestamps: true },
+);
+
+learningModuleSchema.index({ programId: 1, sequence: 1 }, { unique: true });
+
+export default mongoose.model("LearningModule", learningModuleSchema);

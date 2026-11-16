@@ -72,6 +72,13 @@ pass/fail/timing summaries.
 The weekly assessment's **Run** action also uses the bundled local engine.
 Final Battle Room and weekly submissions remain server-authoritative.
 
+The desktop includes the AI Learning workspace and Super Admin authoring
+screens. Learning content, purchases, student progress, assessments, and
+certificates are server-managed. Configure `AI_PROVIDER`, `AI_MODEL`, and
+`AI_BASE_URL` on the backend; provider credentials are never placed in the
+desktop renderer. Tutor speech uses separate platform speech input/output
+adapters, so text tutoring remains available when a system voice is missing.
+
 Local execution remains useful for immediate candidate feedback, but it is not
 the score authority. The authenticated candidate can still inspect or modify
 their own machine, so the desktop runtime is defense in depth rather than a
