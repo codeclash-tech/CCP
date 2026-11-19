@@ -9,7 +9,7 @@ const learningPurchaseSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     currency: { type: String, required: true, uppercase: true, default: "INR", maxlength: 3 },
     status: { type: String, enum: ["PENDING", "ACTIVE", "EXPIRED", "FAILED", "REFUNDED", "REJECTED", "REVOKED"], default: "PENDING", index: true },
-    paymentProvider: { type: String, enum: ["RAZORPAY", "MANUAL"], default: "RAZORPAY" },
+    paymentProvider: { type: String, enum: ["RAZORPAY", "MANUAL", "FREE"], default: "RAZORPAY" },
     paymentOrderId: { type: String, trim: true, default: null },
     paymentId: { type: String, trim: true, default: null },
     paymentStatus: { type: String, enum: ["CREATED", "AUTHORIZED", "CAPTURED", "FAILED", "REFUNDED", "FREE"], default: "CREATED" },

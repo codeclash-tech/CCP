@@ -33,7 +33,10 @@ test("free module access uses the database price and never accepts course purcha
   LearningModule.findOne = () => ({ select: async () => module });
   LearningProgram.findOne = () => ({ select: async () => ({ _id: programId }) });
   LearningPurchase.findOne = () => ({ sort: async () => null });
-  LearningPurchase.prototype.save = async function savePurchase() { return this; };
+  LearningPurchase.prototype.save = async function savePurchase() {
+    await this.validate();
+    return this;
+  };
   LearningProgress.updateOne = async () => ({ acknowledged: true });
 
   try {

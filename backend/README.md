@@ -56,6 +56,14 @@ answer criteria; the AI never records completion. Voice output uses native
 device voices, with Boy/Girl choices shown only when a matching voice exists
 for the selected language.
 
+For local development, put these settings in `backend/.env`. For a deployed
+backend, configure them in that service's environment settings (for example,
+Render's service Environment page); a local `.env` does not configure the
+deployed service. `AI_BASE_URL` must be reachable from the backend host, so
+`localhost` refers to that host. Keep `AI_API_KEY` empty for local Ollama; set
+it only when the configured Ollama-compatible endpoint requires a bearer key.
+Never put AI or payment secrets in the desktop app or frontend.
+
 Razorpay order creation and payment confirmation run on the backend. The client
 receives only the public key ID and server-created order data. Checkout
 confirmation is checked against Razorpay's payment API and HMAC signature;
