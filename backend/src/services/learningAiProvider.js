@@ -75,6 +75,77 @@ function allowedGenerationOptions(settings = {}) {
   return options;
 }
 
+function allowedGroqOptions(settings = {}) {
+  const options = {};
+  const temperature = Number(settings.temperature);
+  const topP = Number(settings.top_p);
+  const maxCompletionTokens = Number(settings.num_predict);
+  if (Number.isFinite(temperature) && temperature >= 0 && temperature <= 2) {
+    options.temperature = temperature;
+  }
+  if (Number.isFinite(topP) && topP > 0 && topP <= 1) options.top_p = topP;
+  if (
+    Number.isInteger(maxCompletionTokens) &&
+    maxCompletionTokens > 0 &&
+    maxCompletionTokens <= 4096
+  ) {
+    options.max_completion_tokens = maxCompletionTokens;
+  }
+  return options;
+}
+
+function tutorMessages({
+  topic,
+  approvedContent,
+  history,
+  language,
+  progressContext,
+  moduleBehavior,
+  topicBehavior,
+  validationInstructions,
+}) {
+  return [
+    {
+      role: "system",
+      content: tutorSystemPrompt({
+        language,
+        topic,
+        approvedContent,
+        progressContext,
+        moduleBehavior,
+        topicBehavior,
+        validationInstructions,
+      }),
+    },
+    ...limitHistory(history),
+  ];
+}
+
+function groqProviderError(status) {
+  if (status === 401 || status === 403) {
+    return new AiProviderError(
+      "The AI provider could not authenticate. Check the backend AI_API_KEY setting.",
+    );
+  }
+  if (status === 400 || status === 404) {
+    return new AiProviderError(
+      "The configured AI model or request is unavailable. Check AI_MODEL and the Groq settings.",
+    );
+  }
+  if (status === 429) {
+    return new AiProviderError(
+      "The AI provider rate limit has been reached. Please try again shortly.",
+      429,
+    );
+  }
+  if (status === 408 || status === 504) {
+    return new AiProviderError(
+      "The AI tutor took too long to respond. Please try again.",
+    );
+  }
+  return new AiProviderError("The AI tutor is temporarily unavailable. Please try again.");
+}
+
 export class OllamaTutorProvider {
   constructor({
     model,
@@ -106,21 +177,16 @@ export class OllamaTutorProvider {
       throw new AiProviderError("The AI tutor is not configured.", 503);
     }
 
-    const messages = [
-      {
-        role: "system",
-        content: tutorSystemPrompt({
-          language,
-          topic,
-          approvedContent,
-          progressContext,
-          moduleBehavior,
-          topicBehavior,
-          validationInstructions,
-        }),
-      },
-      ...limitHistory(history),
-    ];
+    const messages = tutorMessages({
+      topic,
+      approvedContent,
+      history,
+      language,
+      progressContext,
+      moduleBehavior,
+      topicBehavior,
+      validationInstructions,
+    });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -160,10 +226,101 @@ export class OllamaTutorProvider {
   }
 }
 
+class GroqTutorProvider {
+  constructor({
+    model,
+    baseUrl,
+    apiKey = "",
+    fetchImpl = globalThis.fetch,
+    timeoutMs = 45000,
+  }) {
+    this.model = String(model || "").trim();
+    this.baseUrl = String(baseUrl || "").replace(/\/+$/, "");
+    this.apiKey = String(apiKey || "").trim();
+    this.fetchImpl = fetchImpl;
+    this.timeoutMs = timeoutMs;
+    this.name = "groq";
+  }
+
+  async generateReply({
+    topic,
+    approvedContent,
+    history,
+    language,
+    progressContext,
+    moduleBehavior,
+    topicBehavior,
+    validationInstructions,
+    advancedSettings,
+  }) {
+    if (!this.model || !this.baseUrl) {
+      throw new AiProviderError("The AI tutor is not configured.", 503);
+    }
+    if (!this.apiKey) {
+      throw new AiProviderError("The Groq API key is not configured on the backend.", 503);
+    }
+
+    const messages = tutorMessages({
+      topic,
+      approvedContent,
+      history,
+      language,
+      progressContext,
+      moduleBehavior,
+      topicBehavior,
+      validationInstructions,
+    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      const response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          stream: false,
+          ...allowedGroqOptions(advancedSettings),
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw groqProviderError(response.status);
+      const result = await response.json();
+      const content = result?.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || !content.trim()) {
+        throw new AiProviderError("The AI tutor returned an empty response.", 503);
+      }
+      return { content: content.trim(), provider: this.name, model: this.model };
+    } catch (error) {
+      if (error instanceof AiProviderError) throw error;
+      throw new AiProviderError(
+        error?.name === "AbortError"
+          ? "The AI tutor took too long to respond. Please try again."
+          : "The AI tutor is temporarily unavailable. Please try again.",
+        503,
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export function createTutorProvider(config, options = {}) {
   const providerName = String(config.AI_PROVIDER || "ollama").trim().toLowerCase();
   if (providerName === "ollama") {
     return new OllamaTutorProvider({
+      model: config.AI_MODEL,
+      baseUrl: config.AI_BASE_URL,
+      apiKey: config.AI_API_KEY,
+      timeoutMs: Number(config.AI_TIMEOUT_MS) || 45000,
+      ...options,
+    });
+  }
+  if (providerName === "groq") {
+    return new GroqTutorProvider({
       model: config.AI_MODEL,
       baseUrl: config.AI_BASE_URL,
       apiKey: config.AI_API_KEY,

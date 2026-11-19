@@ -64,6 +64,24 @@ deployed service. `AI_BASE_URL` must be reachable from the backend host, so
 it only when the configured Ollama-compatible endpoint requires a bearer key.
 Never put AI or payment secrets in the desktop app or frontend.
 
+To use GroqCloud instead, configure the backend with the OpenAI-compatible
+Chat Completions endpoint:
+
+```env
+AI_PROVIDER=groq
+AI_MODEL=openai/gpt-oss-20b
+AI_BASE_URL=https://api.groq.com/openai/v1
+AI_API_KEY=your_groq_api_key
+AI_TIMEOUT_MS=45000
+```
+
+The backend sends `AI_API_KEY` as a Bearer token to
+`{AI_BASE_URL}/chat/completions`. Use the same values in the Render backend
+service's Environment settings, then redeploy/restart that service. The model
+is selected only from `AI_MODEL`; it is not embedded in tutor code. Provider
+errors are returned as safe tutor messages, and only backend-authored
+completion and assessment rules can update student progress.
+
 Razorpay order creation and payment confirmation run on the backend. The client
 receives only the public key ID and server-created order data. Checkout
 confirmation is checked against Razorpay's payment API and HMAC signature;

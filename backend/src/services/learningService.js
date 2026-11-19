@@ -1362,7 +1362,10 @@ export async function askLearningTutor(userId, sessionId, message, language) {
       topicBehavior: topic.tutorInstructions || "",
       validationInstructions: topic.validationInstructions || "",
       advancedSettings: module.aiConfiguration?.advancedSettings || {},
-      history: priorMessages.map(({ role, content }) => ({ role, content })),
+      history: [
+        ...priorMessages,
+        { role: "user", content: prompt },
+      ].map(({ role, content }) => ({ role, content })),
       language,
     });
     session.language = language;
