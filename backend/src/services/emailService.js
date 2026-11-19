@@ -17,7 +17,7 @@ export async function sendChallengeCompletionEmail({
   if (
     typeof challengeName !== "string" ||
     !challengeName.trim() ||
-    !["DAILY_CHALLENGE", "DAILY_CHALLENGE_RANK", "BATTLE_ROOM"].includes(challengeType)
+    !["DAILY_CHALLENGE", "DAILY_CHALLENGE_RANK", "BATTLE_ROOM", "LEARNING_MODULE"].includes(challengeType)
   ) {
     return { success: false, error: "A valid completed challenge is required." };
   }
@@ -28,12 +28,16 @@ export async function sendChallengeCompletionEmail({
   const safeName = escapeHtml(userName || "there");
   const safeChallengeName = escapeHtml(challengeName.trim());
   const completionLabel =
-    challengeType === "BATTLE_ROOM"
+    challengeType === "LEARNING_MODULE"
+      ? "Learning Module"
+      : challengeType === "BATTLE_ROOM"
       ? "Battle Room"
       : challengeType === "DAILY_CHALLENGE_RANK"
         ? `Daily Challenge Rank #${Number(certificateRank) || ""}`
         : "Daily Challenge";
-  const subject = challengeType === "DAILY_CHALLENGE_RANK"
+  const subject = challengeType === "LEARNING_MODULE"
+    ? `Your ${completionLabel} Certificate`
+    : challengeType === "DAILY_CHALLENGE_RANK"
     ? `Your ${completionLabel} Certificate`
     : `${completionLabel} completed`;
 

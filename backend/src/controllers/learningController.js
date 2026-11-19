@@ -2,23 +2,33 @@ import LearningCertificate from "../models/LearningCertificate.js";
 import { streamCertificatePdf } from "../services/certificatePdfService.js";
 import {
   askLearningTutor,
+  archiveLearningModule,
+  archiveLearningProgram,
   completeLearningTopic,
+  createLearningTopic,
   createLearningModule,
   createLearningProgram,
-  createJavaLearningProgramStructure,
   createLearningPurchase,
   getAdminLearningModule,
   getLearningDashboard,
   getStudentModule,
+  getStudentTopic,
+  deleteLearningTopic,
   listAdminLearningPrograms,
   listAdminLearningPurchases,
   listLearningPrograms,
+  processLearningPaymentWebhook,
+  reorderLearningModules,
+  reorderLearningTopics,
   requestLearningSession,
   reviewLearningPurchase,
   submitLearningAssessment,
   submitLearningExercise,
+  setLearningModuleStatus,
+  updateLearningTopic,
   updateLearningModule,
   updateLearningProgram,
+  verifyLearningPurchase,
 } from "../services/learningService.js";
 
 function requireObjectBody(body) {
@@ -44,17 +54,15 @@ export async function createProgram(req, res) {
   });
 }
 
-export async function createJavaProgramTemplate(req, res) {
-  return res.status(201).json({
-    program: await createJavaLearningProgramStructure(req.userId),
-  });
-}
-
 export async function updateProgram(req, res) {
   requireObjectBody(req.body);
   return res.json({
     program: await updateLearningProgram(req.userId, req.params.programId, req.body),
   });
+}
+
+export async function archiveProgram(req, res) {
+  return res.json({ program: await archiveLearningProgram(req.params.programId) });
 }
 
 export async function createModule(req, res) {
@@ -75,11 +83,70 @@ export async function updateModule(req, res) {
   });
 }
 
-export async function createPurchase(req, res) {
+export async function changeModuleStatus(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    module: await setLearningModuleStatus(req.params.moduleId, req.body.status),
+  });
+}
+
+export async function archiveModule(req, res) {
+  return res.json({ module: await archiveLearningModule(req.params.moduleId) });
+}
+
+export async function reorderModules(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    modules: await reorderLearningModules(req.params.programId, req.body.moduleIds),
+  });
+}
+
+export async function createTopic(req, res) {
   requireObjectBody(req.body);
   return res.status(201).json({
-    purchase: await createLearningPurchase(req.userId, req.body),
+    topic: await createLearningTopic(req.params.moduleId, req.body),
   });
+}
+
+export async function updateTopic(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    topic: await updateLearningTopic(req.params.moduleId, req.params.topicId, req.body),
+  });
+}
+
+export async function deleteTopic(req, res) {
+  return res.json(await deleteLearningTopic(req.params.moduleId, req.params.topicId));
+}
+
+export async function reorderTopics(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    topics: await reorderLearningTopics(req.params.moduleId, req.body.topicIds),
+  });
+}
+
+export async function createPurchase(req, res) {
+  requireObjectBody(req.body);
+  const result = await createLearningPurchase(req.userId, req.body);
+  return res.status(201).json(result);
+}
+
+export async function verifyPurchase(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    purchase: await verifyLearningPurchase(req.userId, req.params.purchaseId, req.body),
+  });
+}
+
+export async function learningPaymentWebhook(req, res) {
+  const result = await processLearningPaymentWebhook(
+    req.rawBody,
+    req.headers["x-razorpay-signature"],
+    req.headers["x-razorpay-event-id"],
+    req.body,
+  );
+  return res.json({ received: true, ...result });
 }
 
 export async function listAdminPurchases(req, res) {
@@ -100,6 +167,17 @@ export async function updatePurchase(req, res) {
 export async function getModule(req, res) {
   return res.json(
     await getStudentModule(req.userId, req.params.programId, req.params.moduleId),
+  );
+}
+
+export async function getTopic(req, res) {
+  return res.json(
+    await getStudentTopic(
+      req.userId,
+      req.params.programId,
+      req.params.moduleId,
+      req.params.topicId,
+    ),
   );
 }
 
@@ -159,10 +237,12 @@ export async function sendTutorMessage(req, res) {
 }
 
 export async function completeTopic(req, res) {
+  requireObjectBody(req.body);
   const result = await completeLearningTopic(
     req.userId,
     req.params.moduleId,
     req.params.topicId,
+    req.body.answers,
   );
   return res.json(result);
 }

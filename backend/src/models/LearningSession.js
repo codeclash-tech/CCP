@@ -13,6 +13,7 @@ const learningSessionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     moduleId: { type: mongoose.Schema.Types.ObjectId, ref: "LearningModule", required: true },
+    moduleVersion: { type: Number, min: 1, default: 1 },
     topicId: { type: mongoose.Schema.Types.ObjectId, required: true },
     language: { type: String, enum: ["en", "ta"], default: "en" },
     messages: { type: [messageSchema], default: [] },

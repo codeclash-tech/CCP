@@ -17,6 +17,7 @@ import {
   submitDesktopQuestion,
 } from "./desktopSubmission.js";
 import { SecureAuthStore } from "./secureAuthStore.js";
+import { allowRazorpayCheckoutInDesktopRenderer } from "./rendererCsp.js";
 import {
   CODECLASH_RENDERER_ORIGIN,
   resolveRendererPath,
@@ -193,7 +194,17 @@ async function serveRendererRequest(request) {
     rendererPath = path.join(rendererDirectory, "index.html");
   }
 
-  return net.fetch(pathToFileURL(rendererPath).href);
+  const response = await net.fetch(pathToFileURL(rendererPath).href);
+  if (path.basename(rendererPath) !== "index.html") return response;
+  const html = allowRazorpayCheckoutInDesktopRenderer(await response.text());
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.delete("content-encoding");
+  return new Response(html, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 ipcMain.handle("codeclash:engine-status", async (event) => {

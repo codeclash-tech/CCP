@@ -33,6 +33,7 @@ test("does not pass an assessment with missing or incorrect answers", () => {
 
 test("module completion requires every configured server-side criterion", () => {
   const module = {
+    topics: [{ _id: "one" }, { _id: "two" }],
     completionRequirements: {
       minCompletedTopics: 2,
       requireAssessment: true,
@@ -44,6 +45,14 @@ test("module completion requires every configured server-side criterion", () => 
       completedTopicIds: ["one", "two"],
       completedExerciseIds: ["exercise"],
       assessmentPassed: false,
+    }),
+    false,
+  );
+  assert.equal(
+    meetsModuleCompletionRequirements(module, {
+      completedTopicIds: ["one"],
+      completedExerciseIds: ["exercise"],
+      assessmentPassed: true,
     }),
     false,
   );

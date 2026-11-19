@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createSpeechInputProvider,
   createSpeechOutputProvider,
+  getVoiceProfileChoices,
 } from "../src/services/learningVoiceService.js";
 
 test("speech input provider selects the requested language and returns recognized text", () => {
@@ -33,7 +34,7 @@ test("speech providers report when a platform capability is unavailable", () => 
 
 test("speech output provider applies language and selected voice", () => {
   let spoken;
-  const voice = { name: "Tamil voice" };
+  const voice = { name: "Microsoft Pallavi", lang: "ta-IN" };
   const synthesis = {
     getVoices: () => [voice],
     addEventListener() {},
@@ -50,7 +51,36 @@ test("speech output provider applies language and selected voice", () => {
     speechSynthesis: synthesis,
     SpeechSynthesisUtterance: MockUtterance,
   });
-  provider.speak("வணக்கம்", { language: "ta", voiceName: voice.name });
+  provider.speak("வணக்கம்", { language: "ta", profile: "girl" });
   assert.equal(spoken.lang, "ta-IN");
   assert.equal(spoken.voice, voice);
+});
+
+test("native voice choices expose only matching boy and girl voices for the selected language", () => {
+  const choices = getVoiceProfileChoices([
+    { name: "Microsoft David", lang: "en-US" },
+    { name: "Microsoft Zira", lang: "en-US" },
+    { name: "Microsoft Pallavi", lang: "ta-IN" },
+  ], "en");
+  assert.equal(choices.boy.name, "Microsoft David");
+  assert.equal(choices.girl.name, "Microsoft Zira");
+  const tamilChoices = getVoiceProfileChoices([
+    { name: "Microsoft Pallavi", lang: "ta-IN" },
+  ], "ta");
+  assert.equal(tamilChoices.boy, null);
+  assert.equal(tamilChoices.girl.name, "Microsoft Pallavi");
+});
+
+test("native speech output reports when the selected profile is unavailable", () => {
+  const provider = createSpeechOutputProvider({
+    speechSynthesis: {
+      getVoices: () => [{ name: "Unknown", lang: "en-US" }],
+      addEventListener() {},
+      removeEventListener() {},
+      cancel() {},
+      speak() {},
+    },
+    SpeechSynthesisUtterance: class {},
+  });
+  assert.throws(() => provider.speak("Hello", { language: "en", profile: "boy" }), /No native boy voice/);
 });

@@ -26,25 +26,53 @@ explicitly allowed for credentialed API requests.
 ## Desktop AI Learning
 
 The learning API is available only to authenticated desktop learning roles and
-Super Admin authoring routes. Configure the tutor on the backend, never in the
-desktop renderer:
+Super Admin authoring routes. Courses have no price; each module is independently
+published and priced. Course and module archival keeps existing purchases,
+progress, assessments, and certificate references. Published module edits create
+immutable content versions, and student progress and tutor sessions stay pinned
+to the version first opened.
+
+Configure the tutor and payment service on the backend, never in the desktop
+renderer:
 
 ```env
 AI_PROVIDER=ollama
-AI_MODEL=your_model_name
+AI_MODEL=llama3.1:8b
 AI_BASE_URL=http://localhost:11434
 AI_API_KEY=
 AI_TIMEOUT_MS=45000
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+RAZORPAY_WEBHOOK_SECRET=
 ```
 
-`AI_MODEL` and any provider credentials are supplied by the deployment
-operator. Tutor prompts include only the selected admin-authored topic and
-bounded session history. Ollama provides text responses; the desktop renderer
-uses the platform browser speech interfaces for replaceable English/Tamil
-speech recognition and synthesis. Purchase requests are recorded as pending
-until approved by a Super Admin; no payment gateway is included.
-The authoring screen can create a draft Java program with ten empty modules;
-the Super Admin supplies all official learning content before publication.
+The initial tutor uses the local Ollama model `llama3.1:8b`; install Ollama and
+pull that model on the backend host with `ollama pull llama3.1:8b`. Local Ollama
+does not require an API key. Keep Ollama reachable from the backend at
+`AI_BASE_URL`. Module and topic teaching instructions are subordinate to
+platform safety rules. Tutor prompts include only the selected admin-authored
+topic and bounded session history. Topic checks are graded by backend-authored
+answer criteria; the AI never records completion. Voice output uses native
+device voices, with Boy/Girl choices shown only when a matching voice exists
+for the selected language.
+
+Razorpay order creation and payment confirmation run on the backend. The client
+receives only the public key ID and server-created order data. Checkout
+confirmation is checked against Razorpay's payment API and HMAC signature;
+webhooks use `POST /api/learning/payments/webhook` and must be configured with
+the same webhook secret. Only a verified captured payment activates module
+access. Module prices are converted using the selected ISO currency's minor
+unit precision and checked against the order and captured-payment responses.
+Free modules can be granted without a payment. Payment processing uses the
+built-in Node fetch and crypto APIs and does not add an SDK dependency.
+
+The Super Admin creates and publishes a course with only its name and
+description, then adds modules one at a time. A course appears in the student
+catalog only after it has a published module. Each module may have a finite
+access duration in days, measured from verified payment, or lifetime access.
+Expired access prevents further lesson access but retains progress and earned
+certificates. Student APIs hide draft, unpublished, and archived courses or
+modules while retaining historical purchases and learning records.
 
 ## Super Admin account
 

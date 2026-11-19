@@ -42,7 +42,14 @@ app.use(morgan(config.LOG_LEVEL || "dev"));
 securityMiddleware(app);
 
 // Body parsing with size limits
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({
+  limit: "1mb",
+  verify: (req, _res, buffer) => {
+    if (req.originalUrl.startsWith("/api/learning/payments/webhook")) {
+      req.rawBody = Buffer.from(buffer);
+    }
+  },
+}));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // Input sanitization

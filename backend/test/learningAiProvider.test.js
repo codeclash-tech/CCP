@@ -29,6 +29,10 @@ test("Ollama tutor uses configured model and only the supplied lesson context", 
   const response = await provider.generateReply({
     topic: { title: "Variables" },
     approvedContent: '{"explanation":"A variable stores a value."}',
+    moduleBehavior: "Use analogies and ask one question at a time.",
+    topicBehavior: "Give a visual analogy before the formal definition.",
+    validationInstructions: "Ask the authored check question and offer a hint before feedback.",
+    advancedSettings: { temperature: 0.3, num_predict: 512, model: "untrusted-override" },
     history: [{ role: "user", content: "What is a variable?" }],
     language: "en",
   });
@@ -36,8 +40,14 @@ test("Ollama tutor uses configured model and only the supplied lesson context", 
   assert.equal(requestUrl, "http://localhost:11434/api/chat");
   assert.equal(requestBody.model, "configured-model");
   assert.equal(requestBody.stream, false);
+  assert.deepEqual(requestBody.options, { temperature: 0.3, num_predict: 512 });
   assert.match(requestBody.messages[0].content, /A variable stores a value/);
   assert.match(requestBody.messages[0].content, /Do not fetch, cite, or invent external/);
+  assert.match(requestBody.messages[0].content, /Use analogies and ask one question at a time/);
+  assert.match(requestBody.messages[0].content, /visual analogy before the formal definition/);
+  assert.match(requestBody.messages[0].content, /authored check question/);
+  assert.match(requestBody.messages[0].content, /Do not reveal hidden expected answers/);
+  assert.match(requestBody.messages[0].content, /highest priority/);
   assert.equal(response.content, "Let's review the idea together.");
 });
 

@@ -30,10 +30,12 @@ export async function connectDB() {
         ensureOtpTtlIndex,
         ensureCreatorVerificationOtpTtlIndex,
         ensureWeeklyAssessmentIndexes,
+        ensureLearningIndexes,
       } = await import("../models/ensureIndexes.js");
       await ensureOtpTtlIndex();
       await ensureCreatorVerificationOtpTtlIndex();
       await ensureWeeklyAssessmentIndexes();
+      await ensureLearningIndexes();
     }
     return isConnected;
   } catch (error) {

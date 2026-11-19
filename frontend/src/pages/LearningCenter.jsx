@@ -17,6 +17,7 @@ import api from "../services/api";
 import {
   createSpeechInputProvider,
   createSpeechOutputProvider,
+  getVoiceProfileChoices,
 } from "../services/learningVoiceService";
 import { getAssessmentRole, ASSESSMENT_ROLES } from "../routes/roleAccess";
 import { useAuth } from "../context/AuthContext";
@@ -25,14 +26,14 @@ import "./LearningCenter.css";
 const EMPTY_PROGRAM = {
   title: "",
   description: "",
-  language: "java",
-  price: 0,
 };
 
 const EMPTY_MODULE = {
   title: "",
+  shortDescription: "",
   description: "",
   price: 0,
+  accessDurationDays: "",
   difficulty: "BEGINNER",
   sequence: 1,
   estimatedDurationMinutes: 60,
@@ -46,9 +47,69 @@ const EMPTY_MODULE = {
     requireAssessment: false,
   },
 };
+const EMPTY_TOPIC = {
+  title: "",
+  description: "",
+  explanation: "",
+  tutorInstructions: "",
+  validationInstructions: "",
+  objectivesText: "",
+  examples: [],
+  questions: [],
+  exercises: [],
+  subtopics: [],
+};
+function displayPrice(price, currencyInput = "INR") {
+  const currency = /^[A-Z]{3}$/.test(currencyInput) ? currencyInput : "INR";
+  return Number(price) === 0
+    ? "Free"
+    : new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(Number(price));
+}
 
-function displayPrice(price) {
-  return Number(price) === 0 ? "Free" : `₹${Number(price).toFixed(2)}`;
+function createTopicDraft(topic = {}) {
+  return {
+    title: topic.title || "",
+    description: topic.description || "",
+    explanation: topic.explanation || "",
+    tutorInstructions: topic.tutorInstructions || "",
+    validationInstructions: topic.validationInstructions || "",
+    objectivesText: (topic.objectives || []).join("\n"),
+    examples: (topic.examples || []).map((example) => ({ ...example })),
+    questions: (topic.questions || []).map((question) => ({
+      ...question,
+      acceptedAnswersText: (question.acceptedAnswers || []).join("\n"),
+    })),
+    exercises: (topic.exercises || []).map((exercise) => ({
+      ...exercise,
+      tests: (exercise.tests || []).map((testCase) => ({ ...testCase })),
+    })),
+    subtopics: (topic.subtopics || []).map((subtopic) => ({ ...subtopic })),
+  };
+}
+
+function updateTopicItem(items, index, field, value) {
+  return items.map((item, itemIndex) =>
+    itemIndex === index ? { ...item, [field]: value } : item,
+  );
+}
+
+function loadRazorpayCheckout() {
+  if (window.Razorpay) return Promise.resolve(window.Razorpay);
+  if (window.razorpayScriptPromise) return window.razorpayScriptPromise;
+  window.razorpayScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => window.Razorpay
+      ? resolve(window.Razorpay)
+      : reject(new Error("Razorpay Checkout did not initialize."));
+    script.onerror = () => reject(new Error("Could not load Razorpay Checkout."));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    window.razorpayScriptPromise = null;
+    throw error;
+  });
+  return window.razorpayScriptPromise;
 }
 
 function parseJsonField(value, label) {
@@ -81,15 +142,19 @@ function AdminLearning() {
   const [programForm, setProgramForm] = useState(EMPTY_PROGRAM);
   const [moduleId, setModuleId] = useState("");
   const [moduleForm, setModuleForm] = useState(EMPTY_MODULE);
+  const [aiSettingsText, setAiSettingsText] = useState("{}");
+  const [topicDraft, setTopicDraft] = useState(EMPTY_TOPIC);
+  const [editingTopicId, setEditingTopicId] = useState("");
+  const [topicError, setTopicError] = useState("");
   const [jsonFields, setJsonFields] = useState({
     objectives: "[]",
     prerequisites: "[]",
-    topics: "[]",
     assessment: JSON.stringify(EMPTY_MODULE.assessment, null, 2),
     completionRequirements: JSON.stringify(EMPTY_MODULE.completionRequirements, null, 2),
   });
   const [newProgram, setNewProgram] = useState(EMPTY_PROGRAM);
   const [newModule, setNewModule] = useState(false);
+  const [previewModule, setPreviewModule] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -128,8 +193,6 @@ function AdminLearning() {
         ? {
             title: program.title,
             description: program.description,
-            language: program.language,
-            price: program.price,
           }
         : EMPTY_PROGRAM,
     );
@@ -138,7 +201,11 @@ function AdminLearning() {
   useEffect(() => {
     setModuleId("");
     setModuleForm(EMPTY_MODULE);
+    setAiSettingsText("{}");
     setNewModule(false);
+    setEditingTopicId("");
+    setTopicError("");
+    setTopicDraft(EMPTY_TOPIC);
   }, [selectedProgramId]);
 
   const loadModule = async (id) => {
@@ -150,10 +217,14 @@ function AdminLearning() {
       setModuleId(String(module._id));
       setNewModule(false);
       setModuleForm(module);
+      setAiSettingsText(JSON.stringify(module.aiConfiguration?.advancedSettings || {}, null, 2));
+      setPreviewModule(false);
+      setEditingTopicId("");
+      setTopicError("");
+      setTopicDraft(EMPTY_TOPIC);
       setJsonFields({
         objectives: JSON.stringify(module.objectives || [], null, 2),
         prerequisites: JSON.stringify(module.prerequisites || [], null, 2),
-        topics: JSON.stringify(module.topics || [], null, 2),
         assessment: JSON.stringify(module.assessment || EMPTY_MODULE.assessment, null, 2),
         completionRequirements: JSON.stringify(
           module.completionRequirements || EMPTY_MODULE.completionRequirements,
@@ -173,27 +244,12 @@ function AdminLearning() {
     try {
       const { data } = await api.post("/learning/admin/programs", newProgram);
       setNewProgram(EMPTY_PROGRAM);
-      setNotice("Learning program created as a draft.");
+      setNotice("Course published. It will appear to students after you publish its first module.");
       const { data: list } = await api.get("/learning/admin/programs");
       setPrograms(list.programs || []);
       setSelectedProgramId(String(data.program._id));
     } catch (saveError) {
       setError(saveError.message || "Could not create the learning program.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const createJavaStructure = async () => {
-    setSaving(true);
-    setError("");
-    try {
-      const { data } = await api.post("/learning/admin/programs/java-template");
-      setNotice("Created a draft Java program with 10 blank modules. Add official content before publishing.");
-      await loadAdminData();
-      setSelectedProgramId(String(data.program._id));
-    } catch (saveError) {
-      setError(saveError.message || "Could not create the Java module structure.");
     } finally {
       setSaving(false);
     }
@@ -231,16 +287,82 @@ function AdminLearning() {
     }
   };
 
+  const archiveProgram = async () => {
+    if (!selectedProgram || !window.confirm("Archive this course? Existing student records will be retained.")) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.delete(`/learning/admin/programs/${selectedProgram._id}`);
+      setSelectedProgramId("");
+      setNotice("Course archived. Existing student records remain preserved.");
+      await loadAdminData();
+    } catch (archiveError) {
+      setError(archiveError.message || "Could not archive this course.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changeModuleStatus = async () => {
+    if (!moduleId || !moduleForm) return;
+    const status = moduleForm.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED";
+    if (status === "PUBLISHED") {
+      const topics = (moduleForm.topics || []).filter((topic) => String(topic.title || "").trim());
+      if (!topics.length) {
+        setError("Add at least one topic before publishing this module.");
+        return;
+      }
+      if (topics.some((topic) => !(topic.questions || []).some((question) =>
+        String(question.prompt || "").trim() && String(question.expectedAnswer || "").trim()
+      ))) {
+        setError("Add a check question and expected answer to every topic before publishing.");
+        return;
+      }
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await api.patch(`/learning/admin/modules/${moduleId}/status`, { status });
+      setNotice(status === "PUBLISHED" ? "Module published." : "Module unpublished.");
+      await loadAdminData();
+      await loadModule(moduleId);
+    } catch (statusError) {
+      setError(statusError.message || "Could not change the module publication status.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const archiveModule = async () => {
+    if (!moduleId || !window.confirm("Archive this module? Purchases, progress, and certificates will be retained.")) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.delete(`/learning/admin/modules/${moduleId}`);
+      setModuleId("");
+      setNotice("Module archived. Existing student records remain preserved.");
+      await loadAdminData();
+    } catch (archiveError) {
+      setError(archiveError.message || "Could not archive this module.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const startNewModule = () => {
     setModuleId("");
+    setAiSettingsText("{}");
+    setEditingTopicId("");
+    setTopicError("");
+    setTopicDraft(EMPTY_TOPIC);
     setModuleForm({
       ...EMPTY_MODULE,
       sequence: (selectedProgram?.modules?.length || 0) + 1,
     });
+    setPreviewModule(false);
     setJsonFields({
       objectives: "[]",
       prerequisites: "[]",
-      topics: "[]",
       assessment: JSON.stringify(EMPTY_MODULE.assessment, null, 2),
       completionRequirements: JSON.stringify(EMPTY_MODULE.completionRequirements, null, 2),
     });
@@ -258,11 +380,19 @@ function AdminLearning() {
       const payload = {
         ...moduleForm,
         price: Number(moduleForm.price),
-        sequence: Number(moduleForm.sequence),
-        estimatedDurationMinutes: Number(moduleForm.estimatedDurationMinutes),
+        accessDurationDays: moduleForm.accessDurationDays === "" ||
+          moduleForm.accessDurationDays === null
+          ? null
+          : Number(moduleForm.accessDurationDays),
+        sequence: moduleId ? Number(moduleForm.sequence) : undefined,
+        estimatedDurationMinutes: Number(moduleForm.estimatedDurationMinutes) || 60,
         objectives: parseJsonField(jsonFields.objectives, "Objectives"),
         prerequisites: parseJsonField(jsonFields.prerequisites, "Prerequisites"),
-        topics: parseJsonField(jsonFields.topics, "Topics"),
+        topics: newModule ? [] : (moduleForm.topics || []),
+        aiConfiguration: {
+          ...(moduleForm.aiConfiguration || {}),
+          advancedSettings: parseJsonField(aiSettingsText, "AI advanced settings"),
+        },
         assessment: parseJsonField(jsonFields.assessment, "Assessment"),
         completionRequirements: parseJsonField(
           jsonFields.completionRequirements,
@@ -276,6 +406,18 @@ function AdminLearning() {
         );
         setModuleId(String(data.module._id));
         setNewModule(false);
+        setModuleForm(data.module);
+        setAiSettingsText(JSON.stringify(data.module.aiConfiguration?.advancedSettings || {}, null, 2));
+        setJsonFields({
+          objectives: JSON.stringify(data.module.objectives || [], null, 2),
+          prerequisites: JSON.stringify(data.module.prerequisites || [], null, 2),
+          assessment: JSON.stringify(data.module.assessment || EMPTY_MODULE.assessment, null, 2),
+          completionRequirements: JSON.stringify(
+            data.module.completionRequirements || EMPTY_MODULE.completionRequirements,
+            null,
+            2,
+          ),
+        });
         setNotice("Module created.");
       } else {
         await api.patch(`/learning/admin/modules/${moduleId}`, payload);
@@ -287,6 +429,143 @@ function AdminLearning() {
       setError(saveError.message || "Could not save the learning module.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveTopic = async () => {
+    if (!moduleId) return;
+    setError("");
+    setTopicError("");
+    if (!topicDraft.title.trim()) {
+      setTopicError("Enter a topic title.");
+      return;
+    }
+    if (!topicDraft.explanation.trim()) {
+      setTopicError("Add lesson content describing what students will learn.");
+      return;
+    }
+    if (topicDraft.questions.some((question) =>
+      String(question.prompt || "").trim() && !String(question.expectedAnswer || "").trim()
+    )) {
+      setTopicError("Add an expected answer for each question or remove the empty question.");
+      return;
+    }
+    if (topicDraft.exercises.some((exercise) =>
+      [exercise.title, exercise.instructions].some((value) => String(value || "").trim()) &&
+      (!String(exercise.title || "").trim() || !String(exercise.instructions || "").trim())
+    )) {
+      setTopicError("Each activity needs a title and instructions.");
+      return;
+    }
+    if (topicDraft.exercises.some((exercise) =>
+      exercise.type !== "ACTIVITY" &&
+      (exercise.tests || []).some((testCase) => !String(testCase.expectedOutput || "").trim())
+    )) {
+      setTopicError("Add an expected output for each coding test case.");
+      return;
+    }
+    setSaving(true);
+    setTopicError("");
+    setError("");
+    try {
+      const topic = {
+        title: topicDraft.title.trim(),
+        description: topicDraft.description.trim(),
+        explanation: topicDraft.explanation.trim(),
+        tutorInstructions: topicDraft.tutorInstructions.trim(),
+        validationInstructions: topicDraft.validationInstructions.trim(),
+        objectives: topicDraft.objectivesText.split(/\r?\n/).map((objective) => objective.trim()).filter(Boolean),
+        examples: topicDraft.examples.filter((example) =>
+          [example.title, example.explanation, example.code].some((value) => String(value || "").trim()),
+        ),
+        questions: topicDraft.questions
+          .filter((question) => String(question.prompt || "").trim())
+          .map((question) => ({
+            ...question,
+            acceptedAnswers: String(question.acceptedAnswersText || "")
+              .split(/\r?\n/)
+              .map((answer) => answer.trim())
+              .filter(Boolean),
+          })),
+        exercises: topicDraft.exercises.filter((exercise) =>
+          [exercise.title, exercise.instructions].some((value) => String(value || "").trim()),
+        ),
+        subtopics: topicDraft.subtopics.filter((subtopic) => String(subtopic.title || "").trim()),
+      };
+      if (editingTopicId) {
+        await api.patch(`/learning/admin/modules/${moduleId}/topics/${editingTopicId}`, topic);
+        setNotice("Topic content saved as a new published version where applicable.");
+      } else {
+        await api.post(`/learning/admin/modules/${moduleId}/topics`, topic);
+        setNotice("Topic added.");
+      }
+      setEditingTopicId("");
+      setTopicError("");
+      setTopicDraft(EMPTY_TOPIC);
+      await loadModule(moduleId);
+      await loadAdminData();
+    } catch (topicError) {
+      setError(topicError.message || "Could not save this topic.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const editTopic = (topic) => {
+    setEditingTopicId(String(topic._id));
+    setTopicError("");
+    setTopicDraft(createTopicDraft(topic));
+  };
+
+  const cancelTopicEdit = () => {
+    setEditingTopicId("");
+    setTopicError("");
+    setTopicDraft(EMPTY_TOPIC);
+  };
+
+  const removeTopic = async (topicIdToRemove) => {
+    if (!window.confirm("Remove this topic from the current module version? Earlier student versions are preserved.")) return;
+    try {
+      await api.delete(`/learning/admin/modules/${moduleId}/topics/${topicIdToRemove}`);
+      setNotice("Topic removed from the current version.");
+      setEditingTopicId("");
+      setTopicError("");
+      setTopicDraft(EMPTY_TOPIC);
+      await loadModule(moduleId);
+      await loadAdminData();
+    } catch (topicError) {
+      setError(topicError.message || "Could not remove this topic.");
+    }
+  };
+
+  const moveTopic = async (topicIndex, offset) => {
+    const topics = [...(moduleForm.topics || [])];
+    const destination = topicIndex + offset;
+    if (destination < 0 || destination >= topics.length) return;
+    [topics[topicIndex], topics[destination]] = [topics[destination], topics[topicIndex]];
+    try {
+      await api.put(`/learning/admin/modules/${moduleId}/topics/order`, {
+        topicIds: topics.map((topic) => topic._id),
+      });
+      await loadModule(moduleId);
+    } catch (topicError) {
+      setError(topicError.message || "Could not reorder topics.");
+    }
+  };
+
+  const moveModule = async (moduleIndex, offset) => {
+    if (!selectedProgram) return;
+    const modules = [...selectedProgram.modules];
+    const destination = moduleIndex + offset;
+    if (destination < 0 || destination >= modules.length) return;
+    [modules[moduleIndex], modules[destination]] = [modules[destination], modules[moduleIndex]];
+    try {
+      await api.put(`/learning/admin/programs/${selectedProgram._id}/modules/order`, {
+        moduleIds: modules.map((module) => module._id),
+      });
+      await loadAdminData();
+    } catch (orderError) {
+      setError(orderError.message || "Could not reorder modules.");
     }
   };
 
@@ -308,7 +587,7 @@ function AdminLearning() {
       <header className="learning-heading">
         <div>
           <p className="learning-eyebrow">Learning management</p>
-          <h1>Learning programs</h1>
+          <h1>Learning courses</h1>
           <p>Create and maintain all official lessons, activities, and module requirements.</p>
         </div>
         <BookOpen size={24} aria-hidden="true" />
@@ -318,25 +597,28 @@ function AdminLearning() {
 
       <section className="learning-management-grid">
         <div className="learning-panel">
-          <h2>Programs</h2>
-          <label className="learning-field">
-            Select program
-            <select
-              value={selectedProgramId}
-              onChange={(event) => setSelectedProgramId(event.target.value)}
-            >
-              <option value="">Choose a program</option>
+          <h2>Courses</h2>
+          {programs.length > 0 && (
+            <div className="learning-module-list learning-course-list" aria-label="Your courses">
               {programs.map((program) => (
-                <option key={program._id} value={program._id}>
-                  {program.title} · {program.status}
-                </option>
+                <div className="learning-module-row" key={program._id}>
+                  <button
+                    className={String(program._id) === selectedProgramId ? "is-selected" : ""}
+                    onClick={() => setSelectedProgramId(String(program._id))}
+                    type="button"
+                  >
+                    <span>{program.title}</span>
+                    <small>{program.modules.length} module(s) · {program.status}</small>
+                  </button>
+                </div>
               ))}
-            </select>
-          </label>
+            </div>
+          )}
           <form className="learning-form" onSubmit={createProgram}>
-            <h3>Create a program</h3>
+            <h3>Create and publish a course</h3>
+            <p className="learning-help">A published course becomes visible to students after its first module is published.</p>
             <label className="learning-field">
-              Program name
+              Course name
               <input
                 required
                 maxLength={140}
@@ -350,50 +632,24 @@ function AdminLearning() {
                 required
                 maxLength={4000}
                 rows={3}
+                placeholder="Describe what students will learn."
                 value={newProgram.description}
                 onChange={(event) => setNewProgram({ ...newProgram, description: event.target.value })}
               />
             </label>
-            <div className="learning-field-row">
-              <label className="learning-field">
-                Language
-                <input
-                  required
-                  value={newProgram.language}
-                  onChange={(event) => setNewProgram({ ...newProgram, language: event.target.value })}
-                />
-              </label>
-              <label className="learning-field">
-                Price
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={newProgram.price}
-                  onChange={(event) => setNewProgram({ ...newProgram, price: event.target.value })}
-                />
-              </label>
-            </div>
             <button className="learning-button" disabled={saving} type="submit">
-              Create draft program
+              {saving ? "Publishing…" : "Publish course"}
             </button>
-            {!programs.some((program) => program.language === "java" && program.title === "Java") && (
-              <button
-                className="learning-button learning-button-secondary"
-                disabled={saving}
-                onClick={createJavaStructure}
-                type="button"
-              >
-                Create Java program with 10 blank modules
-              </button>
-            )}
           </form>
 
           {selectedProgram && (
             <form className="learning-form learning-form-divider" onSubmit={saveProgram}>
-              <h3>Program settings</h3>
+              <div className="learning-panel-title">
+                <h3>Course settings</h3>
+                <span className="learning-status-badge">{selectedProgram.status}</span>
+              </div>
               <label className="learning-field">
-                Name
+                Course name
                 <input
                   required
                   value={programForm.title}
@@ -409,28 +665,9 @@ function AdminLearning() {
                   onChange={(event) => setProgramForm({ ...programForm, description: event.target.value })}
                 />
               </label>
-              <div className="learning-field-row">
-                <label className="learning-field">
-                  Language
-                  <input
-                    value={programForm.language}
-                    onChange={(event) => setProgramForm({ ...programForm, language: event.target.value })}
-                  />
-                </label>
-                <label className="learning-field">
-                  Price
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={programForm.price}
-                    onChange={(event) => setProgramForm({ ...programForm, price: event.target.value })}
-                  />
-                </label>
-              </div>
               <div className="learning-actions">
                 <button className="learning-button" disabled={saving} type="submit">
-                  <Save size={15} /> Save program
+                  <Save size={15} /> Save course
                 </button>
                 <button
                   className="learning-button learning-button-secondary"
@@ -439,6 +676,9 @@ function AdminLearning() {
                   type="button"
                 >
                   {selectedProgram.status === "PUBLISHED" ? "Unpublish" : "Publish"}
+                </button>
+                <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveProgram} type="button">
+                  Archive course
                 </button>
               </div>
             </form>
@@ -449,7 +689,7 @@ function AdminLearning() {
           <div className="learning-panel-title">
             <div>
               <h2>Modules and lesson content</h2>
-              <p>{selectedProgram ? `${selectedProgram.modules.length} module(s)` : "Select or create a program first."}</p>
+              <p>{selectedProgram ? `${selectedProgram.modules.length} module(s) · add each module when you need it` : "Select or create a course first."}</p>
             </div>
             {selectedProgram && (
               <button className="learning-button learning-button-secondary" onClick={startNewModule} type="button">
@@ -457,63 +697,88 @@ function AdminLearning() {
               </button>
             )}
           </div>
+          {selectedProgram && selectedProgram.modules?.length === 0 && !newModule && (
+            <p className="learning-empty-state">No modules yet. Add the first module when you are ready.</p>
+          )}
           {selectedProgram?.modules?.length > 0 && (
             <div className="learning-module-list">
-              {selectedProgram.modules.map((module) => (
-                <button
-                  className={`learning-module-row${String(module._id) === moduleId ? " is-selected" : ""}`}
-                  key={module._id}
-                  onClick={() => loadModule(module._id)}
-                  type="button"
-                >
-                  <span>{module.sequence}. {module.title}</span>
-                  <small>{displayPrice(module.price)} · {module.difficulty}</small>
-                </button>
+              {selectedProgram.modules.map((module, index) => (
+                <div className="learning-module-row" key={module._id}>
+                  <button
+                    className={String(module._id) === moduleId ? "is-selected" : ""}
+                    onClick={() => loadModule(module._id)}
+                    type="button"
+                  >
+                    <span>{module.sequence}. {module.title}</span>
+                    <small>{displayPrice(module.price, module.currency)} · {module.difficulty} · {module.status || "PUBLISHED"}</small>
+                  </button>
+                  <span className="learning-actions">
+                    <button className="learning-link-button" aria-label="Move module up" disabled={index === 0} onClick={() => moveModule(index, -1)} type="button">↑</button>
+                    <button className="learning-link-button" aria-label="Move module down" disabled={index === selectedProgram.modules.length - 1} onClick={() => moveModule(index, 1)} type="button">↓</button>
+                  </span>
+                </div>
               ))}
             </div>
           )}
           {(newModule || moduleId) && (
             <form className="learning-form learning-form-divider" onSubmit={saveModule}>
-              <h3>{newModule ? "New module" : "Edit module"}</h3>
-              <div className="learning-field-row">
-                <label className="learning-field">
-                  Module name
-                  <input
-                    required
-                    maxLength={160}
-                    value={moduleForm.title || ""}
-                    onChange={(event) => setModuleForm({ ...moduleForm, title: event.target.value })}
-                  />
-                </label>
-                <label className="learning-field">
-                  Sequence
-                  <input
-                    required
-                    type="number"
-                    min="1"
-                    value={moduleForm.sequence || 1}
-                    onChange={(event) => setModuleForm({ ...moduleForm, sequence: event.target.value })}
-                  />
-                </label>
+              <div className="learning-panel-title">
+                <h3>{newModule ? "Add a module" : "Edit module"}</h3>
+                {!newModule && <span className="learning-status-badge">{moduleForm.status}</span>}
               </div>
+              <label className="learning-field">
+                Module name
+                <input
+                  required
+                  maxLength={160}
+                  placeholder="e.g. Components"
+                  value={moduleForm.title || ""}
+                  onChange={(event) => setModuleForm({ ...moduleForm, title: event.target.value })}
+                />
+              </label>
               <label className="learning-field">
                 Description
                 <textarea
                   required
                   rows={3}
+                  placeholder="Briefly describe this module for students."
                   value={moduleForm.description || ""}
                   onChange={(event) => setModuleForm({ ...moduleForm, description: event.target.value })}
                 />
               </label>
               <div className="learning-field-row">
                 <label className="learning-field">
-                  Price
+                  Fee (INR)
                   <input
                     type="number"
                     min="0"
                     step="0.01"
                     value={moduleForm.price ?? 0}
                     onChange={(event) => setModuleForm({ ...moduleForm, price: event.target.value })}
+                  />
+                </label>
+                <label className="learning-field">
+                  Access duration (days)
+                  <input
+                    type="number"
+                    min="1"
+                    max="36500"
+                    step="1"
+                    placeholder="Blank means lifetime"
+                    value={moduleForm.accessDurationDays ?? ""}
+                    onChange={(event) => setModuleForm({ ...moduleForm, accessDurationDays: event.target.value })}
+                  />
+                  <small className="learning-help">Starts after verified payment. Free modules start when access is granted; leave blank for lifetime access.</small>
+                </label>
+              </div>
+              <details className="learning-advanced-section">
+                <summary>Advanced module settings</summary>
+                <label className="learning-field">
+                  Currency
+                  <input
+                    maxLength={3}
+                    value={moduleForm.currency || "INR"}
+                    onChange={(event) => setModuleForm({ ...moduleForm, currency: event.target.value.toUpperCase() })}
                   />
                 </label>
                 <label className="learning-field">
@@ -527,61 +792,562 @@ function AdminLearning() {
                     <option value="ADVANCED">Advanced</option>
                   </select>
                 </label>
-              </div>
-              <label className="learning-field">
-                Estimated duration (minutes)
-                <input
-                  type="number"
-                  min="1"
-                  value={moduleForm.estimatedDurationMinutes || 60}
-                  onChange={(event) => setModuleForm({ ...moduleForm, estimatedDurationMinutes: event.target.value })}
-                />
-              </label>
-              {[
-                ["objectives", "Module learning objectives"],
-                ["prerequisites", "Prerequisite module IDs"],
-                ["topics", "Topics and subtopics (JSON)"],
-                ["assessment", "Assessment questions and expected answers (JSON)"],
-                ["completionRequirements", "Completion requirements (JSON)"],
-              ].map(([field, label]) => (
-                <label className="learning-field" key={field}>
-                  {label}
-                  <textarea
-                    className="learning-json-field"
-                    rows={field === "topics" ? 11 : 5}
-                    spellCheck="false"
-                    value={jsonFields[field]}
-                    onChange={(event) => setJsonFields({ ...jsonFields, [field]: event.target.value })}
+                <label className="learning-field">
+                  Estimated duration in minutes (optional)
+                  <input
+                    type="number"
+                    min="1"
+                    value={moduleForm.estimatedDurationMinutes || 60}
+                    onChange={(event) => setModuleForm({ ...moduleForm, estimatedDurationMinutes: event.target.value })}
                   />
                 </label>
-              ))}
-              <details className="learning-content-template">
-                <summary>View the editable topic structure</summary>
-                <pre>{`[
-  {
-    "title": "",
-    "description": "",
-    "explanation": "",
-    "objectives": [],
-    "examples": [{ "title": "", "explanation": "", "code": "", "language": "java" }],
-    "questions": [{ "prompt": "", "expectedAnswer": "", "acceptedAnswers": [] }],
-    "exercises": [{
-      "title": "",
-      "instructions": "",
-      "starterCode": "",
-      "language": "java",
-      "tests": [{ "input": "", "expectedOutput": "", "visible": true }]
-    }],
-    "subtopics": [{ "title": "", "explanation": "", "objectives": [], "examples": [], "questions": [], "exercises": [] }]
-  }
-]`}</pre>
+                {[
+                  ["objectives", "Learning objectives (JSON)"],
+                  ["prerequisites", "Prerequisite module IDs (JSON)"],
+                  ["assessment", "Assessment questions (JSON)"],
+                  ["completionRequirements", "Completion requirements (JSON)"],
+                ].map(([field, label]) => (
+                  <label className="learning-field" key={field}>
+                    {label}
+                    <textarea
+                      className="learning-json-field"
+                      rows={4}
+                      spellCheck="false"
+                      value={jsonFields[field]}
+                      onChange={(event) => setJsonFields({ ...jsonFields, [field]: event.target.value })}
+                    />
+                  </label>
+                ))}
+                <details className="learning-advanced-section">
+                  <summary>AI tutor behavior (optional)</summary>
+                  <label className="learning-field">
+                    How should the tutor teach this module?
+                    <textarea
+                      rows={4}
+                      maxLength={8000}
+                      value={moduleForm.aiConfiguration?.behaviorPrompt || ""}
+                      onChange={(event) => setModuleForm({
+                        ...moduleForm,
+                        aiConfiguration: {
+                          ...(moduleForm.aiConfiguration || {}),
+                          behaviorPrompt: event.target.value,
+                        },
+                      })}
+                      placeholder="Leave blank to use the friendly, topic-focused default tutor."
+                    />
+                  </label>
+                  <details className="learning-advanced-section">
+                    <summary>Advanced AI settings (JSON, optional)</summary>
+                    <textarea
+                      className="learning-json-field"
+                      rows={4}
+                      spellCheck="false"
+                      value={aiSettingsText}
+                      onChange={(event) => setAiSettingsText(event.target.value)}
+                    />
+                  </details>
+                  <details className="learning-content-template">
+                    <summary>Preview tutor instructions</summary>
+                    <pre>{moduleForm.aiConfiguration?.behaviorPrompt || "The platform's safe, friendly teaching defaults will be used."}</pre>
+                  </details>
+                </details>
               </details>
-              <p className="learning-help">
-                Topic objects support title, description, explanation, objectives, examples, questions, exercises, and subtopics. Exercise tests and assessment answers stay server-side.
-              </p>
-              <button className="learning-button" disabled={saving} type="submit">
-                <Save size={15} /> {saving ? "Saving…" : "Save module content"}
-              </button>
+              {!newModule && (
+                <section className="learning-form learning-form-divider">
+                  <div className="learning-panel-title">
+                    <div>
+                      <h4>Topics</h4>
+                      <p>Add only the topics this module needs.</p>
+                    </div>
+                    <span className="learning-status-badge">{moduleForm.topics?.length || 0}</span>
+                  </div>
+                  {!moduleForm.topics?.length && (
+                    <p className="learning-empty-state">No topics yet. Add at least one topic before publishing this module.</p>
+                  )}
+                  {(moduleForm.topics || []).map((topic, index) => (
+                    <div className="learning-module-row" key={topic._id}>
+                      <button
+                        className={editingTopicId === String(topic._id) ? "is-selected" : ""}
+                        onClick={() => editTopic(topic)}
+                        type="button"
+                      >
+                        <span>{index + 1}. {topic.title}</span>
+                      </button>
+                      <span className="learning-actions">
+                        <button className="learning-link-button" aria-label="Move topic up" disabled={index === 0} onClick={() => moveTopic(index, -1)} type="button">↑</button>
+                        <button className="learning-link-button" aria-label="Move topic down" disabled={index === moduleForm.topics.length - 1} onClick={() => moveTopic(index, 1)} type="button">↓</button>
+                        <button className="learning-link-button" onClick={() => removeTopic(String(topic._id))} type="button">Remove</button>
+                      </span>
+                    </div>
+                  ))}
+                  <div className="learning-form">
+                    <h5>{editingTopicId ? "Edit topic" : "Add a topic"}</h5>
+                    {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
+                    <label className="learning-field">
+                      Topic title
+                      <input
+                        maxLength={160}
+                        placeholder="e.g. Components, Variables, Network layers"
+                        value={topicDraft.title}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, title: event.target.value })}
+                      />
+                    </label>
+                    <label className="learning-field">
+                      Short description
+                      <textarea
+                        rows={2}
+                        maxLength={2000}
+                        value={topicDraft.description}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })}
+                      />
+                    </label>
+                    <label className="learning-field">
+                      What will students learn?
+                      <textarea
+                        required
+                        rows={5}
+                        maxLength={12000}
+                        placeholder="Explain the topic clearly. Include theory or code as appropriate."
+                        value={topicDraft.explanation}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, explanation: event.target.value })}
+                      />
+                    </label>
+                    <label className="learning-field">
+                      How should the AI tutor teach this topic? (optional)
+                      <textarea
+                        rows={3}
+                        maxLength={4000}
+                        placeholder="For example: use a simple analogy, then ask the student to explain it back."
+                        value={topicDraft.tutorInstructions}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, tutorInstructions: event.target.value })}
+                      />
+                    </label>
+                    <label className="learning-field">
+                      What should the AI look for in answers? (optional)
+                      <textarea
+                        rows={3}
+                        maxLength={4000}
+                        placeholder="For example: look for the key idea, explain what is missing, and offer a hint."
+                        value={topicDraft.validationInstructions}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, validationInstructions: event.target.value })}
+                      />
+                    </label>
+                    <label className="learning-field">
+                      Learning objectives (optional, one per line)
+                      <textarea
+                        rows={2}
+                        value={topicDraft.objectivesText}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })}
+                      />
+                    </label>
+                    <div className="learning-topic-editor-group">
+                      <div className="learning-panel-title">
+                        <h5>Examples (optional)</h5>
+                        <button
+                          className="learning-button learning-button-small learning-button-secondary"
+                          onClick={() => setTopicDraft({
+                            ...topicDraft,
+                            examples: [...topicDraft.examples, { title: "", explanation: "", code: "", language: "" }],
+                          })}
+                          type="button"
+                        >
+                          Add example
+                        </button>
+                      </div>
+                      {topicDraft.examples.map((example, index) => (
+                        <div className="learning-topic-editor-card" key={`example-${index}`}>
+                          <label className="learning-field">
+                            Example title
+                            <input
+                              value={example.title || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                examples: updateTopicItem(topicDraft.examples, index, "title", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Explanation or example
+                            <textarea
+                              rows={2}
+                              value={example.explanation || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                examples: updateTopicItem(topicDraft.examples, index, "explanation", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Code sample (optional)
+                            <textarea
+                              rows={4}
+                              value={example.code || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                examples: updateTopicItem(topicDraft.examples, index, "code", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Code language (optional)
+                            <input
+                              placeholder="e.g. Java, JavaScript, Python"
+                              value={example.language || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                examples: updateTopicItem(topicDraft.examples, index, "language", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <button
+                            className="learning-link-button"
+                            onClick={() => setTopicDraft({
+                              ...topicDraft,
+                              examples: topicDraft.examples.filter((_item, itemIndex) => itemIndex !== index),
+                            })}
+                            type="button"
+                          >
+                            Remove example
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="learning-topic-editor-group">
+                      <div className="learning-panel-title">
+                        <h5>Topic completion check</h5>
+                        <p className="learning-help">Add at least one question with its expected answer. The server checks answers before marking this topic complete.</p>
+                        <button
+                          className="learning-button learning-button-small learning-button-secondary"
+                          onClick={() => setTopicDraft({
+                            ...topicDraft,
+                            questions: [...topicDraft.questions, {
+                              prompt: "",
+                              expectedAnswer: "",
+                              acceptedAnswersText: "",
+                            }],
+                          })}
+                          type="button"
+                        >
+                          Add question
+                        </button>
+                      </div>
+                      {topicDraft.questions.map((question, index) => (
+                        <div className="learning-topic-editor-card" key={`question-${index}`}>
+                          <label className="learning-field">
+                            Check question
+                            <textarea
+                              rows={2}
+                              value={question.prompt || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                questions: updateTopicItem(topicDraft.questions, index, "prompt", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Expected answer
+                            <textarea
+                              rows={2}
+                              value={question.expectedAnswer || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                questions: updateTopicItem(topicDraft.questions, index, "expectedAnswer", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Other accepted answers (optional, one per line)
+                            <textarea
+                              rows={2}
+                              value={question.acceptedAnswersText || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                questions: updateTopicItem(topicDraft.questions, index, "acceptedAnswersText", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <button
+                            className="learning-link-button"
+                            onClick={() => setTopicDraft({
+                              ...topicDraft,
+                              questions: topicDraft.questions.filter((_item, itemIndex) => itemIndex !== index),
+                            })}
+                            type="button"
+                          >
+                            Remove question
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="learning-topic-editor-group">
+                      <div className="learning-panel-title">
+                        <h5>Exercises and activities (optional)</h5>
+                        <button
+                          className="learning-button learning-button-small learning-button-secondary"
+                          onClick={() => setTopicDraft({
+                            ...topicDraft,
+                            exercises: [...topicDraft.exercises, {
+                              type: "ACTIVITY",
+                              title: "",
+                              instructions: "",
+                              starterCode: "",
+                              language: "java",
+                              tests: [],
+                            }],
+                          })}
+                          type="button"
+                        >
+                          Add activity
+                        </button>
+                      </div>
+                      {topicDraft.exercises.map((exercise, index) => (
+                        <div className="learning-topic-editor-card" key={`exercise-${index}`}>
+                          <label className="learning-field">
+                            Activity type
+                            <select
+                              value={exercise.type || "CODE"}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                exercises: updateTopicItem(topicDraft.exercises, index, "type", event.target.value),
+                              })}
+                            >
+                              <option value="ACTIVITY">Written or discussion activity</option>
+                              <option value="CODE">Coding exercise</option>
+                            </select>
+                          </label>
+                          <label className="learning-field">
+                            Activity title
+                            <input
+                              value={exercise.title || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                exercises: updateTopicItem(topicDraft.exercises, index, "title", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Instructions
+                            <textarea
+                              rows={3}
+                              value={exercise.instructions || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                exercises: updateTopicItem(topicDraft.exercises, index, "instructions", event.target.value),
+                              })}
+                            />
+                          </label>
+                          {exercise.type === "CODE" && (
+                            <>
+                              <label className="learning-field">
+                                Starting code (optional)
+                                <textarea
+                                  rows={4}
+                                  value={exercise.starterCode || ""}
+                                  onChange={(event) => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(topicDraft.exercises, index, "starterCode", event.target.value),
+                                  })}
+                                />
+                              </label>
+                              <details className="learning-advanced-section">
+                                <summary>Java test cases (optional)</summary>
+                                {(exercise.tests || []).map((testCase, testIndex) => (
+                                  <div className="learning-topic-editor-card" key={`test-${testIndex}`}>
+                                    <label className="learning-field">
+                                      Input
+                                      <textarea
+                                        rows={2}
+                                        value={testCase.input || ""}
+                                        onChange={(event) => {
+                                          const tests = updateTopicItem(exercise.tests, testIndex, "input", event.target.value);
+                                          setTopicDraft({
+                                            ...topicDraft,
+                                            exercises: updateTopicItem(topicDraft.exercises, index, "tests", tests),
+                                          });
+                                        }}
+                                      />
+                                    </label>
+                                    <label className="learning-field">
+                                      Expected output
+                                      <textarea
+                                        rows={2}
+                                        value={testCase.expectedOutput || ""}
+                                        onChange={(event) => {
+                                          const tests = updateTopicItem(exercise.tests, testIndex, "expectedOutput", event.target.value);
+                                          setTopicDraft({
+                                            ...topicDraft,
+                                            exercises: updateTopicItem(topicDraft.exercises, index, "tests", tests),
+                                          });
+                                        }}
+                                      />
+                                    </label>
+                                    <label className="learning-field learning-checkbox-field">
+                                      <input
+                                        type="checkbox"
+                                        checked={testCase.visible || false}
+                                        onChange={(event) => {
+                                          const tests = updateTopicItem(exercise.tests, testIndex, "visible", event.target.checked);
+                                          setTopicDraft({
+                                            ...topicDraft,
+                                            exercises: updateTopicItem(topicDraft.exercises, index, "tests", tests),
+                                          });
+                                        }}
+                                      />
+                                      Show this test to students
+                                    </label>
+                                    <button
+                                      className="learning-link-button"
+                                      onClick={() => setTopicDraft({
+                                        ...topicDraft,
+                                        exercises: updateTopicItem(
+                                          topicDraft.exercises,
+                                          index,
+                                          "tests",
+                                          exercise.tests.filter((_item, itemIndex) => itemIndex !== testIndex),
+                                        ),
+                                      })}
+                                      type="button"
+                                    >
+                                      Remove test
+                                    </button>
+                                  </div>
+                                ))}
+                                <button
+                                  className="learning-button learning-button-small learning-button-secondary"
+                                  onClick={() => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(
+                                      topicDraft.exercises,
+                                      index,
+                                      "tests",
+                                      [...(exercise.tests || []), { input: "", expectedOutput: "", visible: false }],
+                                    ),
+                                  })}
+                                  type="button"
+                                >
+                                  Add test case
+                                </button>
+                              </details>
+                            </>
+                          )}
+                          <button
+                            className="learning-link-button"
+                            onClick={() => setTopicDraft({
+                              ...topicDraft,
+                              exercises: topicDraft.exercises.filter((_item, itemIndex) => itemIndex !== index),
+                            })}
+                            type="button"
+                          >
+                            Remove activity
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="learning-topic-editor-group">
+                      <div className="learning-panel-title">
+                        <h5>Subtopics (optional)</h5>
+                        <button
+                          className="learning-button learning-button-small learning-button-secondary"
+                          onClick={() => setTopicDraft({
+                            ...topicDraft,
+                            subtopics: [...topicDraft.subtopics, { title: "", explanation: "" }],
+                          })}
+                          type="button"
+                        >
+                          Add subtopic
+                        </button>
+                      </div>
+                      {topicDraft.subtopics.map((subtopic, index) => (
+                        <div className="learning-topic-editor-card" key={`subtopic-${index}`}>
+                          <label className="learning-field">
+                            Subtopic title
+                            <input
+                              value={subtopic.title || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                subtopics: updateTopicItem(topicDraft.subtopics, index, "title", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Explanation
+                            <textarea
+                              rows={2}
+                              value={subtopic.explanation || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                subtopics: updateTopicItem(topicDraft.subtopics, index, "explanation", event.target.value),
+                              })}
+                            />
+                          </label>
+                          <button
+                            className="learning-link-button"
+                            onClick={() => setTopicDraft({
+                              ...topicDraft,
+                              subtopics: topicDraft.subtopics.filter((_item, itemIndex) => itemIndex !== index),
+                            })}
+                            type="button"
+                          >
+                            Remove subtopic
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="learning-actions">
+                      <button className="learning-button" disabled={saving} onClick={saveTopic} type="button">
+                        {editingTopicId ? "Save topic" : "Add topic"}
+                      </button>
+                      {editingTopicId && (
+                        <button
+                          className="learning-button learning-button-secondary"
+                          onClick={cancelTopicEdit}
+                          type="button"
+                        >
+                          Cancel edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </section>
+              )}
+              {previewModule && (
+                <section className="learning-module-preview">
+                  <p className="learning-eyebrow">Preview</p>
+                  <h4>{moduleForm.title || "Untitled module"}</h4>
+                  <p>{moduleForm.description || "Add a module overview to see it here."}</p>
+                  <div className="learning-preview-topics">
+                    {(moduleForm.topics || []).map((topic) => (
+                      <article key={topic._id || topic.title}>
+                        <strong>{topic.title}</strong>
+                        {topic.description && <p>{topic.description}</p>}
+                      </article>
+                    ))}
+                    {!moduleForm.topics?.length && <p className="learning-muted">No topics have been added.</p>}
+                  </div>
+                </section>
+              )}
+              <div className="learning-actions learning-admin-form-actions">
+                <button className="learning-button" disabled={saving} type="submit">
+                  <Save size={15} /> {saving ? "Saving…" : moduleForm.status === "PUBLISHED" ? "Save changes" : "Save draft"}
+                </button>
+                <button
+                  className="learning-button learning-button-secondary"
+                  onClick={() => setPreviewModule((current) => !current)}
+                  type="button"
+                >
+                  {previewModule ? "Close preview" : "Preview"}
+                </button>
+              </div>
+              {!newModule && (
+                <div className="learning-actions">
+                  <button className="learning-button learning-button-secondary" disabled={saving} onClick={changeModuleStatus} type="button">
+                    {moduleForm.status === "PUBLISHED" ? "Unpublish module" : "Publish module"}
+                  </button>
+                  <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveModule} type="button">
+                    Archive module
+                  </button>
+                </div>
+              )}
             </form>
           )}
         </div>
@@ -601,13 +1367,14 @@ function AdminLearning() {
                   <small>{purchase.currency} {Number(purchase.amount || 0).toFixed(2)}</small>
                   <small>{purchase.status}</small>
                 </div>
-                {purchase.status === "PENDING" && (
+                {["PENDING", "ACTIVE"].includes(purchase.status) && (
                   <div className="learning-actions">
-                    <button className="learning-button" onClick={() => reviewPurchase(purchase._id, "ACTIVE")} type="button">
-                      Approve access
-                    </button>
-                    <button className="learning-button learning-button-secondary" onClick={() => reviewPurchase(purchase._id, "REJECTED")} type="button">
-                      Reject
+                    <button
+                      className="learning-button learning-button-secondary"
+                      onClick={() => reviewPurchase(purchase._id, purchase.status === "ACTIVE" ? "REVOKED" : "REJECTED")}
+                      type="button"
+                    >
+                      {purchase.status === "ACTIVE" ? "Revoke access" : "Reject purchase"}
                     </button>
                   </div>
                 )}
@@ -632,14 +1399,17 @@ function StudentLearning() {
   });
   const [loadingMore, setLoadingMore] = useState(false);
   const [moduleData, setModuleData] = useState(null);
+  const [topicContent, setTopicContent] = useState(null);
   const [topicId, setTopicId] = useState("");
   const [exerciseId, setExerciseId] = useState("");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [topicAnswers, setTopicAnswers] = useState({});
+  const [topicCheckResult, setTopicCheckResult] = useState(null);
   const [message, setMessage] = useState("");
   const [language, setLanguage] = useState("en");
   const [voices, setVoices] = useState([]);
-  const [voiceName, setVoiceName] = useState("");
+  const [voiceProfile, setVoiceProfile] = useState("girl");
   const [voiceOutput, setVoiceOutput] = useState(true);
   const [voiceError, setVoiceError] = useState("");
   const [codingOpen, setCodingOpen] = useState(false);
@@ -656,6 +1426,10 @@ function StudentLearning() {
       output: createSpeechOutputProvider(window),
     }),
     [],
+  );
+  const voiceChoices = useMemo(
+    () => getVoiceProfileChoices(voices, language),
+    [voices, language],
   );
 
   const loadStudentData = async (page = 1, append = false) => {
@@ -694,10 +1468,12 @@ function StudentLearning() {
     return voiceProviders.output.onVoicesChanged(refreshVoices);
   }, [voiceProviders]);
 
-  const selectedTopic = useMemo(
-    () => moduleData?.module?.topics?.find((topic) => String(topic._id) === topicId) || null,
-    [moduleData, topicId],
-  );
+  useEffect(() => {
+    if (!voiceChoices[voiceProfile] && voiceChoices.boy) setVoiceProfile("boy");
+    else if (!voiceChoices[voiceProfile] && voiceChoices.girl) setVoiceProfile("girl");
+  }, [voiceChoices, voiceProfile]);
+
+  const selectedTopic = String(topicContent?._id) === topicId ? topicContent : null;
   const selectedExercise = useMemo(
     () => getTopicExercises(selectedTopic).find((exercise) => String(exercise._id) === exerciseId) || null,
     [exerciseId, selectedTopic],
@@ -705,15 +1481,22 @@ function StudentLearning() {
 
   const beginSession = async (module, topic, selectedLanguage = language) => {
     if (!topic) return;
+    setTopicContent(null);
     const { data } = await api.post("/learning/sessions", {
       moduleId: module._id,
       topicId: topic._id,
       language: selectedLanguage,
     });
+    const { data: topicResponse } = await api.get(
+      `/learning/programs/${module.programId}/modules/${module._id}/topics/${topic._id}`,
+    );
+    setTopicContent(topicResponse.topic);
     setSession(data.session);
     setMessages(data.session.messages || []);
+    setTopicAnswers({});
+    setTopicCheckResult(null);
     setTopicId(String(topic._id));
-    const firstExercise = getTopicExercises(topic)[0];
+    const firstExercise = getTopicExercises(topicResponse.topic)[0];
     setExerciseId(String(firstExercise?._id || ""));
     setExerciseCode(firstExercise?.starterCode || "");
     setExerciseResult(null);
@@ -763,7 +1546,11 @@ function StudentLearning() {
       setVoiceError("Voice output is not available in this desktop runtime. Tutor text remains available.");
       return;
     }
-    voiceProviders.output.speak(text, { language, voiceName });
+    try {
+      voiceProviders.output.speak(text, { language, profile: voiceProfile });
+    } catch (speechError) {
+      setVoiceError(speechError.message || "The selected voice is not installed for this language.");
+    }
   };
 
   const sendMessage = async (input = message) => {
@@ -805,13 +1592,48 @@ function StudentLearning() {
     }
   };
 
-  const requestPurchase = async (target) => {
+  const requestPurchase = async ({ moduleId: requestedModuleId }) => {
     setError("");
     setNotice("");
     try {
-      await api.post("/learning/purchases", target);
-      setNotice("Purchase request recorded. A Super Admin must approve access; no payment was taken.");
-      await loadStudentData();
+      const { data } = await api.post("/learning/purchases", { moduleId: requestedModuleId });
+      if (data.purchase?.status === "ACTIVE") {
+        setNotice("This module is now available in your learning account.");
+        await loadStudentData();
+        return;
+      }
+      if (!data.checkout?.keyId || !data.checkout?.orderId) {
+        throw new Error("The server did not create a valid Razorpay checkout order.");
+      }
+      const Razorpay = await loadRazorpayCheckout();
+      const checkout = new Razorpay({
+        key: data.checkout.keyId,
+        amount: data.checkout.amount,
+        currency: data.checkout.currency,
+        order_id: data.checkout.orderId,
+        name: "CodeClash",
+        description: data.checkout.moduleTitle,
+        handler: async (paymentResponse) => {
+          try {
+            await api.post(`/learning/purchases/${data.purchase._id}/verify`, {
+              orderId: paymentResponse.razorpay_order_id,
+              paymentId: paymentResponse.razorpay_payment_id,
+              signature: paymentResponse.razorpay_signature,
+            });
+            setNotice("Payment verified. Module access is now active.");
+            await loadStudentData();
+          } catch (verifyError) {
+            setError(verifyError.message || "Payment confirmation is pending. Please refresh later.");
+          }
+        },
+        modal: {
+          ondismiss: () => setNotice("Checkout closed. No access is granted until payment is confirmed."),
+        },
+      });
+      checkout.on("payment.failed", () => {
+        setError("Razorpay could not complete the payment. You can try again.");
+      });
+      checkout.open();
     } catch (purchaseError) {
       setError(purchaseError.message || "Could not create the purchase request.");
     }
@@ -842,9 +1664,20 @@ function StudentLearning() {
     try {
       const { data } = await api.post(
         `/learning/modules/${moduleData.module._id}/topics/${selectedTopic._id}/complete`,
+        { answers: topicAnswers },
       );
+      if (!data.passed) {
+        setTopicCheckResult(data);
+        setNotice("Not quite yet. Ask the AI tutor for a hint, then try again.");
+        return;
+      }
+      setTopicCheckResult(data);
       setModuleData({ ...moduleData, progress: data.progress, certificate: data.certificate || moduleData.certificate });
-      setNotice(data.certificate ? "Module completed. Your certificate is ready." : "Topic progress saved.");
+      setNotice(data.certificate
+        ? data.certificateEmailSent
+          ? "All module topics are complete. Your certificate is ready and has been emailed."
+          : "Your certificate is ready. Email delivery failed; download it from your certificates."
+        : "Topic completed. Continue with the next topic.");
       await loadStudentData();
     } catch (progressError) {
       setError(progressError.message || "Could not save topic progress.");
@@ -885,7 +1718,11 @@ function StudentLearning() {
         progress: data.progress,
         certificate: data.certificate || moduleData.certificate,
       });
-      if (data.accepted) setNotice("All server-side exercise tests passed.");
+      if (data.accepted) {
+        setNotice(exercise.type === "ACTIVITY"
+          ? "Activity completed."
+          : "All server-side exercise tests passed.");
+      }
       await loadStudentData();
     } catch (exerciseError) {
       setError(exerciseError.message || "Could not run the exercise.");
@@ -906,9 +1743,11 @@ function StudentLearning() {
   if (moduleData) {
     const { module, progress } = moduleData;
     const completedTopics = progress.completedTopicIds || [];
-    const topicProgress = module.topics.length
-      ? Math.round((completedTopics.length / module.topics.length) * 100)
-      : 0;
+    const topicProgress = Number.isFinite(progress.progressPercentage)
+      ? progress.progressPercentage
+      : module.topics.length
+        ? Math.round((completedTopics.length / module.topics.length) * 100)
+        : 0;
     return (
       <div className="learning-center learning-workspace">
         <button className="learning-back-button" onClick={closeModule} type="button">
@@ -982,11 +1821,29 @@ function StudentLearning() {
                     {selectedTopic.questions?.length > 0 && (
                       <div className="learning-objectives">
                         <strong>Check your understanding</strong>
-                        <ul>
-                          {selectedTopic.questions.map((question) => (
-                            <li key={question._id}>{question.prompt}</li>
-                          ))}
-                        </ul>
+                        <p>Answer these questions to complete the topic. Ask the tutor for hints if you need them.</p>
+                        {selectedTopic.questions.map((question) => (
+                          <label className="learning-field" key={question._id}>
+                            {question.prompt}
+                            <textarea
+                              rows={2}
+                              maxLength={5000}
+                              value={topicAnswers[String(question._id)] || ""}
+                              onChange={(event) => setTopicAnswers({
+                                ...topicAnswers,
+                                [String(question._id)]: event.target.value,
+                              })}
+                            />
+                          </label>
+                        ))}
+                        {topicCheckResult && !topicCheckResult.passed && (
+                          <p className="learning-field-error" role="status">
+                            {topicCheckResult.scorePercent}% matched. The tutor can give you a hint.
+                          </p>
+                        )}
+                        {topicCheckResult?.passed && (
+                          <p className="learning-success-text" role="status">Topic check passed.</p>
+                        )}
                       </div>
                     )}
                     {selectedTopic.subtopics?.map((subtopic) => (
@@ -1009,10 +1866,12 @@ function StudentLearning() {
                   </div>
                   <div className="learning-topic-actions">
                     <button className="learning-button learning-button-secondary" onClick={() => setCodingOpen((open) => !open)} type="button">
-                      <Code2 size={16} /> {codingOpen ? "Close coding workspace" : "Open coding workspace"}
+                      <Code2 size={16} /> {codingOpen ? "Close practice workspace" : "Open practice workspace"}
                     </button>
                     <button className="learning-button" onClick={markTopicComplete} type="button">
-                      <Check size={16} /> Mark topic complete
+                      <Check size={16} /> {selectedTopic.questions?.length
+                        ? "Check answers and complete topic"
+                        : "Mark topic complete"}
                     </button>
                   </div>
                 </>
@@ -1022,7 +1881,7 @@ function StudentLearning() {
             {codingOpen && selectedTopic && (
               <section className="learning-panel learning-code-panel">
                 <div className="learning-panel-title">
-                  <div><h2>Coding workspace</h2><p>Exercises are evaluated by CodeClash's existing secure Java execution service.</p></div>
+                  <div><h2>Practice workspace</h2><p>Complete a written activity or run a supported Java exercise.</p></div>
                 </div>
                 {getTopicExercises(selectedTopic).length ? (
                   <div className="learning-exercise">
@@ -1052,21 +1911,47 @@ function StudentLearning() {
                       <>
                         <h3>{selectedExercise.title}</h3>
                         <p>{selectedExercise.instructions}</p>
-                        <div className="learning-editor-wrap">
-                          <CodeEditorSandbox
-                            key={selectedExercise._id}
-                            language={selectedExercise.language || "java"}
-                            value={exerciseCode}
-                            onChange={setExerciseCode}
-                            height="270px"
-                          />
-                        </div>
-                        <button className="learning-button" disabled={busy} onClick={() => runExercise(selectedExercise)} type="button">
-                          <Play size={15} /> {busy ? "Running…" : "Run exercise"}
-                        </button>
+                        {selectedExercise.type === "ACTIVITY" ? (
+                          <label className="learning-field">
+                            Your response
+                            <textarea
+                              rows={5}
+                              maxLength={20000}
+                              placeholder="Write your response or reflection here."
+                              value={exerciseCode}
+                              onChange={(event) => setExerciseCode(event.target.value)}
+                            />
+                          </label>
+                        ) : String(selectedExercise.language || "java").toLowerCase() === "java" ? (
+                          <>
+                            <div className="learning-editor-wrap">
+                              <CodeEditorSandbox
+                                key={selectedExercise._id}
+                                language="java"
+                                value={exerciseCode}
+                                onChange={setExerciseCode}
+                                height="270px"
+                              />
+                            </div>
+                            <button className="learning-button" disabled={busy} onClick={() => runExercise(selectedExercise)} type="button">
+                              <Play size={15} /> {busy ? "Running…" : "Run exercise"}
+                            </button>
+                          </>
+                        ) : (
+                          <p className="learning-help">
+                            The current secure runner supports Java exercises. Discuss this activity with the tutor or use a written activity for this subject.
+                          </p>
+                        )}
+                        {selectedExercise.type === "ACTIVITY" && (
+                          <button className="learning-button" disabled={busy} onClick={() => runExercise(selectedExercise)} type="button">
+                            <Check size={15} /> {busy ? "Saving…" : "Complete activity"}
+                          </button>
+                        )}
                         {exerciseResult && (
                           <div className={`learning-run-result${exerciseResult.accepted ? " is-success" : ""}`} role="status">
-                            <strong>{exerciseResult.accepted ? "Passed" : `Not passed · ${exerciseResult.passed}/${exerciseResult.total} tests`}</strong>
+                            <strong>{exerciseResult.accepted
+                              ? selectedExercise.type === "ACTIVITY" ? "Activity completed" : "Passed"
+                              : `Not passed · ${exerciseResult.passed}/${exerciseResult.total} tests`}</strong>
                             {exerciseResult.visibleResults?.map((result, index) => (
                               <p key={`${result.testCase}-${index}`}>Test {result.testCase}: {result.status} {result.output && `· ${result.output}`}</p>
                             ))}
@@ -1100,11 +1985,20 @@ function StudentLearning() {
                 </label>
                 <label className="learning-field">
                   Voice
-                  <select value={voiceName} onChange={(event) => setVoiceName(event.target.value)}>
-                    <option value="">System default</option>
-                    {voices.map((voice) => <option key={`${voice.name}-${voice.lang}`} value={voice.name}>{voice.name} · {voice.lang}</option>)}
+                  <select value={voiceProfile} onChange={(event) => setVoiceProfile(event.target.value)}>
+                    <option value="boy" disabled={!voiceChoices.boy}>
+                      {voiceChoices.boy ? "Boy voice" : "Boy voice (not installed)"}
+                    </option>
+                    <option value="girl" disabled={!voiceChoices.girl}>
+                      {voiceChoices.girl ? "Girl voice" : "Girl voice (not installed)"}
+                    </option>
                   </select>
                 </label>
+                {!voiceChoices[voiceProfile] && (
+                  <p className="learning-help" role="status">
+                    No matching native {language === "ta" ? "Tamil" : "English"} {voiceProfile} voice is installed. Add one in your device language settings.
+                  </p>
+                )}
                 <label className="learning-voice-toggle">
                   <input type="checkbox" checked={voiceOutput} onChange={(event) => setVoiceOutput(event.target.checked)} />
                   <Volume2 size={16} /> Voice output
@@ -1194,15 +2088,36 @@ function StudentLearning() {
           {programs.map((program) => (
             <section className="learning-panel learning-program-card" key={program._id}>
               <div className="learning-program-header">
-                <div><span className="learning-program-language">{program.language}</span><h2>{program.title}</h2></div>
-                <span className="learning-price">{displayPrice(program.price)}</span>
+                <div><span className="learning-program-language">{program.category || program.language || "Course"}</span><h2>{program.title}</h2></div>
               </div>
+              {program.shortDescription && <p>{program.shortDescription}</p>}
               <p>{program.description}</p>
+              {program.category && <span className="learning-module-progress">{program.category} · {program.difficulty}</span>}
+              {program.technologies?.length > 0 && (
+                <p className="learning-muted">Subjects: {program.technologies.join(", ")}</p>
+              )}
+              {program.features?.length > 0 && (
+                <ul className="learning-course-features">{program.features.map((feature, index) => <li key={`${feature}-${index}`}>{feature}</li>)}</ul>
+              )}
+              {program.prerequisites?.length > 0 && (
+                <p className="learning-muted">Requirements: {program.prerequisites.join(", ")}</p>
+              )}
+              {program.learningOutcomes?.length > 0 && (
+                <p className="learning-muted">Learning outcomes: {program.learningOutcomes.join(", ")}</p>
+              )}
               {program.modules.map((module) => (
                 <div className="learning-catalog-module" key={module._id}>
                   <div className="learning-catalog-module-copy">
                     <strong>{module.sequence}. {module.title}</strong>
-                    <span>{module.difficulty} · {module.estimatedDurationMinutes} min · {displayPrice(module.price)}</span>
+                    <span>{module.shortDescription || module.description}</span>
+                    <span>{module.difficulty} · {module.estimatedDurationMinutes} min · {displayPrice(module.price, module.currency)}</span>
+                    {module.prerequisites?.length > 0 && (
+                      <span>
+                        Prerequisites: {module.prerequisites.map((id) =>
+                          program.modules.find((item) => String(item._id) === String(id))?.title || "Required module",
+                        ).join(", ")}
+                      </span>
+                    )}
                     <span className="learning-module-progress">
                       {module.progress.completed ? "Completed" : `${module.progress.completedTopics} topic(s) completed`}
                     </span>
@@ -1218,22 +2133,25 @@ function StudentLearning() {
                       onClick={() => requestPurchase({ moduleId: module._id })}
                       type="button"
                     >
-                      {module.purchaseStatus === "PENDING" ? "Pending approval" : module.purchaseStatus === "ACTIVE" ? "Prerequisite required" : "Request module access"}
+                      {module.purchaseStatus === "PENDING"
+                        ? "Payment pending"
+                        : module.purchaseStatus === "ACTIVE"
+                          ? "Prerequisite required"
+                          : module.purchaseStatus === "EXPIRED"
+                            ? `Access expired · Repurchase · ${displayPrice(module.price, module.currency)}`
+                            : `Purchase module · ${displayPrice(module.price, module.currency)}`}
                     </button>
                   )}
+                  <small className="learning-access-duration">
+                    {module.accessDurationDays
+                      ? `Access for ${module.accessDurationDays} days from ${module.price === 0 ? "activation" : "payment"}`
+                      : "Lifetime access"}
+                    {module.hasAccess && module.accessExpiresAt
+                      ? ` · Expires ${new Date(module.accessExpiresAt).toLocaleDateString()}`
+                      : ""}
+                  </small>
                 </div>
               ))}
-              <div className="learning-program-purchase">
-                <span>Program access · {displayPrice(program.price)}</span>
-                <button
-                  className="learning-link-button"
-                  disabled={program.purchaseStatus === "PENDING" || program.purchaseStatus === "ACTIVE"}
-                  onClick={() => requestPurchase({ programId: program._id })}
-                  type="button"
-                >
-                  {program.purchaseStatus === "PENDING" ? "Request pending" : program.purchaseStatus === "ACTIVE" ? "Program access active" : "Request program purchase"}
-                </button>
-              </div>
             </section>
           ))}
         </div>

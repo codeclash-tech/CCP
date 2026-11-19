@@ -91,6 +91,16 @@ The API URL is embedded in the build. To change it later, build and install a
 new version of the desktop app. Ensure the selected backend is running and
 allows requests from the packaged desktop app.
 
+## AI tutor readiness
+
+The desktop installer does not bundle Ollama or the language model. Install
+Ollama on the backend host, run `ollama pull llama3.1:8b`, and configure the
+backend with `AI_PROVIDER=ollama`, `AI_MODEL=llama3.1:8b`, and an
+`AI_BASE_URL` reachable from that backend. Local Ollama does not require an API
+key, so keep `AI_API_KEY` empty. Do not put AI credentials in the desktop
+renderer or commit the backend `.env`. The tutor is ready for students only
+when the backend and Ollama model are running and reachable.
+
 ## Desktop integrity and assessment trust
 
 The Windows packaging script creates an integrity manifest for the bundled

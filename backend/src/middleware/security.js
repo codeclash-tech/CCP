@@ -59,6 +59,15 @@ export const learningTutorLimiter = rateLimit({
   },
 });
 
+export const learningPurchaseLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many purchase requests. Please try again later." },
+  skip: skipPreflight,
+});
+
 export function requireJudgeCallbackSecret(req, res, next) {
   const configuredSecret = config.JUDGE_CALLBACK_SECRET;
 

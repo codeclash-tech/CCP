@@ -1,10 +1,12 @@
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import LearningCertificate from "../models/LearningCertificate.js";
 import User from "../models/User.js";
 import WeeklyCertificate from "../models/WeeklyCertificate.js";
 import WeeklyCycle from "../models/WeeklyCycle.js";
 import WeeklySubmission from "../models/WeeklySubmission.js";
 import { createCertificatePdfBuffer } from "./certificatePdfService.js";
 import { sendChallengeCompletionEmail } from "./emailService.js";
+import { dispatchLearningCertificateEmail } from "./learningCertificateNotificationService.js";
 
 const STALE_DELIVERY_MS = 10 * 60 * 1000;
 const RETRY_DELIVERY_MS = 5 * 60 * 1000;
@@ -259,7 +261,7 @@ export async function dispatchBattleRoomCompletionEmails(roomId) {
 }
 
 export async function retryPendingCompletionEmails() {
-  const [weekly, battles] = await Promise.all([
+  const [weekly, battles, learningCertificates] = await Promise.all([
     WeeklySubmission.find({
       status: "FINALIZED",
       "certificateEmail.eligible": true,
@@ -279,11 +281,20 @@ export async function retryPendingCompletionEmails() {
       .sort({ "certificateEmail.attemptedAt": 1 })
       .limit(100)
       .lean(),
+    LearningCertificate.find({
+      "completionEmail.status": { $in: ["PENDING", "FAILED", "SENDING"] },
+      "completionEmail.attempts": { $lt: 3 },
+    })
+      .select("_id")
+      .sort({ "completionEmail.attemptedAt": 1 })
+      .limit(100)
+      .lean(),
   ]);
 
   await Promise.all([
     ...weekly.map(({ _id }) => dispatchWeeklyCompletionEmail(_id)),
     ...battles.map(({ _id }) => dispatchBattleRoomCompletionEmail(_id)),
+    ...learningCertificates.map(({ _id }) => dispatchLearningCertificateEmail(_id)),
   ]);
 
   const rankingCertificates = await WeeklyCertificate.find({

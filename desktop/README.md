@@ -74,10 +74,12 @@ Final Battle Room and weekly submissions remain server-authoritative.
 
 The desktop includes the AI Learning workspace and Super Admin authoring
 screens. Learning content, purchases, student progress, assessments, and
-certificates are server-managed. Configure `AI_PROVIDER`, `AI_MODEL`, and
-`AI_BASE_URL` on the backend; provider credentials are never placed in the
-desktop renderer. Tutor speech uses separate platform speech input/output
-adapters, so text tutoring remains available when a system voice is missing.
+certificates are server-managed. Configure AI and Razorpay credentials on the
+backend; only the Razorpay public key ID and a server-created order reach
+Checkout. The package adds the Razorpay Checkout origins to the packaged
+desktop renderer policy only; the shared website CSP source remains unchanged.
+Tutor speech uses separate platform speech input/output adapters, so text
+tutoring remains available when a system voice is missing.
 
 Local execution remains useful for immediate candidate feedback, but it is not
 the score authority. The authenticated candidate can still inspect or modify

@@ -31,10 +31,13 @@ export function evaluateLearningAssessment(questions, answers, passingScorePerce
 
 export function meetsModuleCompletionRequirements(module, progress) {
   const requirements = module.completionRequirements || {};
-  const topicCount = (progress.completedTopicIds || []).length;
+  const completedTopicIds = new Set((progress.completedTopicIds || []).map(String));
+  const topics = module.topics || [];
   const exerciseCount = (progress.completedExerciseIds || []).length;
   return (
-    topicCount >= Number(requirements.minCompletedTopics || 0) &&
+    topics.length > 0 &&
+    topics.every((topic) => completedTopicIds.has(String(topic._id))) &&
+    completedTopicIds.size >= Number(requirements.minCompletedTopics || 0) &&
     exerciseCount >= Number(requirements.requiredExercises || 0) &&
     (!requirements.requireAssessment || progress.assessmentPassed === true)
   );

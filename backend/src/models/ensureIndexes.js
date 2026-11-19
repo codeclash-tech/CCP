@@ -9,6 +9,12 @@ import WeeklySubmission from "./WeeklySubmission.js";
 import WeeklyCertificate from "./WeeklyCertificate.js";
 import AssessmentIntegritySession from "./AssessmentIntegritySession.js";
 import User from "./User.js";
+import LearningPurchase from "./LearningPurchase.js";
+import LearningModule from "./LearningModule.js";
+import LearningPaymentEvent from "./LearningPaymentEvent.js";
+import LearningModuleVersion from "./LearningModuleVersion.js";
+import LearningAssessmentAttempt from "./LearningAssessmentAttempt.js";
+import LearningTopicVersion from "./LearningTopicVersion.js";
 import config from "../config/env.js";
 
 /**
@@ -92,6 +98,91 @@ export async function ensureOrganizationMembershipIndexes(
   );
 }
 
+export async function ensureLearningIndexes(
+  collection = LearningPurchase.collection,
+  ensureModelIndexes = true,
+) {
+  let indexes = [];
+  try {
+    indexes = await collection.indexes();
+  } catch (error) {
+    if (error.code !== 26 && error.codeName !== "NamespaceNotFound") throw error;
+  }
+  const purchaseKey = (index) =>
+    index.key?.userId === 1 &&
+    index.key?.moduleId === 1 &&
+    Object.keys(index.key).length === 2;
+  const desiredName = "unique_live_user_module_purchase";
+  const desiredPartialFilter = {
+    moduleId: { $type: "objectId" },
+    status: { $in: ["PENDING", "ACTIVE"] },
+  };
+  const isDesiredPurchaseIndex = (index) =>
+    index.name === desiredName &&
+    index.unique === true &&
+    JSON.stringify(index.partialFilterExpression || {}) === JSON.stringify(desiredPartialFilter);
+  for (const index of indexes) {
+    if (purchaseKey(index) && !isDesiredPurchaseIndex(index)) {
+      await collection.dropIndex(index.name);
+      console.info(`[Models] Replaced stale learning purchase index "${index.name}".`);
+    }
+  }
+  await collection.createIndex(
+    { userId: 1, moduleId: 1 },
+    {
+      name: desiredName,
+      unique: true,
+      partialFilterExpression: desiredPartialFilter,
+    },
+  );
+  if (ensureModelIndexes) {
+    await ensureLearningModuleSequenceIndex();
+    await Promise.all([
+      LearningModule.createIndexes(),
+      LearningPurchase.createIndexes(),
+      LearningPaymentEvent.createIndexes(),
+      LearningModuleVersion.createIndexes(),
+      LearningAssessmentAttempt.createIndexes(),
+      LearningTopicVersion.createIndexes(),
+    ]);
+  }
+}
+
+export async function ensureLearningModuleSequenceIndex(
+  collection = LearningModule.collection,
+) {
+  let indexes = [];
+  try {
+    indexes = await collection.indexes();
+  } catch (error) {
+    if (error.code !== 26 && error.codeName !== "NamespaceNotFound") throw error;
+  }
+  const sequenceKey = (index) =>
+    index.key?.programId === 1 &&
+    index.key?.sequence === 1 &&
+    Object.keys(index.key).length === 2;
+  const desiredName = "unique_active_learning_module_sequence";
+  const desiredFilter = { deletedAt: null };
+  const isDesired = (index) =>
+    index.name === desiredName &&
+    index.unique === true &&
+    JSON.stringify(index.partialFilterExpression || {}) === JSON.stringify(desiredFilter);
+  for (const index of indexes) {
+    if (sequenceKey(index) && !isDesired(index)) {
+      await collection.dropIndex(index.name);
+      console.info(`[Models] Replaced stale learning-module sequence index "${index.name}".`);
+    }
+  }
+  await collection.createIndex(
+    { programId: 1, sequence: 1 },
+    {
+      name: desiredName,
+      unique: true,
+      partialFilterExpression: desiredFilter,
+    },
+  );
+}
+
 export async function ensureWeeklyAssessmentIndexes() {
   await ensureOrganizationMembershipIndexes();
   await Promise.all([
@@ -112,4 +203,5 @@ export default {
   ensureOtpTtlIndex,
   ensureCreatorVerificationOtpTtlIndex,
   ensureWeeklyAssessmentIndexes,
+  ensureLearningIndexes,
 };
