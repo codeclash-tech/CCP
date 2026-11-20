@@ -6,6 +6,7 @@ const learningProgressSchema = new mongoose.Schema(
     moduleId: { type: mongoose.Schema.Types.ObjectId, ref: "LearningModule", required: true },
     moduleVersion: { type: Number, min: 1, default: null },
     completedTopicIds: [{ type: mongoose.Schema.Types.ObjectId }],
+    completedObjectiveKeys: [{ type: String }],
     completedExerciseIds: [{ type: mongoose.Schema.Types.ObjectId }],
     progressPercentage: { type: Number, min: 0, max: 100, default: 0 },
     assessmentPassed: { type: Boolean, default: false },

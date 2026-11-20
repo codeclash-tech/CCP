@@ -52,6 +52,10 @@ function sameId(left, right) {
   return id(left) === id(right);
 }
 
+function objectiveProgressKey(topicId, objectiveIndex) {
+  return `${id(topicId)}:${objectiveIndex}`;
+}
+
 function getTopic(module, topicId) {
   return module.topics.id(topicId);
 }
@@ -105,38 +109,7 @@ function approvedTopicContext(topic) {
   return JSON.stringify({
     title: plain.title,
     description: plain.description,
-    explanation: plain.explanation,
-    tutorInstructions: plain.tutorInstructions,
-    validationInstructions: plain.validationInstructions,
     objectives: plain.objectives,
-    examples: plain.examples,
-    questions: (plain.questions || []).map(({ prompt, question }) => ({ prompt, question })),
-    exercises: (plain.exercises || []).map(({ type, title, instructions, starterCode, language }) => ({
-      type,
-      title,
-      instructions,
-      starterCode,
-      language,
-    })),
-    subtopics: (plain.subtopics || []).map(({
-      title,
-      explanation,
-      objectives,
-      examples,
-      exercises,
-    }) => ({
-      title,
-      explanation,
-      objectives,
-      examples,
-      exercises: (exercises || []).map(({ type, title: exerciseTitle, instructions, starterCode, language }) => ({
-        type,
-        title: exerciseTitle,
-        instructions,
-        starterCode,
-        language,
-      })),
-    })),
   }).slice(0, 16000);
 }
 
@@ -145,13 +118,8 @@ function validateModuleCompletionConfiguration(module) {
   if (!topics.length) {
     throw requestError(`Module "${module.title}" needs at least one topic before it can be published.`);
   }
-  if (topics.some((topic) => !String(topic.explanation || "").trim())) {
-    throw requestError(`Every topic in "${module.title}" needs lesson content before publishing.`);
-  }
-  if (topics.some((topic) => !(topic.questions || []).some((question) =>
-    String(question.prompt || "").trim() && String(question.expectedAnswer || "").trim()
-  ))) {
-    throw requestError(`Every topic in "${module.title}" needs at least one validation question with an expected answer before publishing.`);
+  if (topics.some((topic) => !(topic.objectives || []).some((objective) => String(objective || "").trim()))) {
+    throw requestError(`Every topic in "${module.title}" needs at least one learning objective before publishing.`);
   }
   const requirements = module.completionRequirements || {};
   const exerciseCount = (module.topics || []).reduce(
@@ -559,7 +527,7 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
       moduleId: { $in: moduleIds },
     }).select("programId moduleId status accessExpiresAt").lean(),
     LearningProgress.find({ userId, moduleId: { $in: moduleIds } })
-      .select("moduleId completedTopicIds completedAt assessmentPassed")
+      .select("moduleId completedTopicIds completedObjectiveKeys completedAt assessmentPassed progressPercentage")
       .lean(),
   ]);
   const purchaseFor = (module) => {
@@ -600,10 +568,12 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
             progress: moduleProgress
               ? {
                   completedTopics: moduleProgress.completedTopicIds.length,
+                  completedObjectives: moduleProgress.completedObjectiveKeys?.length || 0,
                   completed: Boolean(moduleProgress.completedAt),
                   assessmentPassed: moduleProgress.assessmentPassed,
+                  progressPercentage: moduleProgress.progressPercentage || 0,
                 }
-              : { completedTopics: 0, completed: false, assessmentPassed: false },
+              : { completedTopics: 0, completedObjectives: 0, completed: false, assessmentPassed: false, progressPercentage: 0 },
           };
         }),
     })),
@@ -728,15 +698,26 @@ export async function updateLearningProgram(userId, programId, input) {
     if (!["DRAFT", "PUBLISHED"].includes(input.status)) {
       throw requestError("Program status must be DRAFT or PUBLISHED.");
     }
-    if (input.status === "PUBLISHED" && program.status !== "PUBLISHED") {
-      const moduleCount = await LearningModule.countDocuments({
+    if (input.status === "PUBLISHED") {
+      const modules = await LearningModule.find({
         programId: program._id,
         deletedAt: null,
       });
-      if (!moduleCount) {
+      if (!modules.length) {
         throw requestError("Add at least one module before publishing this course.");
       }
-      program.publishedAt = new Date();
+      modules.forEach(validateModuleCompletionConfiguration);
+      for (const module of modules) {
+        if (module.status === "PUBLISHED" && module.currentPublishedVersion) continue;
+        module.status = "PUBLISHED";
+        module.currentPublishedVersion = Math.max(
+          1,
+          Number(module.currentPublishedVersion) + 1 || 1,
+        );
+        await module.save();
+        await savePublishedModuleVersion(module);
+      }
+      if (program.status !== "PUBLISHED") program.publishedAt = new Date();
     }
     program.status = input.status;
   }
@@ -1260,6 +1241,7 @@ export async function getStudentModule(userId, programId, moduleId) {
     module: serializeStudentModule(module),
     progress: progress || {
       completedTopicIds: [],
+      completedObjectiveKeys: [],
       completedExerciseIds: [],
       assessmentPassed: false,
       assessmentScorePercent: 0,
@@ -1353,7 +1335,7 @@ export async function askLearningTutor(
   const displayName = String(studentName || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 40);
   const { session, module, topic } = await getLearningSession(userId, sessionId);
   const progress = await LearningProgress.findOne({ userId, moduleId: module._id })
-    .select("completedTopicIds completedExerciseIds assessmentPassed")
+    .select("completedTopicIds completedObjectiveKeys completedExerciseIds assessmentPassed")
     .lean();
   const priorMessages = session.messages.slice(-MAX_SESSION_MESSAGES);
   const startedAt = Date.now();
@@ -1371,9 +1353,16 @@ export async function askLearningTutor(
         completedExercises: progress?.completedExerciseIds?.length || 0,
         assessmentPassed: progress?.assessmentPassed === true,
       },
-      moduleBehavior: module.aiConfiguration?.behaviorPrompt || "",
-      topicBehavior: topic.tutorInstructions || "",
-      validationInstructions: topic.validationInstructions || "",
+      objectiveProgress: {
+        total: (topic.objectives || []).length,
+        completedIndexes: (topic.objectives || [])
+          .map((_objective, index) => index)
+          .filter((index) =>
+            (progress?.completedObjectiveKeys || []).includes(
+              objectiveProgressKey(topic._id, index),
+            ),
+          ),
+      },
       advancedSettings: module.aiConfiguration?.advancedSettings || {},
       history: [
         ...priorMessages,
@@ -1382,6 +1371,49 @@ export async function askLearningTutor(
       language,
       inputTranscribedFromSpeech,
     });
+    const masteredIndexes = [...new Set(reply.masteredObjectiveIndexes || [])]
+      .filter((index) =>
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < (topic.objectives || []).length,
+      );
+    let progressUpdate = null;
+    if (masteredIndexes.length) {
+      const objectiveProgress = await loadProgress(userId, module._id);
+      const completedKeys = new Set(
+        (objectiveProgress.completedObjectiveKeys || []).map(String),
+      );
+      let changed = false;
+      for (const index of masteredIndexes) {
+        const key = objectiveProgressKey(topic._id, index);
+        if (!completedKeys.has(key)) {
+          completedKeys.add(key);
+          changed = true;
+        }
+      }
+      const topicObjectives = topic.objectives || [];
+      const topicComplete = topicObjectives.some((objective) =>
+        String(objective || "").trim(),
+      ) && topicObjectives.every((objective, index) =>
+        !String(objective || "").trim() ||
+        completedKeys.has(objectiveProgressKey(topic._id, index)),
+      );
+      if (
+        topicComplete &&
+        !objectiveProgress.completedTopicIds.some((currentId) => sameId(currentId, topic._id))
+      ) {
+        objectiveProgress.completedTopicIds.push(new mongoose.Types.ObjectId(topic._id));
+        changed = true;
+      }
+      if (changed) {
+        objectiveProgress.completedObjectiveKeys = [...completedKeys];
+        progressUpdate = await updateProgressAndCertificate(
+          userId,
+          module,
+          objectiveProgress,
+        );
+      }
+    }
     session.language = language;
     session.messages.push(
       { role: "user", content: prompt },
@@ -1401,6 +1433,9 @@ export async function askLearningTutor(
       session,
       reply: reply.content,
       replyLanguage: "en",
+      progress: progressUpdate?.progress,
+      certificate: progressUpdate?.certificate,
+      certificateEmailSent: progressUpdate?.certificateEmailSent,
     };
   } catch (error) {
     await LearningAiUsage.create({
@@ -1421,8 +1456,21 @@ async function updateProgressAndCertificate(userId, module, progress) {
       topic.subtopics.reduce((subtopicTotal, subtopic) => subtopicTotal + subtopic.exercises.length, 0),
     0,
   );
-  const totalItems = module.topics.length + exerciseCount + (module.assessment?.questions?.length ? 1 : 0);
-  const completedItems = progress.completedTopicIds.length +
+  const objectiveKeys = new Set((progress.completedObjectiveKeys || []).map(String));
+  const objectiveCount = module.topics.reduce(
+    (total, topic) => total + (topic.objectives || []).filter((objective) => String(objective || "").trim()).length,
+    0,
+  );
+  const completedObjectives = module.topics.reduce(
+    (total, topic) =>
+      total +
+      (topic.objectives || []).filter((objective, index) =>
+        objectiveKeys.has(objectiveProgressKey(topic._id, index)),
+      ).length,
+    0,
+  );
+  const totalItems = objectiveCount + exerciseCount + (module.assessment?.questions?.length ? 1 : 0);
+  const completedItems = completedObjectives +
     progress.completedExerciseIds.length +
     (module.assessment?.questions?.length && progress.assessmentPassed ? 1 : 0);
   progress.progressPercentage = totalItems
@@ -1436,13 +1484,25 @@ async function updateProgressAndCertificate(userId, module, progress) {
   return { progress, certificate, certificateEmailSent };
 }
 
-export async function completeLearningTopic(userId, moduleId, topicId, answers = {}) {
+export async function completeLearningTopic(userId, moduleId, topicId) {
   const { module, progress } = await getEntitledModuleForStudent(userId, moduleId);
   const topic = await getVersionedTopic(module, topicId);
   if (!topic) throw requestError("Topic not found in this module.", 404);
-  const validation = topic.questions?.length
-    ? evaluateLearningAssessment(topic.questions, answers, 100)
-    : { passed: true, scorePercent: 100, results: [] };
+  const completedKeys = new Set((progress.completedObjectiveKeys || []).map(String));
+  const objectives = (topic.objectives || [])
+    .map((objective, index) => ({ objective, index }))
+    .filter(({ objective }) => String(objective || "").trim());
+  const results = objectives.map(({ objective, index }) => ({
+    objective,
+    completed: completedKeys.has(objectiveProgressKey(topic._id, index)),
+  }));
+  const validation = {
+    passed: objectives.length > 0 && results.every((result) => result.completed),
+    scorePercent: objectives.length
+      ? Math.round((results.filter((result) => result.completed).length / objectives.length) * 100)
+      : 0,
+    results,
+  };
   if (!validation.passed) {
     return {
       progress,

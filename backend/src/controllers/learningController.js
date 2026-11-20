@@ -244,7 +244,6 @@ export async function completeTopic(req, res) {
     req.userId,
     req.params.moduleId,
     req.params.topicId,
-    req.body.answers,
   );
   return res.json(result);
 }

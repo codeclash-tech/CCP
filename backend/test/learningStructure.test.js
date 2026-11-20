@@ -57,7 +57,7 @@ test("course creation requires only the course name and description", async () =
 
 test("a course cannot be published before at least one module exists", async () => {
   const originalFindById = LearningProgram.findById;
-  const originalModuleCount = LearningModule.countDocuments;
+  const originalModuleFind = LearningModule.find;
   const program = {
     _id: "507f1f77bcf86cd799439011",
     status: "DRAFT",
@@ -66,7 +66,7 @@ test("a course cannot be published before at least one module exists", async () 
     },
   };
   LearningProgram.findById = async () => program;
-  LearningModule.countDocuments = async () => 0;
+  LearningModule.find = async () => [];
 
   try {
     await assert.rejects(
@@ -76,7 +76,7 @@ test("a course cannot be published before at least one module exists", async () 
     assert.equal(program.status, "DRAFT");
   } finally {
     LearningProgram.findById = originalFindById;
-    LearningModule.countDocuments = originalModuleCount;
+    LearningModule.find = originalModuleFind;
   }
 });
 
@@ -141,7 +141,7 @@ test("modules can be created one at a time with basic details and sensible defau
   }
 });
 
-test("module publication requires at least one valid topic", async () => {
+test("module publication requires topics with learning objectives", async () => {
   const originalFindOne = LearningModule.findOne;
   const originalSave = LearningModule.prototype.save;
   const originalVersionUpsert = LearningModuleVersion.findOneAndUpdate;
@@ -173,21 +173,16 @@ test("module publication requires at least one valid topic", async () => {
       /needs at least one topic/,
     );
     module.topics.splice(0, module.topics.length);
-    module.topics.push({ title: "Introduction" });
-    await assert.rejects(
-      setLearningModuleStatus(module._id, "PUBLISHED"),
-      /needs lesson content/,
-    );
-    module.topics.splice(0, module.topics.length);
-    module.topics.push({ title: "Introduction", explanation: "Learn network basics." });
-    await assert.rejects(
-      setLearningModuleStatus(module._id, "PUBLISHED"),
-      /needs at least one validation question/,
-    );
-    module.topics[0].questions.push({
-      prompt: "What is a network?",
-      expectedAnswer: "Connected devices",
+    module.topics.push({
+      title: "Introduction",
+      description: "Learn network basics.",
+      objectives: [],
     });
+    await assert.rejects(
+      setLearningModuleStatus(module._id, "PUBLISHED"),
+      /needs at least one learning objective/,
+    );
+    module.topics[0].objectives = ["Explain how devices connect."];
     const published = await setLearningModuleStatus(module._id, "PUBLISHED");
     assert.equal(published.status, "PUBLISHED");
     assert.equal(published.currentPublishedVersion, 1);

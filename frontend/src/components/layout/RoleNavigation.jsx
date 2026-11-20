@@ -46,14 +46,15 @@ export default function RoleNavigation({ open = false, onNavigate, onToggle }) {
         </button>
       </div>
       <nav className="role-navigation-links" aria-label="Main navigation">
-        {links.map(({ path, label }) => (
+        {links.map(({ path, label, icon: Icon }) => (
           <NavLink
             key={path}
             to={path}
             end={path === "/" || path === "/admin"}
             onClick={onNavigate}
           >
-            {label}
+            {Icon && <Icon size={16} aria-hidden="true" />}
+            <span>{label}</span>
           </NavLink>
         ))}
       </nav>

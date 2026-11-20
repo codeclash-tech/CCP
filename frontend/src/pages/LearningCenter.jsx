@@ -6,16 +6,13 @@ import {
   BookmarkCheck,
   Check,
   ChevronRight,
-  Code2,
   Pencil,
   Mic,
-  Play,
   Save,
-  Send,
+  Trash2,
   Volume2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import CodeEditorSandbox from "../components/editor/CodeEditorSandbox";
 import api from "../services/api";
 import {
   createSpeechInputProvider,
@@ -53,14 +50,7 @@ const EMPTY_MODULE = {
 const EMPTY_TOPIC = {
   title: "",
   description: "",
-  explanation: "",
-  tutorInstructions: "",
-  validationInstructions: "",
   objectivesText: "",
-  examples: [],
-  questions: [],
-  exercises: [],
-  subtopics: [],
 };
 function displayPrice(price, currencyInput = "INR") {
   const currency = /^[A-Z]{3}$/.test(currencyInput) ? currencyInput : "INR";
@@ -68,24 +58,17 @@ function displayPrice(price, currencyInput = "INR") {
     ? "Free"
     : new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(Number(price));
 }
+function objectiveProgressKey(topicId, objectiveIndex) {
+  return `${String(topicId)}:${objectiveIndex}`;
+}
+
 function createTopicDraft(topic = {}) {
   return {
     title: topic.title || "",
     description: topic.description || "",
-    explanation: topic.explanation || "",
-    tutorInstructions: topic.tutorInstructions || "",
-    validationInstructions: topic.validationInstructions || "",
-    objectivesText: (topic.objectives || []).join("\n"),
-    examples: (topic.examples || []).map((example) => ({ ...example })),
-    questions: (topic.questions || []).map((question) => ({
-      ...question,
-      acceptedAnswersText: (question.acceptedAnswers || []).join("\n"),
-    })),
-    exercises: (topic.exercises || []).map((exercise) => ({
-      ...exercise,
-      tests: (exercise.tests || []).map((testCase) => ({ ...testCase })),
-    })),
-    subtopics: (topic.subtopics || []).map((subtopic) => ({ ...subtopic })),
+    objectivesText: (topic.objectives || []).length
+      ? topic.objectives.join("\n")
+      : topic.explanation || "",
   };
 }
 
@@ -114,49 +97,19 @@ function loadRazorpayCheckout() {
   return window.razorpayScriptPromise;
 }
 
-function parseJsonField(value, label) {
-  try {
-    return JSON.parse(value);
-  } catch {
-    throw new Error(`${label} must contain valid JSON.`);
-  }
-}
-
-function getTopicExercises(topic) {
-  if (!topic) return [];
-  return [
-    ...(topic.exercises || []).map((exercise) => ({ ...exercise, subtopicId: null })),
-    ...(topic.subtopics || []).flatMap((subtopic) =>
-      (subtopic.exercises || []).map((exercise) => ({
-        ...exercise,
-        subtopicId: String(subtopic._id),
-        subtopicTitle: subtopic.title,
-      })),
-    ),
-  ];
-}
-
 function AdminLearning() {
   const [programs, setPrograms] = useState([]);
-  const [purchases, setPurchases] = useState([]);
   const [selectedProgramId, setSelectedProgramId] = useState("");
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [programForm, setProgramForm] = useState(EMPTY_PROGRAM);
   const [moduleId, setModuleId] = useState("");
   const [moduleForm, setModuleForm] = useState(EMPTY_MODULE);
-  const [aiSettingsText, setAiSettingsText] = useState("{}");
   const [topicDraft, setTopicDraft] = useState(EMPTY_TOPIC);
   const [editingTopicId, setEditingTopicId] = useState("");
   const [topicError, setTopicError] = useState("");
-  const [jsonFields, setJsonFields] = useState({
-    objectives: "[]",
-    prerequisites: "[]",
-    assessment: JSON.stringify(EMPTY_MODULE.assessment, null, 2),
-    completionRequirements: JSON.stringify(EMPTY_MODULE.completionRequirements, null, 2),
-  });
   const [newProgram, setNewProgram] = useState(EMPTY_PROGRAM);
+  const [creatingProgram, setCreatingProgram] = useState(false);
   const [newModule, setNewModule] = useState(false);
-  const [previewModule, setPreviewModule] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -167,13 +120,9 @@ function AdminLearning() {
     setLoading(true);
     setError("");
     try {
-      const [programResponse, purchaseResponse] = await Promise.all([
-        api.get("/learning/admin/programs"),
-        api.get("/learning/admin/purchases"),
-      ]);
+      const programResponse = await api.get("/learning/admin/programs");
       const nextPrograms = programResponse.data.programs || [];
       setPrograms(nextPrograms);
-      setPurchases(purchaseResponse.data.purchases || []);
       if (nextPrograms.length) {
         setSelectedProgramId((current) => current || String(nextPrograms[0]._id));
       }
@@ -204,38 +153,25 @@ function AdminLearning() {
   useEffect(() => {
     setModuleId("");
     setModuleForm(EMPTY_MODULE);
-    setAiSettingsText("{}");
     setNewModule(false);
     setEditingTopicId("");
     setTopicError("");
     setTopicDraft(EMPTY_TOPIC);
   }, [selectedProgramId]);
 
-  const loadModule = async (id) => {
+  const loadModule = async (id, destination = "modules") => {
     setError("");
     setNotice("");
     try {
       const { data } = await api.get(`/learning/admin/modules/${id}`);
       const module = data.module;
       setModuleId(String(module._id));
-      setAdminPage("modules");
+      setAdminPage(destination);
       setNewModule(false);
       setModuleForm(module);
-      setAiSettingsText(JSON.stringify(module.aiConfiguration?.advancedSettings || {}, null, 2));
-      setPreviewModule(false);
       setEditingTopicId("");
       setTopicError("");
       setTopicDraft(EMPTY_TOPIC);
-      setJsonFields({
-        objectives: JSON.stringify(module.objectives || [], null, 2),
-        prerequisites: JSON.stringify(module.prerequisites || [], null, 2),
-        assessment: JSON.stringify(module.assessment || EMPTY_MODULE.assessment, null, 2),
-        completionRequirements: JSON.stringify(
-          module.completionRequirements || EMPTY_MODULE.completionRequirements,
-          null,
-          2,
-        ),
-      });
     } catch (loadError) {
       setError(loadError.message || "Could not load the learning module.");
     }
@@ -256,6 +192,7 @@ function AdminLearning() {
     try {
       const { data } = await api.post("/learning/admin/programs", newProgram);
       setNewProgram(EMPTY_PROGRAM);
+      setCreatingProgram(false);
       setNotice("Course saved. Add at least one module before publishing it.");
       const { data: list } = await api.get("/learning/admin/programs");
       setPrograms(list.programs || []);
@@ -296,9 +233,14 @@ function AdminLearning() {
     setSaving(true);
     setError("");
     try {
-      const status = selectedProgram.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED";
+      const hasDraftModules = (selectedProgram.modules || []).some(
+        (module) => module.status !== "PUBLISHED",
+      );
+      const status = selectedProgram.status === "PUBLISHED" && !hasDraftModules
+        ? "DRAFT"
+        : "PUBLISHED";
       await api.patch(`/learning/admin/programs/${selectedProgram._id}`, { status });
-      setNotice(status === "PUBLISHED" ? "Program published." : "Program unpublished.");
+      setNotice(status === "PUBLISHED" ? "Course and its modules published." : "Course unpublished.");
       await loadAdminData();
     } catch (saveError) {
       setError(saveError.message || "Could not change the program status.");
@@ -307,47 +249,17 @@ function AdminLearning() {
     }
   };
 
-  const archiveProgram = async () => {
-    if (!selectedProgram || !window.confirm("Delete this course? Existing student records will be retained.")) return;
+  const archiveProgram = async (programId = selectedProgram?._id) => {
+    if (!programId || !window.confirm("Delete this course? Existing student records will be retained.")) return;
     setSaving(true);
     setError("");
     try {
-      await api.delete(`/learning/admin/programs/${selectedProgram._id}`);
-      setSelectedProgramId("");
+      await api.delete(`/learning/admin/programs/${programId}`);
+      if (String(selectedProgramId) === String(programId)) setSelectedProgramId("");
       setNotice("Course deleted. Existing student records remain preserved.");
       await loadAdminData();
     } catch (archiveError) {
       setError(archiveError.message || "Could not archive this course.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const changeModuleStatus = async () => {
-    if (!moduleId || !moduleForm) return;
-    const status = moduleForm.status === "PUBLISHED" ? "DRAFT" : "PUBLISHED";
-    if (status === "PUBLISHED") {
-      const topics = (moduleForm.topics || []).filter((topic) => String(topic.title || "").trim());
-      if (!topics.length) {
-        setError("Add at least one topic before publishing this module.");
-        return;
-      }
-      if (topics.some((topic) => !(topic.questions || []).some((question) =>
-        String(question.prompt || "").trim() && String(question.expectedAnswer || "").trim()
-      ))) {
-        setError("Add a check question and expected answer to every topic before publishing.");
-        return;
-      }
-    }
-    setSaving(true);
-    setError("");
-    try {
-      await api.patch(`/learning/admin/modules/${moduleId}/status`, { status });
-      setNotice(status === "PUBLISHED" ? "Module published." : "Module unpublished.");
-      await loadAdminData();
-      await loadModule(moduleId);
-    } catch (statusError) {
-      setError(statusError.message || "Could not change the module publication status.");
     } finally {
       setSaving(false);
     }
@@ -372,20 +284,12 @@ function AdminLearning() {
   const startNewModule = () => {
     setAdminPage("modules");
     setModuleId("");
-    setAiSettingsText("{}");
     setEditingTopicId("");
     setTopicError("");
     setTopicDraft(EMPTY_TOPIC);
     setModuleForm({
       ...EMPTY_MODULE,
       sequence: (selectedProgram?.modules?.length || 0) + 1,
-    });
-    setPreviewModule(false);
-    setJsonFields({
-      objectives: "[]",
-      prerequisites: "[]",
-      assessment: JSON.stringify(EMPTY_MODULE.assessment, null, 2),
-      completionRequirements: JSON.stringify(EMPTY_MODULE.completionRequirements, null, 2),
     });
     setNewModule(true);
     setError("");
@@ -399,7 +303,9 @@ function AdminLearning() {
     setError("");
     try {
       const payload = {
-        ...moduleForm,
+        title: moduleForm.title,
+        shortDescription: moduleForm.shortDescription || moduleForm.description,
+        description: moduleForm.description,
         price: Number(moduleForm.price),
         accessDurationDays: moduleForm.accessDurationDays === "" ||
           moduleForm.accessDurationDays === null
@@ -407,18 +313,7 @@ function AdminLearning() {
           : Number(moduleForm.accessDurationDays),
         sequence: moduleId ? Number(moduleForm.sequence) : undefined,
         estimatedDurationMinutes: Number(moduleForm.estimatedDurationMinutes) || 60,
-        objectives: parseJsonField(jsonFields.objectives, "Objectives"),
-        prerequisites: parseJsonField(jsonFields.prerequisites, "Prerequisites"),
         topics: newModule ? [] : (moduleForm.topics || []),
-        aiConfiguration: {
-          ...(moduleForm.aiConfiguration || {}),
-          advancedSettings: parseJsonField(aiSettingsText, "AI advanced settings"),
-        },
-        assessment: parseJsonField(jsonFields.assessment, "Assessment"),
-        completionRequirements: parseJsonField(
-          jsonFields.completionRequirements,
-          "Completion requirements",
-        ),
       };
       if (newModule) {
         const { data } = await api.post(
@@ -428,17 +323,7 @@ function AdminLearning() {
         setModuleId(String(data.module._id));
         setNewModule(false);
         setModuleForm(data.module);
-        setAiSettingsText(JSON.stringify(data.module.aiConfiguration?.advancedSettings || {}, null, 2));
-        setJsonFields({
-          objectives: JSON.stringify(data.module.objectives || [], null, 2),
-          prerequisites: JSON.stringify(data.module.prerequisites || [], null, 2),
-          assessment: JSON.stringify(data.module.assessment || EMPTY_MODULE.assessment, null, 2),
-          completionRequirements: JSON.stringify(
-            data.module.completionRequirements || EMPTY_MODULE.completionRequirements,
-            null,
-            2,
-          ),
-        });
+        setAdminPage("topics");
         setNotice("Module created.");
       } else {
         await api.patch(`/learning/admin/modules/${moduleId}`, payload);
@@ -465,32 +350,12 @@ function AdminLearning() {
       setTopicError("Add a short topic description.");
       return;
     }
-    if (!topicDraft.explanation.trim()) {
-      setTopicError("Add lesson content describing what students will learn.");
-      return;
-    }
-    if (!topicDraft.objectivesText.split(/\r?\n/).some((objective) => objective.trim())) {
-      setTopicError("Add at least one expected learning outcome.");
-      return;
-    }
-    if (topicDraft.questions.some((question) =>
-      String(question.prompt || "").trim() && !String(question.expectedAnswer || "").trim()
-    )) {
-      setTopicError("Add an expected answer for each question or remove the empty question.");
-      return;
-    }
-    if (topicDraft.exercises.some((exercise) =>
-      [exercise.title, exercise.instructions].some((value) => String(value || "").trim()) &&
-      (!String(exercise.title || "").trim() || !String(exercise.instructions || "").trim())
-    )) {
-      setTopicError("Each activity needs a title and instructions.");
-      return;
-    }
-    if (topicDraft.exercises.some((exercise) =>
-      exercise.type !== "ACTIVITY" &&
-      (exercise.tests || []).some((testCase) => !String(testCase.expectedOutput || "").trim())
-    )) {
-      setTopicError("Add an expected output for each coding test case.");
+    const objectives = topicDraft.objectivesText
+      .split(/\r?\n/)
+      .map((objective) => objective.trim())
+      .filter(Boolean);
+    if (!objectives.length) {
+      setTopicError("Paste at least one learning objective.");
       return;
     }
     setSaving(true);
@@ -500,26 +365,8 @@ function AdminLearning() {
       const topic = {
         title: topicDraft.title.trim(),
         description: topicDraft.description.trim(),
-        explanation: topicDraft.explanation.trim(),
-        tutorInstructions: topicDraft.tutorInstructions.trim(),
-        validationInstructions: topicDraft.validationInstructions.trim(),
-        objectives: topicDraft.objectivesText.split(/\r?\n/).map((objective) => objective.trim()).filter(Boolean),
-        examples: topicDraft.examples.filter((example) =>
-          [example.title, example.explanation, example.code].some((value) => String(value || "").trim()),
-        ),
-        questions: topicDraft.questions
-          .filter((question) => String(question.prompt || "").trim())
-          .map((question) => ({
-            ...question,
-            acceptedAnswers: String(question.acceptedAnswersText || "")
-              .split(/\r?\n/)
-              .map((answer) => answer.trim())
-              .filter(Boolean),
-          })),
-        exercises: topicDraft.exercises.filter((exercise) =>
-          [exercise.title, exercise.instructions].some((value) => String(value || "").trim()),
-        ),
-        subtopics: topicDraft.subtopics.filter((subtopic) => String(subtopic.title || "").trim()),
+        explanation: objectives.join("\n"),
+        objectives,
       };
       if (editingTopicId) {
         await api.patch(`/learning/admin/modules/${moduleId}/topics/${editingTopicId}`, topic);
@@ -534,6 +381,7 @@ function AdminLearning() {
       setAdminPage("topics");
       await loadModule(moduleId);
       await loadAdminData();
+      setAdminPage("topics");
     } catch (topicError) {
       setError(topicError.message || "Could not save this topic.");
     } finally {
@@ -564,6 +412,7 @@ function AdminLearning() {
       setTopicDraft(EMPTY_TOPIC);
       await loadModule(moduleId);
       await loadAdminData();
+      setAdminPage("topics");
     } catch (topicError) {
       setError(topicError.message || "Could not remove this topic.");
     }
@@ -584,26 +433,15 @@ function AdminLearning() {
     }
   };
 
-  const reviewPurchase = async (purchaseId, status) => {
-    setError("");
-    try {
-      await api.patch(`/learning/admin/purchases/${purchaseId}`, { status });
-      setNotice(`Purchase request ${status.toLowerCase()}.`);
-      await loadAdminData();
-    } catch (reviewError) {
-      setError(reviewError.message || "Could not update the purchase request.");
-    }
-  };
-
   if (loading) return <div className="learning-loading" role="status">Loading learning management…</div>;
 
   return (
-    <div className="learning-center">
+    <div className="learning-center learning-admin-center">
       <header className="learning-heading">
         <div>
           <p className="learning-eyebrow">Thrive management</p>
-          <h1>Thrive courses</h1>
-          <p>Create and maintain all official lessons, activities, and module requirements.</p>
+          <h1>Thrive management</h1>
+          <p>Create courses, their modules, and objective-based topics.</p>
         </div>
         <BookOpen size={24} aria-hidden="true" />
       </header>
@@ -631,25 +469,72 @@ function AdminLearning() {
       </nav>
 
       <section className="learning-management-grid">
-        {adminPage === "courses" && <div className="learning-panel">
-          <h2>Courses</h2>
+        {adminPage === "courses" && <div className="learning-panel learning-admin-course-page">
+          <div className="learning-panel-title">
+            <div>
+              <h2>Courses</h2>
+              <p>Choose a course to manage its modules and topics.</p>
+            </div>
+            <button
+              className="learning-button"
+              disabled={saving || programs.some((program) => program.status === "DRAFT")}
+              onClick={() => {
+                setSelectedProgramId("");
+                setCreatingProgram(true);
+                setNewProgram(EMPTY_PROGRAM);
+              }}
+              type="button"
+            >
+              Create course
+            </button>
+          </div>
           {programs.length > 0 && (
-            <div className="learning-module-list learning-course-list" aria-label="Your courses">
+            <div className="learning-admin-course-grid" aria-label="Your courses">
               {programs.map((program) => (
-                <div className="learning-module-row" key={program._id}>
+                <article className="learning-admin-course-card" key={program._id}>
                   <button
-                    className={String(program._id) === selectedProgramId ? "is-selected" : ""}
-                    onClick={() => setSelectedProgramId(String(program._id))}
+                    className="learning-admin-course-card-main"
+                    onClick={() => {
+                      setSelectedProgramId(String(program._id));
+                      setCreatingProgram(false);
+                      setAdminPage("modules");
+                    }}
                     type="button"
                   >
-                    <span>{program.title}</span>
-                    <small>{program.modules.length} module(s) · {program.status}</small>
+                    <span className="learning-status-badge">{program.status}</span>
+                    <strong>{program.title}</strong>
+                    <span>{program.description}</span>
+                    <small>{program.modules?.length || 0} modules</small>
                   </button>
-                </div>
+                  <div className="learning-actions">
+                    <button
+                      className="learning-link-button"
+                      aria-label={`Edit ${program.title}`}
+                      onClick={() => {
+                        setSelectedProgramId(String(program._id));
+                        setCreatingProgram(false);
+                      }}
+                      type="button"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      className="learning-link-button"
+                      aria-label={`Delete ${program.title}`}
+                      onClick={() => archiveProgram(program._id)}
+                      type="button"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </article>
               ))}
             </div>
           )}
-          <form
+          {!programs.length && !creatingProgram && (
+            <p className="learning-empty-state">No courses yet. Create a course to get started.</p>
+          )}
+          {creatingProgram && <form
             className="learning-form"
             onSubmit={createProgram}
             onBlur={(event) => {
@@ -661,7 +546,7 @@ function AdminLearning() {
               ) void createProgram();
             }}
           >
-            <h3>Create a course</h3>
+            <h3>New course</h3>
             <p className="learning-help">A course can be published after at least one module has been created.</p>
             {programs.some((program) => program.status === "DRAFT") && (
               <p className="learning-field-error" role="status">Finish or delete the unpublished course before creating another.</p>
@@ -691,9 +576,17 @@ function AdminLearning() {
             <button className="learning-button" disabled={saving || programs.some((program) => program.status === "DRAFT")} type="submit">
               {saving ? "Saving…" : "Create course"}
             </button>
-          </form>
+            <button
+              className="learning-button learning-button-secondary"
+              disabled={saving}
+              onClick={() => setCreatingProgram(false)}
+              type="button"
+            >
+              Cancel
+            </button>
+          </form>}
 
-          {selectedProgram && (
+          {selectedProgram && !creatingProgram && (
             <form
               className="learning-form learning-form-divider"
               onSubmit={saveProgram}
@@ -742,14 +635,19 @@ function AdminLearning() {
                   onClick={changeProgramStatus}
                   type="button"
                 >
-                  {selectedProgram.status === "PUBLISHED" ? "Unpublish" : "Publish"}
+                  {selectedProgram.status === "PUBLISHED" &&
+                  (selectedProgram.modules || []).some((module) => module.status !== "PUBLISHED")
+                    ? "Publish course updates"
+                    : selectedProgram.status === "PUBLISHED"
+                      ? "Unpublish course"
+                      : "Publish course"}
                 </button>
                 <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveProgram} type="button">
                   Delete course
                 </button>
               </div>
               {selectedProgram.status !== "PUBLISHED" && !(selectedProgram.modules || []).length && (
-                <p className="learning-help">Create a module to enable course publishing.</p>
+                <p className="learning-help">Add a module with at least one objective-based topic before publishing this course.</p>
               )}
             </form>
           )}
@@ -758,32 +656,37 @@ function AdminLearning() {
         {adminPage !== "courses" && <div className="learning-panel learning-module-admin-panel">
           <div className="learning-panel-title">
             <div>
-              <h2>Modules and lesson content</h2>
+              <h2>
+                {adminPage === "modules"
+                  ? `Modules${selectedProgram ? ` for ${selectedProgram.title}` : ""}`
+                  : `Topics${moduleId ? ` for ${moduleForm.title}` : ""}`}
+              </h2>
               <p>{selectedProgram ? `${selectedProgram.modules.length} module(s) · add each module when you need it` : "Select or create a course first."}</p>
             </div>
           </div>
           {selectedProgram && selectedProgram.modules?.length === 0 && !newModule && (
-            <p className="learning-empty-state">No modules yet. Add the first module when you are ready.</p>
+            <p className="learning-empty-state">No modules yet. Create the first module, then add its topics.</p>
           )}
           {selectedProgram?.modules?.length > 0 && (
-            <div className="learning-module-list">
+            <div className="learning-admin-module-grid">
               {selectedProgram.modules.map((module) => (
-                <div className="learning-module-row" key={module._id}>
+                <article className="learning-admin-module-card" key={module._id}>
                   <button
-                    className={String(module._id) === moduleId ? "is-selected" : ""}
-                    onClick={() => loadModule(module._id)}
+                    className={`learning-admin-module-card-main${String(module._id) === moduleId ? " is-selected" : ""}`}
+                    onClick={() => loadModule(module._id, "topics")}
                     type="button"
                   >
-                    <span>{module.title}</span>
+                    <small>Module {module.sequence}</small>
+                    <strong>{module.title}</strong>
                   </button>
                   <span className="learning-actions">
-                    <button className="learning-link-button" aria-label={`Edit ${module.title}`} onClick={() => loadModule(module._id)} type="button"><Pencil size={14} /></button>
+                    <button className="learning-link-button" aria-label={`Edit ${module.title}`} onClick={() => loadModule(module._id, "modules")} type="button"><Pencil size={14} /></button>
                   </span>
-                </div>
+                </article>
               ))}
             </div>
           )}
-          {selectedProgram && (
+          {selectedProgram && adminPage !== "courses" && (
             <button
               className="learning-button learning-button-secondary learning-module-add-button"
               disabled={saving || newModule}
@@ -841,112 +744,16 @@ function AdminLearning() {
                   onChange={(event) => setModuleForm({ ...moduleForm, description: event.target.value })}
                 />
               </label>
-              <div className="learning-field-row">
-                <label className="learning-field">
-                  Fee (INR)
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={moduleForm.price ?? 0}
-                    onChange={(event) => setModuleForm({ ...moduleForm, price: event.target.value })}
-                  />
-                </label>
-                <label className="learning-field">
-                  Access duration (days)
-                  <input
-                    type="number"
-                    min="1"
-                    max="36500"
-                    step="1"
-                    placeholder="Blank means lifetime"
-                    value={moduleForm.accessDurationDays ?? ""}
-                    onChange={(event) => setModuleForm({ ...moduleForm, accessDurationDays: event.target.value })}
-                  />
-                  <small className="learning-help">Starts after verified payment. Free modules start when access is granted; leave blank for lifetime access.</small>
-                </label>
-              </div>
-              <details className="learning-advanced-section">
-                <summary>Advanced module settings</summary>
-                <label className="learning-field">
-                  Currency
-                  <input
-                    maxLength={3}
-                    value={moduleForm.currency || "INR"}
-                    onChange={(event) => setModuleForm({ ...moduleForm, currency: event.target.value.toUpperCase() })}
-                  />
-                </label>
-                <label className="learning-field">
-                  Difficulty
-                  <select
-                    value={moduleForm.difficulty || "BEGINNER"}
-                    onChange={(event) => setModuleForm({ ...moduleForm, difficulty: event.target.value })}
-                  >
-                    <option value="BEGINNER">Beginner</option>
-                    <option value="INTERMEDIATE">Intermediate</option>
-                    <option value="ADVANCED">Advanced</option>
-                  </select>
-                </label>
-                <label className="learning-field">
-                  Estimated duration in minutes (optional)
-                  <input
-                    type="number"
-                    min="1"
-                    value={moduleForm.estimatedDurationMinutes || 60}
-                    onChange={(event) => setModuleForm({ ...moduleForm, estimatedDurationMinutes: event.target.value })}
-                  />
-                </label>
-                {[
-                  ["objectives", "Learning objectives (JSON)"],
-                  ["prerequisites", "Prerequisite module IDs (JSON)"],
-                  ["assessment", "Assessment questions (JSON)"],
-                  ["completionRequirements", "Completion requirements (JSON)"],
-                ].map(([field, label]) => (
-                  <label className="learning-field" key={field}>
-                    {label}
-                    <textarea
-                      className="learning-json-field"
-                      rows={4}
-                      spellCheck="false"
-                      value={jsonFields[field]}
-                      onChange={(event) => setJsonFields({ ...jsonFields, [field]: event.target.value })}
-                    />
-                  </label>
-                ))}
-                <details className="learning-advanced-section">
-                  <summary>AI tutor behavior (optional)</summary>
-                  <label className="learning-field">
-                    How should the tutor teach this module?
-                    <textarea
-                      rows={4}
-                      maxLength={8000}
-                      value={moduleForm.aiConfiguration?.behaviorPrompt || ""}
-                      onChange={(event) => setModuleForm({
-                        ...moduleForm,
-                        aiConfiguration: {
-                          ...(moduleForm.aiConfiguration || {}),
-                          behaviorPrompt: event.target.value,
-                        },
-                      })}
-                      placeholder="Leave blank to use the friendly, topic-focused default tutor."
-                    />
-                  </label>
-                  <details className="learning-advanced-section">
-                    <summary>Advanced AI settings (JSON, optional)</summary>
-                    <textarea
-                      className="learning-json-field"
-                      rows={4}
-                      spellCheck="false"
-                      value={aiSettingsText}
-                      onChange={(event) => setAiSettingsText(event.target.value)}
-                    />
-                  </details>
-                  <details className="learning-content-template">
-                    <summary>Preview tutor instructions</summary>
-                    <pre>{moduleForm.aiConfiguration?.behaviorPrompt || "The platform's safe, friendly teaching defaults will be used."}</pre>
-                  </details>
-                </details>
-              </details>
+              <label className="learning-field">
+                Fee (INR)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={moduleForm.price ?? 0}
+                  onChange={(event) => setModuleForm({ ...moduleForm, price: event.target.value })}
+                />
+              </label>
               {!newModule && adminPage === "topics-inline" && (
                 <section className="learning-form learning-form-divider">
                   <div className="learning-panel-title">
@@ -1107,73 +914,6 @@ function AdminLearning() {
                             type="button"
                           >
                             Remove example
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="learning-topic-editor-group">
-                      <div className="learning-panel-title">
-                        <h5>Topic completion check</h5>
-                        <p className="learning-help">Add at least one question with its expected answer. The server checks answers before marking this topic complete.</p>
-                        <button
-                          className="learning-button learning-button-small learning-button-secondary"
-                          onClick={() => setTopicDraft({
-                            ...topicDraft,
-                            questions: [...topicDraft.questions, {
-                              prompt: "",
-                              expectedAnswer: "",
-                              acceptedAnswersText: "",
-                            }],
-                          })}
-                          type="button"
-                        >
-                          Add question
-                        </button>
-                      </div>
-                      {topicDraft.questions.map((question, index) => (
-                        <div className="learning-topic-editor-card" key={`question-${index}`}>
-                          <label className="learning-field">
-                            Check question
-                            <textarea
-                              rows={2}
-                              value={question.prompt || ""}
-                              onChange={(event) => setTopicDraft({
-                                ...topicDraft,
-                                questions: updateTopicItem(topicDraft.questions, index, "prompt", event.target.value),
-                              })}
-                            />
-                          </label>
-                          <label className="learning-field">
-                            Expected answer
-                            <textarea
-                              rows={2}
-                              value={question.expectedAnswer || ""}
-                              onChange={(event) => setTopicDraft({
-                                ...topicDraft,
-                                questions: updateTopicItem(topicDraft.questions, index, "expectedAnswer", event.target.value),
-                              })}
-                            />
-                          </label>
-                          <label className="learning-field">
-                            Other accepted answers (optional, one per line)
-                            <textarea
-                              rows={2}
-                              value={question.acceptedAnswersText || ""}
-                              onChange={(event) => setTopicDraft({
-                                ...topicDraft,
-                                questions: updateTopicItem(topicDraft.questions, index, "acceptedAnswersText", event.target.value),
-                              })}
-                            />
-                          </label>
-                          <button
-                            className="learning-link-button"
-                            onClick={() => setTopicDraft({
-                              ...topicDraft,
-                              questions: topicDraft.questions.filter((_item, itemIndex) => itemIndex !== index),
-                            })}
-                            type="button"
-                          >
-                            Remove question
                           </button>
                         </div>
                       ))}
@@ -1409,39 +1149,13 @@ function AdminLearning() {
                   </div>
                 </section>
               )}
-              {previewModule && (
-                <section className="learning-module-preview">
-                  <p className="learning-eyebrow">Preview</p>
-                  <h4>{moduleForm.title || "Untitled module"}</h4>
-                  <p>{moduleForm.description || "Add a module overview to see it here."}</p>
-                  <div className="learning-preview-topics">
-                    {(moduleForm.topics || []).map((topic) => (
-                      <article key={topic._id || topic.title}>
-                        <strong>{topic.title}</strong>
-                        {topic.description && <p>{topic.description}</p>}
-                      </article>
-                    ))}
-                    {!moduleForm.topics?.length && <p className="learning-muted">No topics have been added.</p>}
-                  </div>
-                </section>
-              )}
               <div className="learning-actions learning-admin-form-actions">
                 <button className="learning-button" disabled={saving} type="submit">
                   <Save size={15} /> {saving ? "Saving…" : "Save module"}
                 </button>
-                <button
-                  className="learning-button learning-button-secondary"
-                  onClick={() => setPreviewModule((current) => !current)}
-                  type="button"
-                >
-                  {previewModule ? "Close preview" : "Preview"}
-                </button>
               </div>
               {!newModule && (
                 <div className="learning-actions">
-                  <button className="learning-button learning-button-secondary" disabled={saving} onClick={changeModuleStatus} type="button">
-                    {moduleForm.status === "PUBLISHED" ? "Unpublish module" : "Publish module"}
-                  </button>
                   <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveModule} type="button">
                     Delete module
                   </button>
@@ -1452,18 +1166,40 @@ function AdminLearning() {
           {adminPage === "topics" && moduleId && !newModule && (
             <section className="learning-panel learning-topic-management">
               <h2>Topics for {moduleForm.title}</h2>
-              <p className="learning-help">Select a topic to edit it, or add a new topic with its expected learning outcomes.</p>
-              {(moduleForm.topics || []).map((topic) => (
-                <button
-                  className="learning-module-row"
-                  key={topic._id}
-                  onClick={() => editTopic(topic)}
-                  type="button"
-                >
-                  <span>{topic.title}</span>
-                  <Pencil size={14} aria-hidden="true" />
-                </button>
-              ))}
+              <p className="learning-help">Each topic teaches only its pasted objective content.</p>
+              <div className="learning-admin-topic-grid">
+                {(moduleForm.topics || []).map((topic) => (
+                  <article className="learning-admin-topic-card" key={topic._id}>
+                    <button
+                      className="learning-admin-topic-card-main"
+                      onClick={() => editTopic(topic)}
+                      type="button"
+                    >
+                      <strong>{topic.title}</strong>
+                      <span>{topic.description}</span>
+                      <small>{topic.objectives?.length || 0} objectives</small>
+                    </button>
+                    <div className="learning-actions">
+                      <button
+                        className="learning-link-button"
+                        aria-label={`Edit ${topic.title}`}
+                        onClick={() => editTopic(topic)}
+                        type="button"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        className="learning-link-button"
+                        aria-label={`Delete ${topic.title}`}
+                        onClick={() => removeTopic(String(topic._id))}
+                        type="button"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
               <button
                 className="learning-button"
                 onClick={() => {
@@ -1484,7 +1220,6 @@ function AdminLearning() {
                   !event.currentTarget.contains(event.relatedTarget) &&
                   topicDraft.title.trim() &&
                   topicDraft.description.trim() &&
-                  topicDraft.explanation.trim() &&
                   topicDraft.objectivesText.trim() &&
                   !saving
                 ) void saveTopic();
@@ -1494,19 +1229,22 @@ function AdminLearning() {
               {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
               <label className="learning-field">
                 Topic name
-                <input value={topicDraft.title} onChange={(event) => setTopicDraft({ ...topicDraft, title: event.target.value })} />
+                <input required maxLength={160} value={topicDraft.title} onChange={(event) => setTopicDraft({ ...topicDraft, title: event.target.value })} />
               </label>
               <label className="learning-field">
                 Description
-                <textarea rows={2} value={topicDraft.description} onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })} />
+                <textarea required rows={2} maxLength={2000} value={topicDraft.description} onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })} />
               </label>
               <label className="learning-field">
-                Learning content
-                <textarea rows={6} value={topicDraft.explanation} onChange={(event) => setTopicDraft({ ...topicDraft, explanation: event.target.value })} />
-              </label>
-              <label className="learning-field">
-                Expected learning outcomes
-                <textarea rows={4} value={topicDraft.objectivesText} onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })} />
+                Objective content
+                <textarea
+                  required
+                  rows={8}
+                  maxLength={12000}
+                  placeholder="Paste one expected learning objective per line. This is the only content the tutor will teach."
+                  value={topicDraft.objectivesText}
+                  onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })}
+                />
               </label>
               <div className="learning-actions">
                 <button className="learning-button" disabled={saving} onClick={saveTopic} type="button">{saving ? "Saving…" : "Save topic"}</button>
@@ -1517,36 +1255,6 @@ function AdminLearning() {
         </div>}
       </section>
 
-      {adminPage === "courses" && <section className="learning-panel learning-purchase-panel">
-        <h2>Purchase requests</h2>
-        {purchases.length === 0 ? (
-          <p className="learning-muted">No purchase requests yet.</p>
-        ) : (
-          <div className="learning-request-list">
-            {purchases.map((purchase) => (
-              <div className="learning-request-row" key={purchase._id}>
-                <div>
-                  <strong>{purchase.userId?.name || purchase.userId?.email || "Student"}</strong>
-                  <span>{purchase.programId?.title || purchase.moduleId?.title || "Learning content"}</span>
-                  <small>{purchase.currency} {Number(purchase.amount || 0).toFixed(2)}</small>
-                  <small>{purchase.status}</small>
-                </div>
-                {["PENDING", "ACTIVE"].includes(purchase.status) && (
-                  <div className="learning-actions">
-                    <button
-                      className="learning-button learning-button-secondary"
-                      onClick={() => reviewPurchase(purchase._id, purchase.status === "ACTIVE" ? "REVOKED" : "REJECTED")}
-                      type="button"
-                    >
-                      {purchase.status === "ACTIVE" ? "Revoke access" : "Reject purchase"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>}
     </div>
   );
 }
@@ -1559,12 +1267,9 @@ function StudentLearning() {
   const [moduleData, setModuleData] = useState(null);
   const [topicContent, setTopicContent] = useState(null);
   const [topicId, setTopicId] = useState("");
-  const [exerciseId, setExerciseId] = useState("");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
-  const conversationEndRef = useRef(null);
-  const [topicAnswers, setTopicAnswers] = useState({});
-  const [topicCheckResult, setTopicCheckResult] = useState(null);
+  const conversationRef = useRef(null);
   const [message, setMessage] = useState("");
   const [language, setLanguage] = useState("en");
   const [voices, setVoices] = useState([]);
@@ -1575,11 +1280,6 @@ function StudentLearning() {
   const [voiceError, setVoiceError] = useState("");
   const [voiceInputState, setVoiceInputState] = useState("idle");
   const voiceInputStopRef = useRef(null);
-  const [codingOpen, setCodingOpen] = useState(false);
-  const [exerciseCode, setExerciseCode] = useState("");
-  const [exerciseResult, setExerciseResult] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [assessmentResult, setAssessmentResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -1639,7 +1339,13 @@ function StudentLearning() {
   );
 
   useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const conversation = conversationRef.current;
+    if (conversation) {
+      conversation.scrollTo({
+        top: conversation.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   }, [messages, busy, voiceInputState]);
 
   const loadStudentData = async () => {
@@ -1672,10 +1378,19 @@ function StudentLearning() {
   }, [voiceChoices, voiceProfile]);
 
   const selectedTopic = String(topicContent?._id) === topicId ? topicContent : null;
-  const selectedExercise = useMemo(
-    () => getTopicExercises(selectedTopic).find((exercise) => String(exercise._id) === exerciseId) || null,
-    [exerciseId, selectedTopic],
+  const completedObjectiveKeys = useMemo(
+    () => new Set((moduleData?.progress?.completedObjectiveKeys || []).map(String)),
+    [moduleData?.progress?.completedObjectiveKeys],
   );
+  const topicObjectives = selectedTopic?.objectives || [];
+  const completedTopicObjectiveCount = topicObjectives.reduce(
+    (count, _objective, index) =>
+      count + Number(completedObjectiveKeys.has(objectiveProgressKey(selectedTopic._id, index))),
+    0,
+  );
+  const topicProgressPercentage = topicObjectives.length
+    ? Math.round((completedTopicObjectiveCount / topicObjectives.length) * 100)
+    : 0;
 
   const beginSession = async (module, topic) => {
     if (!topic) return;
@@ -1696,13 +1411,7 @@ function StudentLearning() {
     setTopicContent(topicResponse.topic);
     setSession(data.session);
     setMessages(data.session.messages || []);
-    setTopicAnswers({});
-    setTopicCheckResult(null);
     setTopicId(String(topic._id));
-    const firstExercise = getTopicExercises(topicResponse.topic)[0];
-    setExerciseId(String(firstExercise?._id || ""));
-    setExerciseCode(firstExercise?.starterCode || "");
-    setExerciseResult(null);
     setLanguage("en");
     window.localStorage.setItem(
       "ccp-learning-last-session",
@@ -1722,8 +1431,6 @@ function StudentLearning() {
     try {
       const { data } = await api.get(`/learning/programs/${programId}/modules/${moduleId}`);
       setModuleData(data);
-      setExerciseResult(null);
-      setAssessmentResult(null);
       const topics = data.module.topics || [];
       const saved = JSON.parse(window.localStorage.getItem("ccp-learning-last-session") || "null");
       const preferredTopic = saved?.moduleId === String(moduleId)
@@ -1741,7 +1448,6 @@ function StudentLearning() {
   const selectTopic = async (topic) => {
     if (!moduleData) return;
     setError("");
-    setExerciseResult(null);
     try {
       await beginSession(moduleData.module, topic);
     } catch (sessionError) {
@@ -1783,6 +1489,19 @@ function StudentLearning() {
       });
       setSession(data.session);
       setMessages(data.session.messages || []);
+      if (data.progress) {
+        setModuleData((current) => current && ({
+          ...current,
+          progress: data.progress,
+          certificate: data.certificate || current.certificate,
+        }));
+        await loadStudentData();
+        if (data.certificate) {
+          setNotice(data.certificateEmailSent
+            ? "You completed this module. Your certificate is ready and has been emailed."
+            : "You completed this module. Your certificate is ready to download.");
+        }
+      }
       const reply = data.session.messages?.at(-1)?.content;
       if (reply) speak(reply, data.replyLanguage || language);
     } catch (sendError) {
@@ -1871,78 +1590,6 @@ function StudentLearning() {
     }
   };
 
-  const markTopicComplete = async () => {
-    if (!moduleData || !selectedTopic) return;
-    try {
-      const { data } = await api.post(
-        `/learning/modules/${moduleData.module._id}/topics/${selectedTopic._id}/complete`,
-        { answers: topicAnswers },
-      );
-      if (!data.passed) {
-        setTopicCheckResult(data);
-        setNotice("Not quite yet. Ask the AI tutor for a hint, then try again.");
-        return;
-      }
-      setTopicCheckResult(data);
-      setModuleData({ ...moduleData, progress: data.progress, certificate: data.certificate || moduleData.certificate });
-      setNotice(data.certificate
-        ? data.certificateEmailSent
-          ? "All module topics are complete. Your certificate is ready and has been emailed."
-          : "Your certificate is ready. Email delivery failed; download it from your certificates."
-        : "Topic completed. Continue with the next topic.");
-      await loadStudentData();
-    } catch (progressError) {
-      setError(progressError.message || "Could not save topic progress.");
-    }
-  };
-
-  const submitAssessment = async () => {
-    if (!moduleData) return;
-    try {
-      const { data } = await api.post(
-        `/learning/modules/${moduleData.module._id}/assessment`,
-        { answers },
-      );
-      setAssessmentResult(data);
-      setModuleData({
-        ...moduleData,
-        progress: data.progress,
-        certificate: data.certificate || moduleData.certificate,
-      });
-      await loadStudentData();
-    } catch (assessmentError) {
-      setError(assessmentError.message || "Could not submit the assessment.");
-    }
-  };
-
-  const runExercise = async (exercise) => {
-    if (!moduleData || !selectedTopic) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { data } = await api.post(
-        `/learning/modules/${moduleData.module._id}/topics/${selectedTopic._id}/exercises/${exercise._id}`,
-        { code: exerciseCode || exercise.starterCode, subtopicId: exercise.subtopicId },
-      );
-      setExerciseResult(data);
-      setModuleData({
-        ...moduleData,
-        progress: data.progress,
-        certificate: data.certificate || moduleData.certificate,
-      });
-      if (data.accepted) {
-        setNotice(exercise.type === "ACTIVITY"
-          ? "Activity completed."
-          : "All server-side exercise tests passed.");
-      }
-      await loadStudentData();
-    } catch (exerciseError) {
-      setError(exerciseError.message || "Could not run the exercise.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const closeModule = () => {
     void voiceInputStopRef.current?.({ transcribe: false });
     voiceInputStopRef.current = null;
@@ -1952,7 +1599,6 @@ function StudentLearning() {
     setTopicId("");
     setSession(null);
     setMessages([]);
-    setCodingOpen(false);
   };
 
   const downloadCertificate = async (certificate) => {
@@ -1978,28 +1624,36 @@ function StudentLearning() {
   if (moduleData) {
     const { module, progress } = moduleData;
     const completedTopics = progress.completedTopicIds || [];
-    const topicProgress = Number.isFinite(progress.progressPercentage)
-      ? progress.progressPercentage
-      : module.topics.length
-        ? Math.round((completedTopics.length / module.topics.length) * 100)
-        : 0;
+    const moduleObjectives = module.topics.flatMap((topic) =>
+      (topic.objectives || []).map((_objective, index) =>
+        objectiveProgressKey(topic._id, index),
+      ),
+    );
+    const moduleCompletedObjectives = moduleObjectives.filter((key) =>
+      completedObjectiveKeys.has(key),
+    ).length;
+    const moduleProgress = moduleObjectives.length
+      ? Math.round((moduleCompletedObjectives / moduleObjectives.length) * 100)
+      : 0;
     return (
       <div className="learning-center learning-workspace">
-        <button className="learning-back-button" onClick={closeModule} type="button">
-          <ArrowLeft size={16} /> All modules
-        </button>
-        <header className="learning-heading learning-workspace-heading">
-          <div>
-            <p className="learning-eyebrow">{moduleData.program?.title || "Learning program"} · {module.title}</p>
-            <h1>{selectedTopic?.title || "Choose a topic"}</h1>
-            <p>{selectedTopic?.description || module.description}</p>
-          </div>
-          <div className="learning-progress-summary">
-            <span>Module progress</span>
-            <strong>{topicProgress}%</strong>
-            <div className="learning-progress-track"><span style={{ width: `${topicProgress}%` }} /></div>
-          </div>
-        </header>
+        <div className="learning-workspace-top">
+          <button className="learning-back-button" onClick={closeModule} type="button">
+            <ArrowLeft size={16} /> All modules
+          </button>
+          <header className="learning-heading learning-workspace-heading">
+            <div>
+              <p className="learning-eyebrow">{moduleData.program?.title || "Learning program"} · {module.title}</p>
+              <h1>{selectedTopic?.title || "Choose a topic"}</h1>
+              <p>{selectedTopic?.description || module.description}</p>
+            </div>
+            <div className="learning-progress-summary">
+              <span>Module objectives</span>
+              <strong>{moduleProgress}%</strong>
+              <div className="learning-progress-track"><span style={{ width: `${moduleProgress}%` }} /></div>
+            </div>
+          </header>
+        </div>
         {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
         {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
         <div className="learning-workspace-grid">
@@ -2033,175 +1687,9 @@ function StudentLearning() {
               </div>
             )}
           </aside>
-          <div className="learning-main-column">
-            <section className="learning-panel learning-lesson-panel">
-              {selectedTopic ? (
-                <>
-                  <div className="learning-lesson-copy">
-                    <h2>{selectedTopic.title}</h2>
-                    <p>{selectedTopic.explanation || selectedTopic.description}</p>
-                    {selectedTopic.objectives?.length > 0 && (
-                      <div className="learning-objectives">
-                        <strong>Learning objectives</strong>
-                        <ul>{selectedTopic.objectives.map((objective, index) => <li key={`${objective}-${index}`}>{objective}</li>)}</ul>
-                      </div>
-                    )}
-                    {selectedTopic.examples?.map((example) => (
-                      <div className="learning-example" key={example._id || example.title}>
-                        <strong>{example.title || "Example"}</strong>
-                        {example.explanation && <p>{example.explanation}</p>}
-                        {example.code && <pre><code>{example.code}</code></pre>}
-                      </div>
-                    ))}
-                    {selectedTopic.questions?.length > 0 && (
-                      <div className="learning-objectives">
-                        <strong>Check your understanding</strong>
-                        <p>Answer these questions to complete the topic. Ask the tutor for hints if you need them.</p>
-                        {selectedTopic.questions.map((question) => (
-                          <label className="learning-field" key={question._id}>
-                            {question.prompt}
-                            <textarea
-                              rows={2}
-                              maxLength={5000}
-                              value={topicAnswers[String(question._id)] || ""}
-                              onChange={(event) => setTopicAnswers({
-                                ...topicAnswers,
-                                [String(question._id)]: event.target.value,
-                              })}
-                            />
-                          </label>
-                        ))}
-                        {topicCheckResult && !topicCheckResult.passed && (
-                          <p className="learning-field-error" role="status">
-                            {topicCheckResult.scorePercent}% matched. The tutor can give you a hint.
-                          </p>
-                        )}
-                        {topicCheckResult?.passed && (
-                          <p className="learning-success-text" role="status">Topic check passed.</p>
-                        )}
-                      </div>
-                    )}
-                    {selectedTopic.subtopics?.map((subtopic) => (
-                      <details className="learning-subtopic" key={subtopic._id}>
-                        <summary>{subtopic.title}</summary>
-                        <p>{subtopic.explanation}</p>
-                        {subtopic.objectives?.map((objective, index) => <p key={`${objective}-${index}`}>• {objective}</p>)}
-                        {subtopic.examples?.map((example) => (
-                          <div className="learning-example" key={example._id || example.title}>
-                            <strong>{example.title || "Example"}</strong>
-                            {example.explanation && <p>{example.explanation}</p>}
-                            {example.code && <pre><code>{example.code}</code></pre>}
-                          </div>
-                        ))}
-                        {subtopic.questions?.map((question, index) => (
-                          <p key={question._id || index}><strong>Check your understanding:</strong> {question.prompt}</p>
-                        ))}
-                      </details>
-                    ))}
-                  </div>
-                  <div className="learning-topic-actions">
-                    <button className="learning-button learning-button-secondary" onClick={() => setCodingOpen((open) => !open)} type="button">
-                      <Code2 size={16} /> {codingOpen ? "Close practice workspace" : "Open practice workspace"}
-                    </button>
-                    <button className="learning-button" onClick={markTopicComplete} type="button">
-                      <Check size={16} /> {selectedTopic.questions?.length
-                        ? "Check answers and complete topic"
-                        : "Mark topic complete"}
-                    </button>
-                  </div>
-                </>
-              ) : <p className="learning-muted">This module does not have any topics yet.</p>}
-            </section>
-
-            {codingOpen && selectedTopic && (
-              <section className="learning-panel learning-code-panel">
-                <div className="learning-panel-title">
-                  <div><h2>Practice workspace</h2><p>Complete a written activity or run a supported Java exercise.</p></div>
-                </div>
-                {getTopicExercises(selectedTopic).length ? (
-                  <div className="learning-exercise">
-                    {getTopicExercises(selectedTopic).length > 1 && (
-                      <label className="learning-field">
-                        Exercise
-                        <select
-                          value={exerciseId}
-                          onChange={(event) => {
-                            const nextExercise = getTopicExercises(selectedTopic).find(
-                              (exercise) => String(exercise._id) === event.target.value,
-                            );
-                            setExerciseId(event.target.value);
-                            setExerciseCode(nextExercise?.starterCode || "");
-                            setExerciseResult(null);
-                          }}
-                        >
-                          {getTopicExercises(selectedTopic).map((exercise) => (
-                            <option key={exercise._id} value={exercise._id}>
-                              {exercise.subtopicTitle ? `${exercise.subtopicTitle}: ` : ""}{exercise.title}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {selectedExercise && (
-                      <>
-                        <h3>{selectedExercise.title}</h3>
-                        <p>{selectedExercise.instructions}</p>
-                        {selectedExercise.type === "ACTIVITY" ? (
-                          <label className="learning-field">
-                            Your response
-                            <textarea
-                              rows={5}
-                              maxLength={20000}
-                              placeholder="Write your response or reflection here."
-                              value={exerciseCode}
-                              onChange={(event) => setExerciseCode(event.target.value)}
-                            />
-                          </label>
-                        ) : String(selectedExercise.language || "java").toLowerCase() === "java" ? (
-                          <>
-                            <div className="learning-editor-wrap">
-                              <CodeEditorSandbox
-                                key={selectedExercise._id}
-                                language="java"
-                                value={exerciseCode}
-                                onChange={setExerciseCode}
-                                height="270px"
-                              />
-                            </div>
-                            <button className="learning-button" disabled={busy} onClick={() => runExercise(selectedExercise)} type="button">
-                              <Play size={15} /> {busy ? "Running…" : "Run exercise"}
-                            </button>
-                          </>
-                        ) : (
-                          <p className="learning-help">
-                            The current secure runner supports Java exercises. Discuss this activity with the tutor or use a written activity for this subject.
-                          </p>
-                        )}
-                        {selectedExercise.type === "ACTIVITY" && (
-                          <button className="learning-button" disabled={busy} onClick={() => runExercise(selectedExercise)} type="button">
-                            <Check size={15} /> {busy ? "Saving…" : "Complete activity"}
-                          </button>
-                        )}
-                        {exerciseResult && (
-                          <div className={`learning-run-result${exerciseResult.accepted ? " is-success" : ""}`} role="status">
-                            <strong>{exerciseResult.accepted
-                              ? selectedExercise.type === "ACTIVITY" ? "Activity completed" : "Passed"
-                              : `Not passed · ${exerciseResult.passed}/${exerciseResult.total} tests`}</strong>
-                            {exerciseResult.visibleResults?.map((result, index) => (
-                              <p key={`${result.testCase}-${index}`}>Test {result.testCase}: {result.status} {result.output && `· ${result.output}`}</p>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                ) : <p className="learning-muted">There are no practical exercises in this topic.</p>}
-              </section>
-            )}
-
-            <section className="learning-panel learning-tutor-panel">
+          <section className="learning-panel learning-tutor-panel">
               <div className="learning-panel-title">
-                <div><h2>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</h2><p>Ask about this topic. The tutor uses the approved lesson content.</p></div>
+                <div><h2>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</h2><p>Learn one objective at a time with your tutor.</p></div>
               </div>
               <div className="learning-tutor-controls">
                 <label className="learning-field">
@@ -2241,7 +1729,7 @@ function StudentLearning() {
                   <button className="learning-button" type="submit">Start learning</button>
                 </form>
               ) : (
-              <div className="learning-conversation" aria-live="polite">
+              <div className="learning-conversation" aria-live="polite" ref={conversationRef}>
                 <div className="learning-message learning-message-assistant">
                   <strong>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</strong>
                   <p>Welcome, {nickname}. We will work through this topic together. What would you like to understand first?</p>
@@ -2253,7 +1741,6 @@ function StudentLearning() {
                   </div>
                 ))}
                 {busy && <p className="learning-muted" role="status">{voiceProfile === "boy" ? "Rishi" : "Daisy"} is thinking…</p>}
-                <div ref={conversationEndRef} />
               </div>
               )}
               {nickname && <form className="learning-chat-form" onSubmit={(event) => { event.preventDefault(); sendMessage(); }}>
@@ -2284,8 +1771,8 @@ function StudentLearning() {
                 >
                   <Mic size={17} />
                 </button>
-                <button aria-label="Send message" className="learning-button" disabled={busy || !message.trim()} type="submit">
-                  <Send size={16} /> Send
+                <button className="learning-button learning-chat-send" disabled={busy || !message.trim()} type="submit">
+                  Send
                 </button>
               </form>
               }
@@ -2299,30 +1786,46 @@ function StudentLearning() {
                 <p className="learning-help" role="status">Transcribing locally. First use may download the offline speech model.</p>
               )}
               {voiceError && <p className="learning-alert learning-alert-error" role="status">{voiceError}</p>}
-            </section>
-
-            {module.assessment?.questions?.length > 0 && (
-              <section className="learning-panel learning-assessment-panel">
-                <h2>Module assessment</h2>
-                {module.assessment.questions.map((question, index) => (
-                  <label className="learning-field" key={question._id}>
-                    {index + 1}. {question.prompt}
-                    <textarea
-                      rows={2}
-                      value={answers[String(question._id)] || ""}
-                      onChange={(event) => setAnswers({ ...answers, [String(question._id)]: event.target.value })}
-                    />
-                  </label>
-                ))}
-                <button className="learning-button" onClick={submitAssessment} type="button">Submit assessment</button>
-                {assessmentResult && (
-                  <p className={assessmentResult.passed ? "learning-success-text" : "learning-muted"} role="status">
-                    {assessmentResult.passed ? "Assessment passed" : "Not passed yet"} · {assessmentResult.scorePercent}%
-                  </p>
-                )}
-              </section>
-            )}
-          </div>
+          </section>
+          <aside className="learning-panel learning-lesson-panel learning-objective-card">
+            {selectedTopic ? (
+              <>
+                <div className="learning-panel-title">
+                  <div>
+                    <h2>{selectedTopic.title}</h2>
+                    <p>{selectedTopic.description}</p>
+                  </div>
+                  <strong className="learning-objective-count">
+                    {completedTopicObjectiveCount}/{topicObjectives.length}
+                  </strong>
+                </div>
+                <div className="learning-objective-progress">
+                  <span style={{ width: `${topicProgressPercentage}%` }} />
+                </div>
+                <p className="learning-objective-progress-label">
+                  {completedTopicObjectiveCount} of {topicObjectives.length} objectives complete
+                </p>
+                <div className="learning-objective-list">
+                  {topicObjectives.map((objective, index) => {
+                    const isComplete = completedObjectiveKeys.has(
+                      objectiveProgressKey(selectedTopic._id, index),
+                    );
+                    return (
+                      <div className="learning-objective-item" key={`${objective}-${index}`}>
+                        <span className={isComplete ? "is-complete" : ""}>
+                          {isComplete ? <Check size={14} /> : index + 1}
+                        </span>
+                        <p>{objective}</p>
+                      </div>
+                    );
+                  })}
+                  {!topicObjectives.length && (
+                    <p className="learning-muted">This topic has no learning objectives yet.</p>
+                  )}
+                </div>
+              </>
+            ) : <p className="learning-muted">Choose a topic to see its objectives.</p>}
+          </aside>
         </div>
       </div>
     );
@@ -2348,18 +1851,23 @@ function StudentLearning() {
         {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
         {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
         <div className="learning-module-cards">
-          {selectedProgram.modules.map((module) => (
+          {selectedProgram.modules.map((module, index) => (
             <article className="learning-panel learning-module-card" key={module._id}>
               <div>
+                <small className="learning-module-number">
+                  {module.progress.completed && <Check size={12} />}
+                  Module {index + 1}
+                </small>
                 <h2>{module.title}</h2>
                 <p>{module.shortDescription || module.description}</p>
               </div>
               <div className="learning-module-card-meta">
                 <strong>{displayPrice(module.price, module.currency)}</strong>
-                <span>
+                <span className={module.progress.completed ? "learning-module-completed" : ""}>
+                  {module.progress.completed && <Check size={14} />}
                   {module.progress.completed
                     ? "Completed"
-                    : `${module.progress.completedTopics} topic(s) completed`}
+                    : `${module.progress.completedTopics || 0} topics completed`}
                 </span>
               </div>
               {module.hasAccess ? (
@@ -2368,7 +1876,7 @@ function StudentLearning() {
                   onClick={() => openModule(selectedProgram._id, module._id)}
                   type="button"
                 >
-                  {module.progress.completed ? "Review topics" : "Open topics"}
+                  Start now
                   <ChevronRight size={15} />
                 </button>
               ) : (

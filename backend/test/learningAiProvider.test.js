@@ -28,10 +28,7 @@ test("Ollama tutor uses configured model and only the supplied lesson context", 
   );
   const response = await provider.generateReply({
     topic: { title: "Variables" },
-    approvedContent: '{"explanation":"A variable stores a value."}',
-    moduleBehavior: "Use analogies and ask one question at a time.",
-    topicBehavior: "Give a visual analogy before the formal definition.",
-    validationInstructions: "Ask the authored check question and offer a hint before feedback.",
+    approvedContent: '{"objectives":["Explain that a variable stores a value."]}',
     advancedSettings: { temperature: 0.3, num_predict: 512, model: "untrusted-override" },
     history: [{ role: "user", content: "What is a variable?" }],
     language: "en",
@@ -41,14 +38,13 @@ test("Ollama tutor uses configured model and only the supplied lesson context", 
   assert.equal(requestBody.model, "configured-model");
   assert.equal(requestBody.stream, false);
   assert.deepEqual(requestBody.options, { temperature: 0.3, num_predict: 512 });
-  assert.match(requestBody.messages[0].content, /A variable stores a value/);
+  assert.match(requestBody.messages[0].content, /Explain that a variable stores a value/);
   assert.match(requestBody.messages[0].content, /Do not fetch, cite, or invent external/);
-  assert.match(requestBody.messages[0].content, /Use analogies and ask one question at a time/);
-  assert.match(requestBody.messages[0].content, /visual analogy before the formal definition/);
-  assert.match(requestBody.messages[0].content, /authored check question/);
-  assert.match(requestBody.messages[0].content, /Do not reveal hidden expected answers/);
+  assert.match(requestBody.messages[0].content, /Teach one incomplete objective at a time/);
+  assert.match(requestBody.messages[0].content, /masteredObjectiveIndexes/);
   assert.match(requestBody.messages[0].content, /highest priority/);
   assert.equal(response.content, "Let's review the idea together.");
+  assert.deepEqual(response.masteredObjectiveIndexes, []);
 });
 
 test("Ollama tutor reports provider failures instead of returning a fallback answer", async () => {
@@ -97,11 +93,8 @@ test("Groq tutor sends configured model, bearer key, approved prompt, and conver
   );
   const response = await provider.generateReply({
     topic: { title: "Variables" },
-    approvedContent: '{"explanation":"A variable stores a value."}',
+    approvedContent: '{"objectives":["Explain that a variable stores a value."]}',
     progressContext: { completedTopics: 0 },
-    moduleBehavior: "Use friendly analogies.",
-    topicBehavior: "Explain one idea at a time.",
-    validationInstructions: "Offer a hint before feedback.",
     advancedSettings: { temperature: 0.4, top_p: 0.9, num_predict: 300, top_k: 30 },
     history: [
       { role: "user", content: "What is a variable?" },
@@ -134,13 +127,13 @@ test("Groq tutor sends configured model, bearer key, approved prompt, and conver
     },
     { temperature: 0.4, top_p: 0.9, max_completion_tokens: 300, top_k: undefined },
   );
-  assert.match(body.messages[0].content, /A variable stores a value/);
-  assert.match(body.messages[0].content, /Use friendly analogies/);
-  assert.match(body.messages[0].content, /Explain one idea at a time/);
-  assert.match(body.messages[0].content, /Offer a hint before feedback/);
+  assert.match(body.messages[0].content, /Explain that a variable stores a value/);
+  assert.match(body.messages[0].content, /Use only the topic's objective content/);
+  assert.match(body.messages[0].content, /When the answer is incorrect or incomplete/);
   assert.match(body.messages[0].content, /Never claim assessment completion/);
   assert.deepEqual(response, {
     content: "Let's try a small example.",
+    masteredObjectiveIndexes: [],
     provider: "groq",
     model: "openai/gpt-oss-20b",
   });

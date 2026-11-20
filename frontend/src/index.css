@@ -2235,7 +2235,7 @@ canvas {
   flex-direction: column;
   align-self: start;
   overflow: hidden;
-  padding: 16px 12px 12px;
+  padding: 25px 12px 12px;
   border-right: 1px solid var(--border-color);
   background: var(--bg-elevated);
 }
@@ -2246,7 +2246,7 @@ canvas {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 10px 14px;
+  padding: 0 10px 22px;
 }
 
 .role-navigation-welcome {
@@ -2293,6 +2293,7 @@ canvas {
   min-width: 0;
   min-height: 40px;
   align-items: center;
+  gap: 11px;
   padding: 9px 10px;
   border-radius: 7px;
   color: var(--text-secondary);
@@ -2314,7 +2315,17 @@ canvas {
 .role-navigation-links a.active,
 .role-navigation-account a.active {
   background: var(--accent-blue-soft);
+  color: var(--accent-blue-bright);
   font-weight: 600;
+}
+
+.role-navigation-links a svg {
+  flex: 0 0 16px;
+  color: var(--text-muted);
+}
+
+.role-navigation-links a.active svg {
+  color: var(--accent-blue-bright);
 }
 
 .role-navigation-account {
@@ -2445,7 +2456,7 @@ canvas {
 
   .role-navigation.is-open .role-navigation-header {
     justify-content: space-between;
-    padding: 0 10px 14px;
+    padding: 0 10px 22px;
   }
 
   .role-navigation.is-open .role-navigation-welcome,

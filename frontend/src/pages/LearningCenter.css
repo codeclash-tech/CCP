@@ -4,6 +4,125 @@
   margin: 0 auto;
   padding: clamp(24px, 3vw, 42px) var(--page-gutter);
   color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+.learning-admin-center {
+  width: 100%;
+  max-width: none;
+}
+
+.learning-admin-center .learning-management-grid {
+  display: block;
+}
+
+.learning-admin-course-page {
+  width: 100%;
+}
+
+.learning-admin-course-grid,
+.learning-admin-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.learning-admin-course-card,
+.learning-admin-topic-card {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-main);
+}
+
+.learning-admin-course-card-main,
+.learning-admin-topic-card-main {
+  display: grid;
+  flex: 1;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.learning-admin-course-card-main > strong,
+.learning-admin-topic-card-main > strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.learning-admin-course-card-main > span:not(.learning-status-badge),
+.learning-admin-topic-card-main > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.learning-admin-course-card-main > small,
+.learning-admin-topic-card-main > small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.learning-admin-module-grid {
+  display: grid;
+  grid-column: 1;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.learning-admin-module-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-main);
+}
+
+.learning-admin-module-card-main {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.learning-admin-module-card-main > small,
+.learning-admin-module-card-main > span {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.learning-admin-module-card-main > strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.learning-admin-module-card-main > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .learning-heading,
@@ -120,6 +239,7 @@
 }
 
 .learning-module-admin-panel > .learning-module-list,
+.learning-module-admin-panel > .learning-admin-module-grid,
 .learning-module-admin-panel > .learning-empty-state,
 .learning-module-admin-panel > .learning-module-add-button {
   grid-column: 1;
@@ -705,6 +825,36 @@
   align-items: flex-end;
 }
 
+.learning-center.learning-workspace {
+  display: flex;
+  width: 100%;
+  max-width: none;
+  height: calc(100dvh - var(--app-shell-topbar-height, 68px));
+  min-height: 0;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.learning-workspace-top {
+  flex: 0 0 auto;
+}
+
+.learning-workspace-top .learning-back-button {
+  margin-bottom: 9px;
+}
+
+.learning-workspace .learning-heading {
+  margin-bottom: 0;
+}
+
+.learning-workspace .learning-alert {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
 .learning-progress-summary {
   display: grid;
   gap: 5px;
@@ -734,14 +884,17 @@
 
 .learning-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(140px, 0.22fr) minmax(0, 1fr);
+  grid-template-columns: minmax(145px, 0.55fr) minmax(320px, 1.55fr) minmax(220px, 0.8fr);
   gap: 15px;
-  align-items: start;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .learning-topic-panel {
-  position: sticky;
-  top: 16px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .learning-topic-button {
@@ -789,12 +942,6 @@
   overflow-wrap: anywhere;
   color: var(--text-muted);
   font-size: 9px;
-}
-
-.learning-main-column {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
 }
 
 .learning-lesson-copy {
@@ -912,16 +1059,33 @@
   font-size: 11px;
 }
 
+.learning-tutor-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.learning-tutor-panel > .learning-panel-title,
+.learning-tutor-controls,
+.learning-chat-form,
+.learning-tutor-panel > .learning-help,
+.learning-tutor-panel > .learning-alert {
+  flex: 0 0 auto;
+}
+
 .learning-conversation {
   display: grid;
+  flex: 1 1 0;
   gap: 10px;
-  max-height: 360px;
-  min-height: 100px;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--bg-main);
+  align-content: start;
 }
 
 .learning-message {
@@ -950,17 +1114,128 @@
 
 .learning-chat-form {
   align-items: stretch;
+  flex: 0 0 auto;
   margin-top: 10px;
 }
 
 .learning-chat-form textarea {
-  resize: vertical;
+  resize: none;
 }
 
 .learning-chat-form button {
   align-self: flex-end;
   min-width: 38px;
   min-height: 38px;
+}
+
+.learning-chat-send {
+  min-width: 64px !important;
+}
+
+.learning-objective-card {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.learning-objective-card .learning-panel-title {
+  align-items: flex-start;
+}
+
+.learning-objective-card .learning-panel-title h2 {
+  overflow-wrap: anywhere;
+}
+
+.learning-objective-card .learning-panel-title p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.learning-objective-count {
+  flex: 0 0 auto;
+  color: var(--accent-blue-bright);
+  font-size: 14px;
+}
+
+.learning-objective-progress {
+  height: 6px;
+  margin-top: 15px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--border-color);
+}
+
+.learning-objective-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-blue-bright);
+  transition: width 180ms ease;
+}
+
+.learning-objective-progress-label {
+  margin: 7px 0 14px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.learning-objective-list {
+  display: grid;
+  gap: 10px;
+}
+
+.learning-objective-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-main);
+}
+
+.learning-objective-item > span {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.learning-objective-item > span.is-complete {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.learning-objective-item p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.learning-module-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+  color: var(--accent-blue-bright);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.learning-module-completed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-success);
 }
 
 .learning-assessment-panel .learning-field {
@@ -978,12 +1253,32 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .learning-center.learning-workspace {
+    height: auto;
+    min-height: calc(100dvh - var(--app-shell-topbar-height, 68px));
+    overflow: visible;
+  }
+
+  .learning-workspace-grid {
+    flex: none;
+  }
+
+  .learning-tutor-panel {
+    min-height: 420px;
+  }
+
+  .learning-conversation {
+    min-height: 220px;
+    max-height: 45vh;
+  }
+
   .learning-module-admin-panel {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .learning-module-admin-panel > .learning-panel-title,
   .learning-module-admin-panel > .learning-module-list,
+  .learning-module-admin-panel > .learning-admin-module-grid,
   .learning-module-admin-panel > .learning-empty-state,
   .learning-module-admin-panel > .learning-form,
   .learning-module-admin-panel > .learning-topic-management,

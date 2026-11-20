@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import LearningModule from "../src/models/LearningModule.js";
 import LearningModuleVersion from "../src/models/LearningModuleVersion.js";
+import LearningCertificate from "../src/models/LearningCertificate.js";
 import LearningProgram from "../src/models/LearningProgram.js";
 import LearningProgress from "../src/models/LearningProgress.js";
 import LearningPurchase from "../src/models/LearningPurchase.js";
 import { completeLearningTopic } from "../src/services/learningService.js";
 
-test("topic completion uses backend-authored answers and cannot be self-marked", async () => {
+test("topic completion requires recorded objective mastery and cannot be self-marked", async () => {
   const methods = [
     [LearningModule, "findOne"],
     [LearningModule, "findById"],
@@ -15,6 +16,7 @@ test("topic completion uses backend-authored answers and cannot be self-marked",
     [LearningProgram, "exists"],
     [LearningPurchase, "findOne"],
     [LearningProgress, "findOneAndUpdate"],
+    [LearningCertificate, "findOneAndUpdate"],
   ];
   const originals = methods.map(([target, name]) => [target, name, target[name]]);
   const moduleId = "507f1f77bcf86cd799439031";
@@ -32,13 +34,13 @@ test("topic completion uses backend-authored answers and cannot be self-marked",
     topics: [
       {
         title: "Topic one",
-        explanation: "Lesson one.",
-        questions: [{ prompt: "What is the answer?", expectedAnswer: "the answer" }],
+        description: "Lesson one.",
+        objectives: ["Explain the first outcome."],
       },
       {
         title: "Topic two",
-        explanation: "Lesson two.",
-        questions: [{ prompt: "What comes next?", expectedAnswer: "topic two" }],
+        description: "Lesson two.",
+        objectives: ["Explain the second outcome."],
       },
     ],
   });
@@ -54,6 +56,7 @@ test("topic completion uses backend-authored answers and cannot be self-marked",
     moduleId: module._id,
     moduleVersion: 1,
     completedTopicIds: [],
+    completedObjectiveKeys: [],
     completedExerciseIds: [],
     assessmentPassed: false,
     assessmentScorePercent: 0,
@@ -68,15 +71,15 @@ test("topic completion uses backend-authored answers and cannot be self-marked",
   LearningProgram.exists = async () => ({ _id: programId });
   LearningPurchase.findOne = async () => ({ status: "ACTIVE", accessExpiresAt: null });
   LearningProgress.findOneAndUpdate = async () => progress;
+  LearningCertificate.findOneAndUpdate = async () => null;
 
   try {
     const incorrect = await completeLearningTopic(userId, moduleId, String(topic._id), {});
     assert.equal(incorrect.passed, false);
     assert.equal(progress.completedTopicIds.length, 0);
 
-    const accepted = await completeLearningTopic(userId, moduleId, String(topic._id), {
-      [String(topic.questions[0]._id)]: "THE   ANSWER",
-    });
+    progress.completedObjectiveKeys = [`${topic._id}:0`];
+    const accepted = await completeLearningTopic(userId, moduleId, String(topic._id));
     assert.equal(accepted.passed, true);
     assert.equal(accepted.scorePercent, 100);
     assert.equal(progress.completedTopicIds.length, 1);

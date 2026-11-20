@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import mongoose from "mongoose";
+import LearningCertificate from "../src/models/LearningCertificate.js";
 import LearningAiUsage from "../src/models/LearningAiUsage.js";
 import LearningModule from "../src/models/LearningModule.js";
 import LearningModuleVersion from "../src/models/LearningModuleVersion.js";
@@ -26,10 +27,14 @@ test("Groq tutor receives the student's current question and preserves the sessi
     topics: [{
       _id: topicId,
       title: "Variables",
-      explanation: "A variable stores a value.",
-      tutorInstructions: "Explain one idea at a time.",
-      validationInstructions: "Offer a hint before feedback.",
+      description: "Store values in named variables.",
+      objectives: ["Explain that a variable stores a value."],
     }],
+  });
+  const objectiveProgress = new LearningProgress({
+    userId,
+    moduleId,
+    moduleVersion: 1,
   });
   const session = new LearningSession({
     _id: sessionId,
@@ -64,11 +69,15 @@ test("Groq tutor receives the student's current question and preserves the sessi
       select: () => ({
         lean: async () => ({
           completedTopicIds: [],
+          completedObjectiveKeys: [],
           completedExerciseIds: [],
           assessmentPassed: false,
         }),
       }),
     })],
+    [LearningProgress, "findOneAndUpdate", async () => objectiveProgress],
+    [LearningProgress.prototype, "save", async function saveProgress() { return this; }],
+    [LearningCertificate, "findOneAndUpdate", async () => null],
     [LearningAiUsage, "create", async () => ({})],
   ];
   const originals = patches.map(([target, name]) => [target, name, target[name]]);
@@ -85,7 +94,14 @@ test("Groq tutor receives the student's current question and preserves the sessi
     return {
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: "Let's practice with a simple example." } }],
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              reply: "A variable stores a value. What can you use a variable to store?",
+              masteredObjectiveIndexes: [0, 999],
+            }),
+          },
+        }],
       }),
     };
   };
@@ -94,7 +110,7 @@ test("Groq tutor receives the student's current question and preserves the sessi
     const result = await askLearningTutor(
       userId,
       sessionId,
-      "I am not understand this. I I still don't understand.",
+      "A variable stores a value, such as a score.",
       "ta",
       true,
       "Kai",
@@ -104,11 +120,11 @@ test("Groq tutor receives the student's current question and preserves the sessi
     assert.deepEqual(conversation.map(({ role, content }) => ({ role, content })), [
       { role: "user", content: "What is a variable?" },
       { role: "assistant", content: "It is a named place to store a value." },
-      { role: "user", content: "I am not understand this. I I still don't understand." },
+      { role: "user", content: "A variable stores a value, such as a score." },
     ]);
-    assert.match(requestBody.messages[0].content, /A variable stores a value/);
+    assert.match(requestBody.messages[0].content, /Explain that a variable stores a value/);
     assert.match(requestBody.messages[0].content, /Student nickname: "Kai"/);
-    assert.match(requestBody.messages[0].content, /Use friendly analogies/);
+    assert.match(requestBody.messages[0].content, /Teach one incomplete objective at a time/);
     assert.match(
       requestBody.messages[0].content,
       /English speech transcript and may contain recognition errors/,
@@ -121,14 +137,17 @@ test("Groq tutor receives the student's current question and preserves the sessi
       requestBody.messages[0].content,
       /Never use emojis, markdown/,
     );
-    assert.equal(result.reply, "Let's practice with a simple example.");
+    assert.equal(result.reply, "A variable stores a value. What can you use a variable to store?");
     assert.equal(result.replyLanguage, "en");
     assert.equal(session.language, "en");
+    assert.deepEqual(objectiveProgress.completedObjectiveKeys, [`${topicId}:0`]);
+    assert.deepEqual(objectiveProgress.completedTopicIds.map(String), [String(topicId)]);
+    assert.equal(result.progress.progressPercentage, 100);
     assert.deepEqual(
       session.messages.slice(-2).map(({ role, content }) => ({ role, content })),
       [
-        { role: "user", content: "I am not understand this. I I still don't understand." },
-        { role: "assistant", content: "Let's practice with a simple example." },
+        { role: "user", content: "A variable stores a value, such as a score." },
+        { role: "assistant", content: "A variable stores a value. What can you use a variable to store?" },
       ],
     );
   } finally {
