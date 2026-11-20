@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
+    "build:speech-worker": "node scripts/build-speech-worker.mjs",
     "package:win": "node scripts/package-windows.mjs",
     "test": "node --test"
   },
@@ -41,6 +42,10 @@
       {
         "from": "runtime-dist",
         "to": "runtime"
+      },
+      {
+        "from": "speech-dist/codeclash-speech-worker",
+        "to": "speech-worker"
       },
       {
         "from": "build-integrity-manifest.json",

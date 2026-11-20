@@ -12,6 +12,7 @@ const integrityManifestPath = path.join(
   desktopDirectory,
   "build-integrity-manifest.json",
 );
+const speechWorkerDirectory = path.join(desktopDirectory, "speech-dist");
 
 function run(command, args, cwd, env = process.env) {
   const result = spawnSync(command, args, {
@@ -96,6 +97,7 @@ async function prepareRceditDirectory() {
 try {
   await rm(integrityManifestPath, { force: true });
   run(process.execPath, [path.join(scriptsDirectory, "build.mjs")], repositoryRoot);
+  run(process.execPath, [path.join(scriptsDirectory, "build-speech-worker.mjs")], repositoryRoot);
   run(process.execPath, [path.join(scriptsDirectory, "prepare-runtime.mjs")], repositoryRoot);
   run(
     process.execPath,
@@ -133,4 +135,5 @@ try {
   process.exitCode = 1;
 } finally {
   await rm(integrityManifestPath, { force: true });
+  await rm(speechWorkerDirectory, { recursive: true, force: true });
 }

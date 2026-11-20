@@ -41,6 +41,11 @@ desktop/release/
 desktop/release-local/
 desktop/release-hosted/
 desktop/runtime-dist/
+desktop/speech-dist/
+desktop/.speech-build/
+desktop/.venv/
+desktop/python/__pycache__/
+desktop/python/test_*.pyc
 desktop/node_modules/
 
 # Misc

@@ -232,6 +232,7 @@ export async function sendTutorMessage(req, res) {
       req.params.sessionId,
       req.body.message,
       req.body.language,
+      req.body.inputTranscribedFromSpeech === true,
     ),
   );
 }

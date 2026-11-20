@@ -7,10 +7,12 @@ import {
   protocol,
   safeStorage,
 } from "electron";
+import { totalmem } from "node:os";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { LocalEngine, LOCAL_ENGINE_VERSION } from "./localEngine.js";
+import { PersistentSpeechWorker } from "./speechWorker.js";
 import { normalizeExecutionRequest } from "./executionRequest.js";
 import {
   submitDesktopDailyQuestion,
@@ -46,6 +48,12 @@ const engine = new LocalEngine({
 const authStore = new SecureAuthStore({
   safeStorage,
   userDataPath: app.getPath("userData"),
+});
+const speechWorker = new PersistentSpeechWorker({
+  isPackaged: app.isPackaged,
+  resourcesPath: process.resourcesPath,
+  userDataPath: app.getPath("userData"),
+  totalMemoryBytes: totalmem(),
 });
 
 let mainWindow = null;
@@ -212,6 +220,11 @@ ipcMain.handle("codeclash:engine-status", async (event) => {
   return engine.getStatus();
 });
 
+ipcMain.handle("codeclash:speech-transcribe", (event, request) => {
+  requireTrustedSender(event);
+  return speechWorker.transcribe(request);
+});
+
 ipcMain.handle("codeclash:engine-execute", async (event, request) => {
   requireTrustedSender(event);
   const normalizedRequest = normalizeExecutionRequest(request);
@@ -332,7 +345,7 @@ async function stopApplication() {
   if (shutdownComplete || shutdownInProgress) return;
   shutdownInProgress = true;
   try {
-    await engine.stop();
+    await Promise.all([engine.stop(), speechWorker.stop()]);
     shutdownComplete = true;
   } finally {
     shutdownInProgress = false;
@@ -380,6 +393,9 @@ app.whenReady()
     if (!hasSingleInstanceLock) return;
     try {
       await protocol.handle(rendererScheme, serveRendererRequest);
+      speechWorker.start().catch((error) => {
+        console.error("Persistent speech worker startup failed:", error);
+      });
       await engine.start();
     } catch (error) {
       console.error("Local execution engine startup failed:", error);

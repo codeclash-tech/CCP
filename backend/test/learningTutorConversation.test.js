@@ -96,6 +96,7 @@ test("Groq tutor receives the student's current question and preserves the sessi
       sessionId,
       "Can you show me an example?",
       "en",
+      true,
     );
     const conversation = requestBody.messages.slice(1);
 
@@ -106,6 +107,10 @@ test("Groq tutor receives the student's current question and preserves the sessi
     ]);
     assert.match(requestBody.messages[0].content, /A variable stores a value/);
     assert.match(requestBody.messages[0].content, /Use friendly analogies/);
+    assert.match(
+      requestBody.messages[0].content,
+      /User input is transcribed from a Tamil speaker speaking English/,
+    );
     assert.equal(result.reply, "Let's practice with a simple example.");
     assert.deepEqual(
       session.messages.slice(-2).map(({ role, content }) => ({ role, content })),

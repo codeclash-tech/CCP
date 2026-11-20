@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld(
       submitDaily: (request) =>
         ipcRenderer.invoke("codeclash:daily-submit", request),
     }),
+    speech: Object.freeze({
+      transcribe: (request) =>
+        ipcRenderer.invoke("codeclash:speech-transcribe", request),
+    }),
     window: Object.freeze({
       setChallengeMode: (enabled) =>
         ipcRenderer.invoke("codeclash:challenge-mode", enabled),

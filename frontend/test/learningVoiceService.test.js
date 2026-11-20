@@ -27,6 +27,103 @@ test("speech input provider selects the requested language and returns recognize
   assert.equal(transcript, "வணக்கம்");
 });
 
+test("desktop speech input captures microphone audio, resamples it, and transcribes locally", async () => {
+  let processor;
+  let transcriptionRequest;
+  let stoppedTracks = 0;
+  const states = [];
+  const track = { stop: () => { stoppedTracks += 1; } };
+  class MockAudioContext {
+    constructor(options) {
+      assert.deepEqual(options, { sampleRate: 16000 });
+      this.sampleRate = 48000;
+      this.state = "running";
+      this.destination = {};
+    }
+    async resume() {}
+    async close() {
+      this.state = "closed";
+    }
+    createMediaStreamSource() {
+      return { connect() {}, disconnect() {} };
+    }
+    createScriptProcessor() {
+      processor = { connect() {}, disconnect() {}, onaudioprocess: null };
+      return processor;
+    }
+    createGain() {
+      return { gain: { value: 1 }, connect() {}, disconnect() {} };
+    }
+  }
+  const provider = createSpeechInputProvider({
+    AudioContext: MockAudioContext,
+    navigator: {
+      mediaDevices: {
+        getUserMedia: async (constraints) => {
+          assert.equal(constraints.audio.channelCount, 1);
+          assert.deepEqual(constraints.audio.sampleRate, { ideal: 16000 });
+          assert.equal(constraints.audio.echoCancellation, false);
+          assert.equal(constraints.audio.noiseSuppression, false);
+          assert.equal(constraints.audio.autoGainControl, false);
+          return { getTracks: () => [track] };
+        },
+      },
+    },
+    codeClashDesktop: {
+      speech: {
+        transcribe: async (request) => {
+          transcriptionRequest = request;
+          return "  What is a variable?  ";
+        },
+      },
+    },
+  });
+  let transcript = "";
+  const stop = await provider.start({
+    language: "en",
+    onTranscript: (value) => { transcript = value; },
+    onError: (error) => assert.fail(error),
+    onStateChange: (state) => states.push(state),
+  });
+  processor.onaudioprocess({
+    inputBuffer: { getChannelData: () => new Float32Array(48000).fill(0.25) },
+  });
+  await stop();
+
+  assert.equal(transcriptionRequest.sampleRate, 16000);
+  assert.equal(transcriptionRequest.samples.length, 16000);
+  assert.equal(transcriptionRequest.samples[0], 0.25);
+  assert.equal(transcriptionRequest.language, "en");
+  assert.equal(transcript, "What is a variable?");
+  assert.equal(stoppedTracks, 1);
+  assert.deepEqual(states, ["requesting", "recording", "transcribing", "idle"]);
+});
+
+test("desktop speech input explains denied microphone permissions", async () => {
+  const provider = createSpeechInputProvider({
+    navigator: {
+      mediaDevices: {
+        getUserMedia: async () => {
+          const error = new Error("Permission denied");
+          error.name = "NotAllowedError";
+          throw error;
+        },
+      },
+    },
+    AudioContext: class {},
+    codeClashDesktop: { speech: { transcribe: async () => "" } },
+  });
+
+  await assert.rejects(
+    provider.start({
+      language: "en",
+      onTranscript: () => {},
+      onError: () => {},
+    }),
+    /Microphone access was denied/,
+  );
+});
+
 test("speech providers report when a platform capability is unavailable", () => {
   assert.equal(createSpeechInputProvider({}), null);
   assert.equal(createSpeechOutputProvider({}), null);

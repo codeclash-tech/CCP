@@ -16,6 +16,18 @@ Set-Location ..\desktop
 npm ci
 ```
 
+The desktop speech worker is built with Python 3.12. Install it once for
+development and Windows packaging:
+
+```powershell
+uv python install 3.12
+uv venv --python 3.12 .venv
+uv pip install --python .venv\Scripts\python.exe -r python\requirements.txt
+```
+
+For local development, set `CODECLASH_PYTHON` to
+`desktop\.venv\Scripts\python.exe` before starting Electron.
+
 For local execution, install a Java 21 JDK and set `JAVA_HOME` to its directory.
 Then run `npm run dev` from `desktop`. The command starts Vite and Electron and
 builds the engine JAR if it is missing. The backend remains a separate service.
@@ -26,7 +38,8 @@ the backend CORS allowlist must include that origin for desktop sign-in.
 
 ## Windows installer
 
-With Node.js, Maven, and a Java 21 JDK available, run:
+With Node.js, Python 3.12 and its speech dependencies installed as above,
+Maven, and a Java 21 JDK available, run:
 
 ```powershell
 Set-Location desktop
@@ -78,8 +91,19 @@ certificates are server-managed. Configure AI and Razorpay credentials on the
 backend; only the Razorpay public key ID and a server-created order reach
 Checkout. The package adds the Razorpay Checkout origins to the packaged
 desktop renderer policy only; the shared website CSP source remains unchanged.
-Tutor speech uses separate platform speech input/output adapters, so text
-tutoring remains available when a system voice is missing.
+Tutor speech input captures audio in the renderer and transcribes it locally in
+Electron's main process and a persistent, bundled Python `faster-whisper`
+worker. The worker starts once with the app, loads its model once, and accepts
+mono 16 kHz float32 audio over stdin without writing recordings to disk. It
+selects `distil-large-v3` when system RAM is at least 8 GiB and `small.en` on
+lower-memory machines, uses int8 CPU or int8/float16 CUDA inference, and
+transcribes English literally for the tutor. Browser echo cancellation, noise
+suppression, and automatic gain control are disabled to preserve quieter
+consonants. The model downloads on first use and is cached in the user's app
+data; first setup needs internet and substantial free disk space. Microphone
+audio remains on-device. English speech input is supported by this pipeline;
+the existing Tamil tutor response and voice output remain available. Tutor
+text input remains available if speech recognition is unavailable.
 
 Local execution remains useful for immediate candidate feedback, but it is not
 the score authority. The authenticated candidate can still inspect or modify

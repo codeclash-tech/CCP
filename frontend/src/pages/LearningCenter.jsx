@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -1412,6 +1412,8 @@ function StudentLearning() {
   const [voiceProfile, setVoiceProfile] = useState("girl");
   const [voiceOutput, setVoiceOutput] = useState(true);
   const [voiceError, setVoiceError] = useState("");
+  const [voiceInputState, setVoiceInputState] = useState("idle");
+  const voiceInputStopRef = useRef(null);
   const [codingOpen, setCodingOpen] = useState(false);
   const [exerciseCode, setExerciseCode] = useState("");
   const [exerciseResult, setExerciseResult] = useState(null);
@@ -1467,6 +1469,10 @@ function StudentLearning() {
     refreshVoices();
     return voiceProviders.output.onVoicesChanged(refreshVoices);
   }, [voiceProviders]);
+
+  useEffect(() => () => {
+    void voiceInputStopRef.current?.({ transcribe: false });
+  }, []);
 
   useEffect(() => {
     if (!voiceChoices[voiceProfile] && voiceChoices.boy) setVoiceProfile("boy");
@@ -1553,7 +1559,7 @@ function StudentLearning() {
     }
   };
 
-  const sendMessage = async (input = message) => {
+  const sendMessage = async (input = message, { transcribedFromSpeech = false } = {}) => {
     const text = String(input || "").trim();
     if (!text || !session) return;
     setBusy(true);
@@ -1564,6 +1570,7 @@ function StudentLearning() {
       const { data } = await api.post(`/learning/sessions/${session._id}/messages`, {
         message: text,
         language,
+        inputTranscribedFromSpeech: transcribedFromSpeech,
       });
       setSession(data.session);
       setMessages(data.session.messages || []);
@@ -1576,19 +1583,34 @@ function StudentLearning() {
     }
   };
 
-  const startVoiceInput = () => {
+  const startVoiceInput = async () => {
     if (!voiceProviders.input) {
-      setVoiceError("Speech recognition is not available in this desktop runtime. You can still type to the tutor.");
+      setVoiceError("Offline speech input is not available in this desktop runtime. You can still type to the tutor.");
       return;
     }
+    if (voiceInputStopRef.current) {
+      const stop = voiceInputStopRef.current;
+      voiceInputStopRef.current = null;
+      await stop();
+      return;
+    }
+    if (["requesting", "transcribing"].includes(voiceInputState)) return;
+    setVoiceError("");
     try {
-      voiceProviders.input.start({
+      voiceInputStopRef.current = await voiceProviders.input.start({
         language,
-        onTranscript: (transcript) => sendMessage(transcript),
+        onTranscript: (transcript) => {
+          void sendMessage(transcript, { transcribedFromSpeech: true });
+        },
         onError: setVoiceError,
+        onStateChange: (state) => {
+          setVoiceInputState(state);
+          if (state === "idle") voiceInputStopRef.current = null;
+        },
       });
-    } catch {
-      setVoiceError("Could not start speech input. Check microphone permission or type your question.");
+    } catch (speechError) {
+      setVoiceInputState("idle");
+      setVoiceError(speechError.message || "Could not start microphone capture.");
     }
   };
 
@@ -1732,6 +1754,9 @@ function StudentLearning() {
   };
 
   const closeModule = () => {
+    void voiceInputStopRef.current?.({ transcribe: false });
+    voiceInputStopRef.current = null;
+    setVoiceInputState("idle");
     voiceProviders.output?.cancel();
     setModuleData(null);
     setTopicId("");
@@ -2023,13 +2048,29 @@ function StudentLearning() {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                 />
-                <button aria-label="Speak to tutor" className="learning-button learning-button-secondary" onClick={startVoiceInput} type="button">
+                <button
+                  aria-label={voiceInputState === "recording" ? "Stop recording" : "Speak to tutor"}
+                  aria-pressed={voiceInputState === "recording"}
+                  className="learning-button learning-button-secondary"
+                  disabled={["requesting", "transcribing"].includes(voiceInputState)}
+                  onClick={startVoiceInput}
+                  type="button"
+                >
                   <Mic size={17} />
                 </button>
                 <button aria-label="Send message" className="learning-button" disabled={busy || !message.trim()} type="submit">
                   <Send size={16} />
                 </button>
               </form>
+              {voiceInputState === "recording" && (
+                <p className="learning-help" role="status">Listening… Tap the microphone again to stop recording.</p>
+              )}
+              {voiceInputState === "requesting" && (
+                <p className="learning-help" role="status">Requesting microphone access…</p>
+              )}
+              {voiceInputState === "transcribing" && (
+                <p className="learning-help" role="status">Transcribing locally… First use may download the offline speech model.</p>
+              )}
               {voiceError && <p className="learning-alert learning-alert-error" role="status">{voiceError}</p>}
             </section>
 

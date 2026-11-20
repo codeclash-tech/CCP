@@ -1331,7 +1331,13 @@ export async function getLearningSession(userId, sessionId) {
   return { session, module, topic };
 }
 
-export async function askLearningTutor(userId, sessionId, message, language) {
+export async function askLearningTutor(
+  userId,
+  sessionId,
+  message,
+  language,
+  inputTranscribedFromSpeech = false,
+) {
   const prompt = String(message || "").trim();
   if (!prompt || prompt.length > 2000) {
     throw requestError("Your message must contain between 1 and 2000 characters.");
@@ -1367,6 +1373,7 @@ export async function askLearningTutor(userId, sessionId, message, language) {
         { role: "user", content: prompt },
       ].map(({ role, content }) => ({ role, content })),
       language,
+      inputTranscribedFromSpeech,
     });
     session.language = language;
     session.messages.push(
