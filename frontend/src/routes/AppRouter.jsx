@@ -10,6 +10,7 @@ import { AuthProvider } from "../context/AuthContext";
 
 import Navbar from "../components/layout/Navbar";
 import DesktopTitleBar from "../components/layout/DesktopTitleBar";
+import RoleNavigation from "../components/layout/RoleNavigation";
 import Footer from "../components/layout/Footer";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -62,20 +63,27 @@ function AppLayout({ children }) {
       className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
     >
       {isDesktop && !isFullscreen && (
-        <DesktopTitleBar
-          navigationOpen={navigationOpen}
-          onToggleNavigation={(open) => setNavigationOpen(Boolean(open))}
-        />
+        <DesktopTitleBar />
       )}
-      {!isFullscreen && !isDesktop && (
-        <Navbar
-          navigationOpen={navigationOpen}
-          onToggleNavigation={(open) => setNavigationOpen(Boolean(open))}
-        />
-      )}
+      {!isFullscreen && !isDesktop && <Navbar />}
       <div
-        className={`app-shell-body${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
+        className={`app-shell-body${user ? " app-shell-body-authenticated" : ""}${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
       >
+        {user && (
+          <RoleNavigation
+            open={navigationOpen}
+            onNavigate={() => setNavigationOpen(false)}
+            onToggle={setNavigationOpen}
+          />
+        )}
+        {user && navigationOpen && (
+          <button
+            type="button"
+            className="role-navigation-backdrop"
+            aria-label="Close navigation"
+            onClick={() => setNavigationOpen(false)}
+          />
+        )}
         <main className="app-shell-content">
           <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
         </main>

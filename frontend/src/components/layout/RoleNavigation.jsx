@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Menu, X } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { ROLE_NAVIGATION } from "../../routes/roleNavigation";
 import { getAssessmentRole } from "../../routes/roleAccess";
 import { useAuth } from "../../context/AuthContext";
 
-export default function RoleNavigation({ open = false, onNavigate }) {
+export default function RoleNavigation({ open = false, onNavigate, onToggle }) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [signOutError, setSignOutError] = useState("");
@@ -12,7 +13,7 @@ export default function RoleNavigation({ open = false, onNavigate }) {
   const links = (role ? ROLE_NAVIGATION[role] || ROLE_NAVIGATION.CANDIDATE : [])
     .filter((link) => link.path !== "/profile");
 
-  if (!user || !open) return null;
+  if (!user) return null;
 
   const handleSignOut = async () => {
     setSignOutError("");
@@ -27,8 +28,23 @@ export default function RoleNavigation({ open = false, onNavigate }) {
   };
 
   return (
-    <div className="role-navigation-popover" id="role-navigation">
-      <p className="role-navigation-welcome">Welcome, {user.name || "there"}</p>
+    <aside
+      id="role-navigation"
+      className={`role-navigation${open ? " is-open" : ""}`}
+    >
+      <div className="role-navigation-header">
+        <p className="role-navigation-welcome">Welcome, {user.name || "there"}</p>
+        <button
+          type="button"
+          className="role-navigation-mobile-toggle"
+          aria-label={open ? "Close navigation" : "Open navigation"}
+          aria-controls="role-navigation"
+          aria-expanded={open}
+          onClick={() => onToggle?.(!open)}
+        >
+          {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+        </button>
+      </div>
       <nav className="role-navigation-links" aria-label="Main navigation">
         {links.map(({ path, label }) => (
           <NavLink
@@ -50,6 +66,6 @@ export default function RoleNavigation({ open = false, onNavigate }) {
         </button>
         {signOutError && <p role="alert">{signOutError}</p>}
       </div>
-    </div>
+    </aside>
   );
 }

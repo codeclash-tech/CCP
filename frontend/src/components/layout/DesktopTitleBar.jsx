@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Maximize2, Menu, Minimize2, Minus, X } from "lucide-react";
+import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 import codeclashLogo from "../../../../desktop/assets/codeclash.ico";
-import RoleNavigation from "./RoleNavigation";
 
-export default function DesktopTitleBar({ navigationOpen = false, onToggleNavigation }) {
+export default function DesktopTitleBar() {
   const [maximized, setMaximized] = useState(false);
 
   useEffect(() => {
@@ -49,28 +48,6 @@ export default function DesktopTitleBar({ navigationOpen = false, onToggleNaviga
         <strong>CodeClash</strong>
       </div>
       <div className="desktop-titlebar-actions">
-        <div
-          className="desktop-titlebar-menu"
-          onMouseEnter={() => onToggleNavigation?.(true)}
-          onMouseLeave={() => onToggleNavigation?.(false)}
-          onDoubleClick={(event) => event.stopPropagation()}
-        >
-          <button
-            type="button"
-            className="desktop-titlebar-button desktop-titlebar-menu-button"
-            aria-label={navigationOpen ? "Close navigation menu" : "Open navigation menu"}
-            aria-expanded={navigationOpen}
-            aria-controls="role-navigation"
-            onClick={() => onToggleNavigation?.(!navigationOpen)}
-            onDoubleClick={(event) => event.stopPropagation()}
-          >
-            <Menu size={17} aria-hidden="true" />
-          </button>
-          <RoleNavigation
-            open={navigationOpen}
-            onNavigate={() => onToggleNavigation?.(false)}
-          />
-        </div>
         <button
           type="button"
           className="desktop-titlebar-button"

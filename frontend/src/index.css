@@ -2167,93 +2167,173 @@ canvas {
     }
   }
 
-.app-shell-body,
-.desktop-app-shell .app-shell-body,
-.desktop-app-shell .app-shell-body.desktop-app-shell-unauthenticated {
-  display: block;
-  grid-template-columns: minmax(0, 1fr);
+.app-shell {
+  min-width: 0;
+  min-height: 100dvh;
 }
 
-.app-shell-content,
-.desktop-app-shell .app-shell-content {
-  width: 100%;
+.app-shell-body {
+  display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
 }
 
-.app-navbar-navigation,
-.desktop-titlebar-menu {
-  position: relative;
+.app-shell-body-authenticated {
+  display: grid;
+  grid-template-columns: clamp(210px, 18vw, 260px) minmax(0, 1fr);
 }
 
-.app-navbar-navigation {
-  margin-right: auto;
+.desktop-app-shell {
+  --app-shell-topbar-height: 48px;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
 }
 
-.app-navbar-menu-toggle {
-  display: inline-flex;
-  min-height: 38px;
+.app-shell:not(.desktop-app-shell) {
+  --app-shell-topbar-height: 68px;
+}
+
+.app-navbar .app-navbar-brand-group {
+  min-width: 0;
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+}
+
+.app-navbar .app-navbar-brand {
+  max-width: 100%;
+}
+
+.desktop-app-shell .app-shell-body.app-shell-body-authenticated {
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+}
+
+.desktop-app-shell .app-shell-body.desktop-app-shell-unauthenticated {
+  display: block;
+}
+
+.desktop-app-shell.fullscreen-app-shell .app-shell-body {
+  display: block;
+}
+
+.fullscreen-app-shell .role-navigation {
+  display: none;
+}
+
+.role-navigation {
+  position: sticky;
+  top: var(--app-shell-topbar-height, 68px);
+  z-index: 250;
+  display: flex;
+  width: auto;
+  min-width: 0;
+  height: calc(100dvh - var(--app-shell-topbar-height, 68px));
+  min-height: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-self: start;
+  overflow: hidden;
+  padding: 16px 12px 12px;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+}
+
+.role-navigation-header {
+  display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 7px;
-  padding: 7px 10px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 14px;
+}
+
+.role-navigation-welcome {
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-navigation-mobile-toggle {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border: 1px solid var(--border-color);
   border-radius: 7px;
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
-  font: inherit;
-  font-size: 12px;
 }
 
-.app-navbar-menu-toggle:hover,
-.app-navbar-menu-toggle[aria-expanded="true"] {
+.role-navigation-mobile-toggle:hover {
   border-color: var(--accent-blue-bright);
   background: var(--bg-card);
 }
 
-.role-navigation-popover {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 600;
-  display: grid;
-  width: min(290px, calc(100vw - 24px));
-  gap: 7px;
-  padding: 11px;
-  border: 1px solid var(--border-color);
-  border-radius: 9px;
-  background: var(--bg-elevated);
-  box-shadow: 0 14px 32px rgb(0 0 0 / 38%);
-}
-
-.desktop-titlebar-menu .role-navigation-popover {
-  top: calc(100% + 1px);
-  left: auto;
-  right: 0;
-}
-
-.role-navigation-welcome {
-  padding: 7px 9px 10px;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
 .role-navigation-links {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+}
+
+.role-navigation-links a {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  align-items: center;
+  padding: 9px 10px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.role-navigation-links a:hover,
+.role-navigation-links a.active,
+.role-navigation-account a:hover,
+.role-navigation-account a.active,
+.role-navigation-account button:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.role-navigation-links a.active,
+.role-navigation-account a.active {
+  background: var(--accent-blue-soft);
+  font-weight: 600;
+}
+
+.role-navigation-account {
   display: grid;
   gap: 3px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
 }
 
-.role-navigation-popover .role-navigation-links a,
 .role-navigation-account a,
 .role-navigation-account button {
   display: flex;
+  min-width: 0;
   min-height: 38px;
   align-items: center;
-  gap: 9px;
-  padding: 8px 9px;
+  padding: 8px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
@@ -2263,53 +2343,152 @@ canvas {
   cursor: pointer;
 }
 
-.role-navigation-popover .role-navigation-links a:hover,
-.role-navigation-popover .role-navigation-links a.active,
-.role-navigation-account a:hover,
-.role-navigation-account button:hover {
-  background: var(--bg-card);
-  color: var(--text-primary);
-}
-
-.role-navigation-account {
-  display: grid;
-  gap: 2px;
-  padding-top: 7px;
-  border-top: 1px solid var(--border-color);
-}
-
 .role-navigation-account button {
   color: var(--color-danger);
 }
 
 .role-navigation-account [role="alert"] {
-  padding: 3px 9px;
+  padding: 4px 10px;
   color: var(--color-danger);
   font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.desktop-titlebar-menu-button {
-  width: 42px;
+.role-navigation-backdrop {
+  display: none;
 }
 
-@media (max-width: 900px) {
-  .app-navbar {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    gap: 10px;
+.app-shell-content {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.app-shell-content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-shell-content :where(img, video, iframe, canvas) {
+  max-width: 100%;
+}
+
+.app-shell-content :where(pre) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media (max-width: 1200px) {
+  .app-shell-body-authenticated {
+    grid-template-columns: 210px minmax(0, 1fr);
   }
 
-  .app-navbar-brand-group {
-    flex: 0 0 auto;
+  .desktop-app-shell .app-shell-body.app-shell-body-authenticated {
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 
-  .app-navbar-navigation {
+  .desktop-app-shell .role-navigation {
+    width: auto;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+  .app-navbar > div:first-child {
+    flex: 0 1 auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell-body-authenticated,
+  .desktop-app-shell .app-shell-body.app-shell-body-authenticated {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .role-navigation {
+    width: 52px;
+    height: calc(100dvh - var(--app-shell-topbar-height, 68px));
+    padding: 8px;
+    transition:
+      width 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .role-navigation-header {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .role-navigation-welcome,
+  .role-navigation-links,
+  .role-navigation-account {
+    display: none;
+  }
+
+  .role-navigation-mobile-toggle {
+    display: inline-flex;
+  }
+
+  .role-navigation.is-open {
+    position: fixed;
+    top: var(--app-shell-topbar-height, 68px);
+    bottom: 0;
+    left: 0;
+    z-index: 320;
+    width: min(280px, calc(100vw - 48px));
+    height: calc(100dvh - var(--app-shell-topbar-height, 68px));
+    padding: 16px 12px 12px;
+    box-shadow: 12px 0 32px rgb(0 0 0 / 35%);
+  }
+
+  .role-navigation.is-open .role-navigation-header {
+    justify-content: space-between;
+    padding: 0 10px 14px;
+  }
+
+  .role-navigation.is-open .role-navigation-welcome,
+  .role-navigation.is-open .role-navigation-links,
+  .role-navigation.is-open .role-navigation-account {
+    display: flex;
+  }
+
+  .role-navigation.is-open .role-navigation-account {
+    display: grid;
+  }
+
+  .role-navigation-backdrop {
+    position: fixed;
+    inset: var(--app-shell-topbar-height, 68px) 0 0;
+    z-index: 310;
     display: block;
-    margin: 0;
+    border: 0;
+    background: rgb(0 0 0 / 48%);
   }
 
-  .app-navbar-menu-toggle {
-    min-height: 36px;
-    padding: 6px 8px;
+  .desktop-app-shell .app-shell-content {
+    height: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-navbar {
+    min-height: 56px !important;
+    padding-inline: 12px !important;
+  }
+
+  .app-navbar-brand {
+    font-size: 17px;
+  }
+
+  .app-shell-content .product-panel {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .role-navigation {
+    transition: none;
   }
 }
