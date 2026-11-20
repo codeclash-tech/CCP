@@ -1546,14 +1546,14 @@ function StudentLearning() {
     }
   };
 
-  const speak = (text) => {
+  const speak = (text, replyLanguage = language) => {
     if (!voiceOutput) return;
     if (!voiceProviders.output) {
       setVoiceError("Voice output is not available in this desktop runtime. Tutor text remains available.");
       return;
     }
     try {
-      voiceProviders.output.speak(text, { language, profile: voiceProfile });
+      voiceProviders.output.speak(text, { language: replyLanguage, profile: voiceProfile });
     } catch (speechError) {
       setVoiceError(speechError.message || "The selected voice is not installed for this language.");
     }
@@ -1575,7 +1575,7 @@ function StudentLearning() {
       setSession(data.session);
       setMessages(data.session.messages || []);
       const reply = data.session.messages?.at(-1)?.content;
-      if (reply) speak(reply);
+      if (reply) speak(reply, data.replyLanguage || language);
     } catch (sendError) {
       setError(sendError.message || "The tutor could not respond. Please try again.");
     } finally {
@@ -2004,6 +2004,7 @@ function StudentLearning() {
                       if (module && selectedTopic) beginSession(module, selectedTopic, nextLanguage).catch((sessionError) => setError(sessionError.message));
                     }}
                   >
+                    <option value="auto">Auto detect</option>
                     <option value="en">English</option>
                     <option value="ta">தமிழ்</option>
                     <option value="hi">हिन्दी</option>

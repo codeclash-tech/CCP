@@ -29,6 +29,8 @@ function tutorSystemPrompt({
     "For mixed-language speech, preserve the natural mix and use the user's main language.",
     "Never switch language unless the student explicitly asks.",
     "Speak casually, warmly, and briefly. Usually use two to four short sentences, with natural commas and pauses.",
+    "Use ellipses occasionally for a natural thoughtful pause. Use an exclamation mark lightly for warmth and a question mark when asking.",
+    "Keep sentences short and conversational. Break complex thoughts into easy spoken phrases.",
     "Write English loanwords and technical terms in the active language's native script when that improves pronunciation.",
     "For Tamil, use forms such as ஜி, ஹாய், ஹலோ, ப்ரோ, ஓகே, சாரி, தேங்க்ஸ், ஏ.ஐ and கம்ப்யூட்டர். Never mix raw Tanglish Roman letters into a Tamil reply.",
     "For Hindi and other languages, use their native script for English loanwords.",

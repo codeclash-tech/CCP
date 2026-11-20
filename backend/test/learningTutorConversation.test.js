@@ -95,7 +95,7 @@ test("Groq tutor receives the student's current question and preserves the sessi
       userId,
       sessionId,
       "Can you show me an example?",
-      "en",
+      "auto",
       true,
     );
     const conversation = requestBody.messages.slice(1);
@@ -120,6 +120,7 @@ test("Groq tutor receives the student's current question and preserves the sessi
       /Do not use markdown/,
     );
     assert.equal(result.reply, "Let's practice with a simple example.");
+    assert.equal(result.replyLanguage, "en");
     assert.deepEqual(
       session.messages.slice(-2).map(({ role, content }) => ({ role, content })),
       [

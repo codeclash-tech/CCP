@@ -2,6 +2,7 @@ const SPEECH_SAMPLE_RATE = 16000;
 const MAX_SPEECH_DURATION_SECONDS = 30;
 
 const LANGUAGE_LOCALES = {
+  auto: "en-IN",
   en: "en-IN",
   ta: "ta-IN",
   hi: "hi-IN",

@@ -30,18 +30,24 @@ import {
 
 const MAX_PAGE_SIZE = 50;
 const MAX_SESSION_MESSAGES = 40;
-const supportedTutorLanguages = new Set([
-  "en",
-  "ta",
-  "hi",
-  "ml",
-  "te",
-  "bn",
-  "kn",
-  "mr",
-  "gu",
-  "pa",
-]);
+function normalizeTutorLanguage(language) {
+  const normalized = String(language || "auto").trim().toLowerCase();
+  return /^[a-z]{2,8}(?:-[a-z0-9]{2,8})*$/.test(normalized) ? normalized : "auto";
+}
+
+function detectReplyLanguage(text) {
+  if (/[\u0B80-\u0BFF]/u.test(text)) return "ta";
+  if (/[\u0D00-\u0D7F]/u.test(text)) return "ml";
+  if (/[\u0C00-\u0C7F]/u.test(text)) return "te";
+  if (/[\u0C80-\u0CFF]/u.test(text)) return "kn";
+  if (/[\u0980-\u09FF]/u.test(text)) return "bn";
+  if (/[\u0900-\u097F]/u.test(text)) return "hi";
+  if (/[\u0A80-\u0AFF]/u.test(text)) return "gu";
+  if (/[\u0A00-\u0A7F]/u.test(text)) return "pa";
+  if (/[\u0B00-\u0B7F]/u.test(text)) return "or";
+  if (/[\u0D80-\u0DFF]/u.test(text)) return "si";
+  return "en";
+}
 
 function requestError(message, statusCode = 400) {
   const error = new Error(message);
@@ -1295,9 +1301,7 @@ export async function getStudentTopic(userId, programId, moduleId, topicId) {
 }
 
 export async function requestLearningSession(userId, moduleId, topicId, language) {
-  if (!supportedTutorLanguages.has(language)) {
-    throw requestError("Tutor language must be English or Tamil.");
-  }
+  language = normalizeTutorLanguage(language);
   const { module, progress } = await getEntitledModuleForStudent(userId, moduleId);
   const topic = getTopic(module, topicId);
   if (!topic) throw requestError("Topic not found in this module.", 404);
@@ -1353,9 +1357,7 @@ export async function askLearningTutor(
   if (!prompt || prompt.length > 2000) {
     throw requestError("Your message must contain between 1 and 2000 characters.");
   }
-  if (!supportedTutorLanguages.has(language)) {
-    throw requestError("Tutor language must be English or Tamil.");
-  }
+  language = normalizeTutorLanguage(language);
   const { session, module, topic } = await getLearningSession(userId, sessionId);
   const progress = await LearningProgress.findOne({ userId, moduleId: module._id })
     .select("completedTopicIds completedExerciseIds assessmentPassed")
@@ -1401,7 +1403,11 @@ export async function askLearningTutor(
       responseTimeMs: Date.now() - startedAt,
       succeeded: true,
     });
-    return { session, reply: reply.content };
+    return {
+      session,
+      reply: reply.content,
+      replyLanguage: detectReplyLanguage(reply.content),
+    };
   } catch (error) {
     await LearningAiUsage.create({
       userId,

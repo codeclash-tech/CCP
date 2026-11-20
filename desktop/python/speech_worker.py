@@ -11,7 +11,7 @@ from faster_whisper import WhisperModel
 
 SAMPLE_RATE = 16000
 MAX_DURATION_SECONDS = 30
-INITIAL_PROMPT = "Indian English speaker asking a question or giving instructions."
+INITIAL_PROMPT = "Indian speaker using Tamil or English, possibly with mixed-language words, asking a question or giving instructions."
 
 
 def write_message(message: dict[str, Any]) -> None:
