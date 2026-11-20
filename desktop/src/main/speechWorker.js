@@ -5,33 +5,36 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const SPEECH_SAMPLE_RATE = 16000;
-export const MAX_SPEECH_DURATION_SECONDS = 30;
-export const SPEECH_MODEL_RAM_THRESHOLD_BYTES = 8 * 1024 ** 3;
+export const SPEECH_MODEL_RAM_THRESHOLD_BYTES = 4 * 1024 ** 3;
 export const SPEECH_STARTUP_TIMEOUT_MS = 15 * 60 * 1000;
 export const SPEECH_REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
+const SUPPORTED_SPEECH_MODELS = new Set(["tiny.en", "base.en", "small.en"]);
 
-export function selectSpeechModel(totalMemoryBytes) {
-  // Use multilingual Whisper models so the tutor can recognize Tamil and other Indian languages.
-  return totalMemoryBytes < SPEECH_MODEL_RAM_THRESHOLD_BYTES
-    ? "small"
-    : "large-v3";
+export function selectSpeechModel(
+  totalMemoryBytes,
+  configuredModel = process.env.CODECLASH_SPEECH_MODEL,
+) {
+  if (configuredModel) {
+    if (!SUPPORTED_SPEECH_MODELS.has(configuredModel)) {
+      throw new Error("The configured speech model must be tiny.en, base.en, or small.en.");
+    }
+    return configuredModel;
+  }
+  return totalMemoryBytes < SPEECH_MODEL_RAM_THRESHOLD_BYTES ? "tiny.en" : "base.en";
 }
 
 function validateAudioRequest(request) {
-  const { samples, sampleRate, language } = request || {};
+  const { samples, sampleRate } = request || {};
   if (!(samples instanceof Float32Array)) {
     throw new Error("Microphone audio was not in a supported format.");
   }
   if (sampleRate !== SPEECH_SAMPLE_RATE) {
     throw new Error("Microphone audio must be mono 16 kHz audio.");
   }
-  if (
-    samples.length === 0 ||
-    samples.length > SPEECH_SAMPLE_RATE * MAX_SPEECH_DURATION_SECONDS
-  ) {
-    throw new Error("Record a speech clip that is 30 seconds or shorter.");
+  if (samples.length === 0) {
+    throw new Error("No microphone audio was recorded.");
   }
   return samples;
 }

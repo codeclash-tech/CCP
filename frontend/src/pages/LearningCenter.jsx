@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
+  Bookmark,
+  BookmarkCheck,
   Check,
   ChevronRight,
   Code2,
+  Pencil,
   Mic,
   Play,
   Save,
@@ -65,7 +68,6 @@ function displayPrice(price, currencyInput = "INR") {
     ? "Free"
     : new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(Number(price));
 }
-
 function createTopicDraft(topic = {}) {
   return {
     title: topic.title || "",
@@ -159,6 +161,7 @@ function AdminLearning() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [adminPage, setAdminPage] = useState("courses");
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
@@ -215,6 +218,7 @@ function AdminLearning() {
       const { data } = await api.get(`/learning/admin/modules/${id}`);
       const module = data.module;
       setModuleId(String(module._id));
+      setAdminPage("modules");
       setNewModule(false);
       setModuleForm(module);
       setAiSettingsText(JSON.stringify(module.aiConfiguration?.advancedSettings || {}, null, 2));
@@ -238,16 +242,25 @@ function AdminLearning() {
   };
 
   const createProgram = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
+    if (
+      programs.some((program) => program.status === "DRAFT") ||
+      selectedProgram?.status === "DRAFT"
+    ) {
+      setAdminPage("courses");
+      setError("Finish or delete the current unpublished course before creating another.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       const { data } = await api.post("/learning/admin/programs", newProgram);
       setNewProgram(EMPTY_PROGRAM);
-      setNotice("Course published. It will appear to students after you publish its first module.");
+      setNotice("Course saved. Add at least one module before publishing it.");
       const { data: list } = await api.get("/learning/admin/programs");
       setPrograms(list.programs || []);
       setSelectedProgramId(String(data.program._id));
+      setAdminPage("modules");
     } catch (saveError) {
       setError(saveError.message || "Could not create the learning program.");
     } finally {
@@ -256,7 +269,7 @@ function AdminLearning() {
   };
 
   const saveProgram = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     if (!selectedProgram) return;
     setSaving(true);
     setError("");
@@ -273,6 +286,13 @@ function AdminLearning() {
 
   const changeProgramStatus = async () => {
     if (!selectedProgram) return;
+    if (
+      selectedProgram.status !== "PUBLISHED" &&
+      !(selectedProgram.modules || []).length
+    ) {
+      setError("Create at least one module before publishing this course.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -288,13 +308,13 @@ function AdminLearning() {
   };
 
   const archiveProgram = async () => {
-    if (!selectedProgram || !window.confirm("Archive this course? Existing student records will be retained.")) return;
+    if (!selectedProgram || !window.confirm("Delete this course? Existing student records will be retained.")) return;
     setSaving(true);
     setError("");
     try {
       await api.delete(`/learning/admin/programs/${selectedProgram._id}`);
       setSelectedProgramId("");
-      setNotice("Course archived. Existing student records remain preserved.");
+      setNotice("Course deleted. Existing student records remain preserved.");
       await loadAdminData();
     } catch (archiveError) {
       setError(archiveError.message || "Could not archive this course.");
@@ -334,13 +354,13 @@ function AdminLearning() {
   };
 
   const archiveModule = async () => {
-    if (!moduleId || !window.confirm("Archive this module? Purchases, progress, and certificates will be retained.")) return;
+    if (!moduleId || !window.confirm("Delete this module? Purchases, progress, and certificates will be retained.")) return;
     setSaving(true);
     setError("");
     try {
       await api.delete(`/learning/admin/modules/${moduleId}`);
       setModuleId("");
-      setNotice("Module archived. Existing student records remain preserved.");
+      setNotice("Module deleted. Existing student records remain preserved.");
       await loadAdminData();
     } catch (archiveError) {
       setError(archiveError.message || "Could not archive this module.");
@@ -350,6 +370,7 @@ function AdminLearning() {
   };
 
   const startNewModule = () => {
+    setAdminPage("modules");
     setModuleId("");
     setAiSettingsText("{}");
     setEditingTopicId("");
@@ -372,7 +393,7 @@ function AdminLearning() {
   };
 
   const saveModule = async (event) => {
-    event.preventDefault();
+    event?.preventDefault?.();
     if (!selectedProgram) return;
     setSaving(true);
     setError("");
@@ -440,8 +461,16 @@ function AdminLearning() {
       setTopicError("Enter a topic title.");
       return;
     }
+    if (!topicDraft.description.trim()) {
+      setTopicError("Add a short topic description.");
+      return;
+    }
     if (!topicDraft.explanation.trim()) {
       setTopicError("Add lesson content describing what students will learn.");
+      return;
+    }
+    if (!topicDraft.objectivesText.split(/\r?\n/).some((objective) => objective.trim())) {
+      setTopicError("Add at least one expected learning outcome.");
       return;
     }
     if (topicDraft.questions.some((question) =>
@@ -502,6 +531,7 @@ function AdminLearning() {
       setEditingTopicId("");
       setTopicError("");
       setTopicDraft(EMPTY_TOPIC);
+      setAdminPage("topics");
       await loadModule(moduleId);
       await loadAdminData();
     } catch (topicError) {
@@ -512,6 +542,7 @@ function AdminLearning() {
   };
 
   const editTopic = (topic) => {
+    setAdminPage("topics-editor");
     setEditingTopicId(String(topic._id));
     setTopicError("");
     setTopicDraft(createTopicDraft(topic));
@@ -553,22 +584,6 @@ function AdminLearning() {
     }
   };
 
-  const moveModule = async (moduleIndex, offset) => {
-    if (!selectedProgram) return;
-    const modules = [...selectedProgram.modules];
-    const destination = moduleIndex + offset;
-    if (destination < 0 || destination >= modules.length) return;
-    [modules[moduleIndex], modules[destination]] = [modules[destination], modules[moduleIndex]];
-    try {
-      await api.put(`/learning/admin/programs/${selectedProgram._id}/modules/order`, {
-        moduleIds: modules.map((module) => module._id),
-      });
-      await loadAdminData();
-    } catch (orderError) {
-      setError(orderError.message || "Could not reorder modules.");
-    }
-  };
-
   const reviewPurchase = async (purchaseId, status) => {
     setError("");
     try {
@@ -586,8 +601,8 @@ function AdminLearning() {
     <div className="learning-center">
       <header className="learning-heading">
         <div>
-          <p className="learning-eyebrow">Learning management</p>
-          <h1>Learning courses</h1>
+          <p className="learning-eyebrow">Thrive management</p>
+          <h1>Thrive courses</h1>
           <p>Create and maintain all official lessons, activities, and module requirements.</p>
         </div>
         <BookOpen size={24} aria-hidden="true" />
@@ -595,8 +610,28 @@ function AdminLearning() {
       {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
       {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
 
+      <nav className="learning-step-navigation" aria-label="Thrive management pages">
+        <button
+          className={adminPage === "courses" ? "is-active" : ""}
+          onClick={() => setAdminPage("courses")}
+          type="button"
+        >Courses</button>
+        <button
+          className={adminPage === "modules" ? "is-active" : ""}
+          disabled={!selectedProgram}
+          onClick={() => setAdminPage("modules")}
+          type="button"
+        >Modules</button>
+        <button
+          className={["topics", "topics-editor"].includes(adminPage) ? "is-active" : ""}
+          disabled={!moduleId}
+          onClick={() => setAdminPage("topics")}
+          type="button"
+        >Topics</button>
+      </nav>
+
       <section className="learning-management-grid">
-        <div className="learning-panel">
+        {adminPage === "courses" && <div className="learning-panel">
           <h2>Courses</h2>
           {programs.length > 0 && (
             <div className="learning-module-list learning-course-list" aria-label="Your courses">
@@ -614,14 +649,29 @@ function AdminLearning() {
               ))}
             </div>
           )}
-          <form className="learning-form" onSubmit={createProgram}>
-            <h3>Create and publish a course</h3>
-            <p className="learning-help">A published course becomes visible to students after its first module is published.</p>
+          <form
+            className="learning-form"
+            onSubmit={createProgram}
+            onBlur={(event) => {
+              if (
+                !event.currentTarget.contains(event.relatedTarget) &&
+                newProgram.title.trim() &&
+                newProgram.description.trim() &&
+                !saving
+              ) void createProgram();
+            }}
+          >
+            <h3>Create a course</h3>
+            <p className="learning-help">A course can be published after at least one module has been created.</p>
+            {programs.some((program) => program.status === "DRAFT") && (
+              <p className="learning-field-error" role="status">Finish or delete the unpublished course before creating another.</p>
+            )}
             <label className="learning-field">
               Course name
               <input
                 required
                 maxLength={140}
+                disabled={programs.some((program) => program.status === "DRAFT")}
                 value={newProgram.title}
                 onChange={(event) => setNewProgram({ ...newProgram, title: event.target.value })}
               />
@@ -631,19 +681,33 @@ function AdminLearning() {
               <textarea
                 required
                 maxLength={4000}
+                disabled={programs.some((program) => program.status === "DRAFT")}
                 rows={3}
                 placeholder="Describe what students will learn."
                 value={newProgram.description}
                 onChange={(event) => setNewProgram({ ...newProgram, description: event.target.value })}
               />
             </label>
-            <button className="learning-button" disabled={saving} type="submit">
-              {saving ? "Publishing…" : "Publish course"}
+            <button className="learning-button" disabled={saving || programs.some((program) => program.status === "DRAFT")} type="submit">
+              {saving ? "Saving…" : "Create course"}
             </button>
           </form>
 
           {selectedProgram && (
-            <form className="learning-form learning-form-divider" onSubmit={saveProgram}>
+            <form
+              className="learning-form learning-form-divider"
+              onSubmit={saveProgram}
+              onBlur={(event) => {
+                if (
+                  !event.currentTarget.contains(event.relatedTarget) &&
+                  programForm.title.trim() &&
+                  programForm.description.trim() &&
+                  !saving &&
+                  (programForm.title !== selectedProgram.title ||
+                    programForm.description !== selectedProgram.description)
+                ) void saveProgram();
+              }}
+            >
               <div className="learning-panel-title">
                 <h3>Course settings</h3>
                 <span className="learning-status-badge">{selectedProgram.status}</span>
@@ -671,57 +735,88 @@ function AdminLearning() {
                 </button>
                 <button
                   className="learning-button learning-button-secondary"
-                  disabled={saving}
+                  disabled={saving || (
+                    selectedProgram.status !== "PUBLISHED" &&
+                    !(selectedProgram.modules || []).length
+                  )}
                   onClick={changeProgramStatus}
                   type="button"
                 >
                   {selectedProgram.status === "PUBLISHED" ? "Unpublish" : "Publish"}
                 </button>
                 <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveProgram} type="button">
-                  Archive course
+                  Delete course
                 </button>
               </div>
+              {selectedProgram.status !== "PUBLISHED" && !(selectedProgram.modules || []).length && (
+                <p className="learning-help">Create a module to enable course publishing.</p>
+              )}
             </form>
           )}
-        </div>
+        </div>}
 
-        <div className="learning-panel">
+        {adminPage !== "courses" && <div className="learning-panel learning-module-admin-panel">
           <div className="learning-panel-title">
             <div>
               <h2>Modules and lesson content</h2>
               <p>{selectedProgram ? `${selectedProgram.modules.length} module(s) · add each module when you need it` : "Select or create a course first."}</p>
             </div>
-            {selectedProgram && (
-              <button className="learning-button learning-button-secondary" onClick={startNewModule} type="button">
-                Add module
-              </button>
-            )}
           </div>
           {selectedProgram && selectedProgram.modules?.length === 0 && !newModule && (
             <p className="learning-empty-state">No modules yet. Add the first module when you are ready.</p>
           )}
           {selectedProgram?.modules?.length > 0 && (
             <div className="learning-module-list">
-              {selectedProgram.modules.map((module, index) => (
+              {selectedProgram.modules.map((module) => (
                 <div className="learning-module-row" key={module._id}>
                   <button
                     className={String(module._id) === moduleId ? "is-selected" : ""}
                     onClick={() => loadModule(module._id)}
                     type="button"
                   >
-                    <span>{module.sequence}. {module.title}</span>
-                    <small>{displayPrice(module.price, module.currency)} · {module.difficulty} · {module.status || "PUBLISHED"}</small>
+                    <span>{module.title}</span>
                   </button>
                   <span className="learning-actions">
-                    <button className="learning-link-button" aria-label="Move module up" disabled={index === 0} onClick={() => moveModule(index, -1)} type="button">↑</button>
-                    <button className="learning-link-button" aria-label="Move module down" disabled={index === selectedProgram.modules.length - 1} onClick={() => moveModule(index, 1)} type="button">↓</button>
+                    <button className="learning-link-button" aria-label={`Edit ${module.title}`} onClick={() => loadModule(module._id)} type="button"><Pencil size={14} /></button>
                   </span>
                 </div>
               ))}
             </div>
           )}
-          {(newModule || moduleId) && (
-            <form className="learning-form learning-form-divider" onSubmit={saveModule}>
+          {selectedProgram && (
+            <button
+              className="learning-button learning-button-secondary learning-module-add-button"
+              disabled={saving || newModule}
+              onClick={startNewModule}
+              type="button"
+            >
+              Add module
+            </button>
+          )}
+          {!newModule && !moduleId && (
+            <div className="learning-module-placeholder">
+              <h3>Create a module</h3>
+              <p>Choose an existing module or create one to add its learning topics.</p>
+              {selectedProgram && (
+                <button className="learning-button" onClick={startNewModule} type="button">
+                  Create module
+                </button>
+              )}
+            </div>
+          )}
+          {(newModule || moduleId) && adminPage === "modules" && (
+            <form
+              className="learning-form learning-form-divider"
+              onSubmit={saveModule}
+              onBlur={(event) => {
+                if (
+                  !event.currentTarget.contains(event.relatedTarget) &&
+                  moduleForm.title?.trim() &&
+                  moduleForm.description?.trim() &&
+                  !saving
+                ) void saveModule();
+              }}
+            >
               <div className="learning-panel-title">
                 <h3>{newModule ? "Add a module" : "Edit module"}</h3>
                 {!newModule && <span className="learning-status-badge">{moduleForm.status}</span>}
@@ -852,7 +947,7 @@ function AdminLearning() {
                   </details>
                 </details>
               </details>
-              {!newModule && (
+              {!newModule && adminPage === "topics-inline" && (
                 <section className="learning-form learning-form-divider">
                   <div className="learning-panel-title">
                     <div>
@@ -894,7 +989,9 @@ function AdminLearning() {
                     </label>
                     <label className="learning-field">
                       Short description
+                      <span className="learning-field-required">Required</span>
                       <textarea
+                        required
                         rows={2}
                         maxLength={2000}
                         value={topicDraft.description}
@@ -933,8 +1030,10 @@ function AdminLearning() {
                       />
                     </label>
                     <label className="learning-field">
-                      Learning objectives (optional, one per line)
+                      Expected learning outcomes (one per line)
+                      <span className="learning-field-required">Required</span>
                       <textarea
+                        required
                         rows={2}
                         value={topicDraft.objectivesText}
                         onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })}
@@ -1328,7 +1427,7 @@ function AdminLearning() {
               )}
               <div className="learning-actions learning-admin-form-actions">
                 <button className="learning-button" disabled={saving} type="submit">
-                  <Save size={15} /> {saving ? "Saving…" : moduleForm.status === "PUBLISHED" ? "Save changes" : "Save draft"}
+                  <Save size={15} /> {saving ? "Saving…" : "Save module"}
                 </button>
                 <button
                   className="learning-button learning-button-secondary"
@@ -1344,16 +1443,81 @@ function AdminLearning() {
                     {moduleForm.status === "PUBLISHED" ? "Unpublish module" : "Publish module"}
                   </button>
                   <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveModule} type="button">
-                    Archive module
+                    Delete module
                   </button>
                 </div>
               )}
             </form>
           )}
-        </div>
+          {adminPage === "topics" && moduleId && !newModule && (
+            <section className="learning-panel learning-topic-management">
+              <h2>Topics for {moduleForm.title}</h2>
+              <p className="learning-help">Select a topic to edit it, or add a new topic with its expected learning outcomes.</p>
+              {(moduleForm.topics || []).map((topic) => (
+                <button
+                  className="learning-module-row"
+                  key={topic._id}
+                  onClick={() => editTopic(topic)}
+                  type="button"
+                >
+                  <span>{topic.title}</span>
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+              ))}
+              <button
+                className="learning-button"
+                onClick={() => {
+                  setEditingTopicId("");
+                  setTopicDraft(EMPTY_TOPIC);
+                  setTopicError("");
+                  setAdminPage("topics-editor");
+                }}
+                type="button"
+              >Add topic</button>
+            </section>
+          )}
+          {adminPage === "topics-editor" && moduleId && !newModule && (
+            <section
+              className="learning-panel learning-topic-management"
+              onBlur={(event) => {
+                if (
+                  !event.currentTarget.contains(event.relatedTarget) &&
+                  topicDraft.title.trim() &&
+                  topicDraft.description.trim() &&
+                  topicDraft.explanation.trim() &&
+                  topicDraft.objectivesText.trim() &&
+                  !saving
+                ) void saveTopic();
+              }}
+            >
+              <h2>{editingTopicId ? "Edit topic" : "Create topic"}</h2>
+              {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
+              <label className="learning-field">
+                Topic name
+                <input value={topicDraft.title} onChange={(event) => setTopicDraft({ ...topicDraft, title: event.target.value })} />
+              </label>
+              <label className="learning-field">
+                Description
+                <textarea rows={2} value={topicDraft.description} onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })} />
+              </label>
+              <label className="learning-field">
+                Learning content
+                <textarea rows={6} value={topicDraft.explanation} onChange={(event) => setTopicDraft({ ...topicDraft, explanation: event.target.value })} />
+              </label>
+              <label className="learning-field">
+                Expected learning outcomes
+                <textarea rows={4} value={topicDraft.objectivesText} onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })} />
+              </label>
+              <div className="learning-actions">
+                <button className="learning-button" disabled={saving} onClick={saveTopic} type="button">{saving ? "Saving…" : "Save topic"}</button>
+                <button className="learning-button learning-button-secondary" onClick={() => setAdminPage("topics")} type="button">Cancel</button>
+              </div>
+            </section>
+          )}
+        </div>}
       </section>
 
-      <section className="learning-panel learning-purchase-panel">
+      {adminPage === "courses" && <section className="learning-panel learning-purchase-panel">
         <h2>Purchase requests</h2>
         {purchases.length === 0 ? (
           <p className="learning-muted">No purchase requests yet.</p>
@@ -1382,28 +1546,23 @@ function AdminLearning() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
     </div>
   );
 }
 
 function StudentLearning() {
+  const { user } = useAuth();
   const [programs, setPrograms] = useState([]);
-  const [dashboard, setDashboard] = useState({
-    progress: [],
-    purchases: [],
-    certificates: [],
-    page: 1,
-    limit: 20,
-    totals: { completedModules: 0, certificates: 0 },
-  });
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedProgramId, setSelectedProgramId] = useState("");
+  const [savedProgramIds, setSavedProgramIds] = useState([]);
   const [moduleData, setModuleData] = useState(null);
   const [topicContent, setTopicContent] = useState(null);
   const [topicId, setTopicId] = useState("");
   const [exerciseId, setExerciseId] = useState("");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
+  const conversationEndRef = useRef(null);
   const [topicAnswers, setTopicAnswers] = useState({});
   const [topicCheckResult, setTopicCheckResult] = useState(null);
   const [message, setMessage] = useState("");
@@ -1411,6 +1570,8 @@ function StudentLearning() {
   const [voices, setVoices] = useState([]);
   const [voiceProfile, setVoiceProfile] = useState("girl");
   const [voiceOutput, setVoiceOutput] = useState(true);
+  const [nickname, setNickname] = useState("");
+  const [nicknameDraft, setNicknameDraft] = useState("");
   const [voiceError, setVoiceError] = useState("");
   const [voiceInputState, setVoiceInputState] = useState("idle");
   const voiceInputStopRef = useRef(null);
@@ -1430,32 +1591,63 @@ function StudentLearning() {
     [],
   );
   const voiceChoices = useMemo(
-    () => getVoiceProfileChoices(voices, language),
-    [voices, language],
+    () => getVoiceProfileChoices(voices, "en"),
+    [voices],
+  );
+  const savedCoursesKey = `thrive:saved-courses:${user?._id || user?.id || user?.email || "user"}`;
+  const nicknameKey = `thrive:nickname:${user?._id || user?.id || user?.email || "user"}`;
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(savedCoursesKey) || "[]");
+      setSavedProgramIds(Array.isArray(saved) ? saved.map(String) : []);
+      const savedNickname = window.localStorage.getItem(nicknameKey) || "";
+      setNickname(savedNickname);
+      setNicknameDraft(savedNickname);
+    } catch (storageError) {
+      console.warn("Unable to load Thrive preferences:", storageError.message);
+    }
+  }, [nicknameKey, savedCoursesKey]);
+
+  const saveCourse = (programId) => {
+    setSavedProgramIds((current) => {
+      const next = current.includes(String(programId))
+        ? current.filter((id) => id !== String(programId))
+        : [...current, String(programId)];
+      window.localStorage.setItem(savedCoursesKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const saveNickname = (event) => {
+    event.preventDefault();
+    const value = nicknameDraft.trim();
+    if (!value) return;
+    window.localStorage.setItem(nicknameKey, value);
+    setNickname(value);
+  };
+
+  const visiblePrograms = useMemo(
+    () => [...programs].sort((left, right) =>
+      Number(savedProgramIds.includes(String(right._id))) -
+      Number(savedProgramIds.includes(String(left._id))),
+    ),
+    [programs, savedProgramIds],
+  );
+  const selectedProgram = programs.find(
+    (program) => String(program._id) === selectedProgramId,
   );
 
-  const loadStudentData = async (page = 1, append = false) => {
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, busy, voiceInputState]);
+
+  const loadStudentData = async () => {
     try {
-      const [programResponse, dashboardResponse] = await Promise.all([
-        page === 1
-          ? api.get("/learning/programs")
-          : Promise.resolve({ data: { programs: [] } }),
-        api.get(`/learning/me?page=${page}&limit=20`),
-      ]);
-      if (page === 1) setPrograms(programResponse.data.programs || []);
-      setDashboard((current) => append
-        ? {
-            ...dashboardResponse.data,
-            progress: [...current.progress, ...dashboardResponse.data.progress],
-            purchases: [...current.purchases, ...dashboardResponse.data.purchases],
-            certificates: [...current.certificates, ...dashboardResponse.data.certificates],
-          }
-        : dashboardResponse.data,
-      );
+      const { data } = await api.get("/learning/programs");
+      setPrograms(data.programs || []);
     } catch (loadError) {
       setError(loadError.message || "Could not load learning programs.");
-    } finally {
-      setLoadingMore(false);
     }
   };
 
@@ -1485,13 +1677,18 @@ function StudentLearning() {
     [exerciseId, selectedTopic],
   );
 
-  const beginSession = async (module, topic, selectedLanguage = language) => {
+  const beginSession = async (module, topic) => {
     if (!topic) return;
+    voiceProviders.output?.cancel();
+    await voiceInputStopRef.current?.({ transcribe: false });
+    voiceInputStopRef.current = null;
+    setVoiceInputState("idle");
+    setMessage("");
     setTopicContent(null);
     const { data } = await api.post("/learning/sessions", {
       moduleId: module._id,
       topicId: topic._id,
-      language: selectedLanguage,
+      language: "en",
     });
     const { data: topicResponse } = await api.get(
       `/learning/programs/${module.programId}/modules/${module._id}/topics/${topic._id}`,
@@ -1506,11 +1703,17 @@ function StudentLearning() {
     setExerciseId(String(firstExercise?._id || ""));
     setExerciseCode(firstExercise?.starterCode || "");
     setExerciseResult(null);
-    setLanguage(selectedLanguage);
+    setLanguage("en");
     window.localStorage.setItem(
       "ccp-learning-last-session",
       JSON.stringify({ moduleId: String(module._id), topicId: String(topic._id) }),
     );
+  };
+
+  const openProgram = (programId) => {
+    setSelectedProgramId(String(programId));
+    setError("");
+    setNotice("");
   };
 
   const openModule = async (programId, moduleId) => {
@@ -1561,7 +1764,12 @@ function StudentLearning() {
 
   const sendMessage = async (input = message, { transcribedFromSpeech = false } = {}) => {
     const text = String(input || "").trim();
-    if (!text || !session) return;
+    if (!text || !session || !nickname) return;
+    voiceProviders.output?.cancel();
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: text, createdAt: new Date().toISOString() },
+    ]);
     setBusy(true);
     setError("");
     setVoiceError("");
@@ -1569,7 +1777,8 @@ function StudentLearning() {
     try {
       const { data } = await api.post(`/learning/sessions/${session._id}/messages`, {
         message: text,
-        language,
+        language: "en",
+        studentName: nickname,
         inputTranscribedFromSpeech: transcribedFromSpeech,
       });
       setSession(data.session);
@@ -1584,6 +1793,7 @@ function StudentLearning() {
   };
 
   const startVoiceInput = async () => {
+    voiceProviders.output?.cancel();
     if (!voiceProviders.input) {
       setVoiceError("Offline speech input is not available in this desktop runtime. You can still type to the tutor.");
       return;
@@ -1598,7 +1808,7 @@ function StudentLearning() {
     setVoiceError("");
     try {
       voiceInputStopRef.current = await voiceProviders.input.start({
-        language,
+        onInterim: (transcript) => setMessage(transcript),
         onTranscript: (transcript) => {
           void sendMessage(transcript, { transcribedFromSpeech: true });
         },
@@ -1658,26 +1868,6 @@ function StudentLearning() {
       checkout.open();
     } catch (purchaseError) {
       setError(purchaseError.message || "Could not create the purchase request.");
-    }
-  };
-
-  const downloadCertificate = async (certificate) => {
-    setError("");
-    try {
-      const { data } = await api.get(
-        `/learning/certificates/${certificate._id}/pdf`,
-        { responseType: "blob" },
-      );
-      const url = window.URL.createObjectURL(data);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `CodeClash-Learning-${certificate.code}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
-    } catch (downloadError) {
-      setError(downloadError.message || "Could not download this certificate.");
     }
   };
 
@@ -1765,6 +1955,26 @@ function StudentLearning() {
     setCodingOpen(false);
   };
 
+  const downloadCertificate = async (certificate) => {
+    setError("");
+    try {
+      const { data } = await api.get(
+        `/learning/certificates/${certificate._id}/pdf`,
+        { responseType: "blob" },
+      );
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Thrive-${certificate.code}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (downloadError) {
+      setError(downloadError.message || "Could not download this certificate.");
+    }
+  };
+
   if (moduleData) {
     const { module, progress } = moduleData;
     const completedTopics = progress.completedTopicIds || [];
@@ -1776,7 +1986,7 @@ function StudentLearning() {
     return (
       <div className="learning-center learning-workspace">
         <button className="learning-back-button" onClick={closeModule} type="button">
-          <ArrowLeft size={16} /> All programs
+          <ArrowLeft size={16} /> All modules
         </button>
         <header className="learning-heading learning-workspace-heading">
           <div>
@@ -1991,46 +2201,23 @@ function StudentLearning() {
 
             <section className="learning-panel learning-tutor-panel">
               <div className="learning-panel-title">
-                <div><h2>AI tutor</h2><p>Ask freely; the tutor uses the approved content for this topic.</p></div>
+                <div><h2>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</h2><p>Ask about this topic. The tutor uses the approved lesson content.</p></div>
               </div>
               <div className="learning-tutor-controls">
-                <label className="learning-field">
-                  Language
-                  <select
-                    value={language}
-                    onChange={(event) => {
-                      const nextLanguage = event.target.value;
-                      setLanguage(nextLanguage);
-                      if (module && selectedTopic) beginSession(module, selectedTopic, nextLanguage).catch((sessionError) => setError(sessionError.message));
-                    }}
-                  >
-                    <option value="auto">Auto detect</option>
-                    <option value="en">English</option>
-                    <option value="ta">தமிழ்</option>
-                    <option value="hi">हिन्दी</option>
-                    <option value="ml">മലയാളം</option>
-                    <option value="te">తెలుగు</option>
-                    <option value="bn">বাংলা</option>
-                    <option value="kn">ಕನ್ನಡ</option>
-                    <option value="mr">मराठी</option>
-                    <option value="gu">ગુજરાતી</option>
-                    <option value="pa">ਪੰਜਾਬੀ</option>
-                  </select>
-                </label>
                 <label className="learning-field">
                   Voice
                   <select value={voiceProfile} onChange={(event) => setVoiceProfile(event.target.value)}>
                     <option value="boy" disabled={!voiceChoices.boy}>
-                      {voiceChoices.boy ? "Boy voice" : "Boy voice (not installed)"}
+                      {voiceChoices.boy ? "Rishi" : "Rishi (voice not installed)"}
                     </option>
                     <option value="girl" disabled={!voiceChoices.girl}>
-                      {voiceChoices.girl ? "Girl voice" : "Girl voice (not installed)"}
+                      {voiceChoices.girl ? "Daisy" : "Daisy (voice not installed)"}
                     </option>
                   </select>
                 </label>
                 {!voiceChoices[voiceProfile] && (
                   <p className="learning-help" role="status">
-                    No matching native {language === "ta" ? "Tamil" : "English"} {voiceProfile} voice is installed. Add one in your device language settings.
+                    The selected English voice is not installed. Add an English voice in your device language settings.
                   </p>
                 )}
                 <label className="learning-voice-toggle">
@@ -2038,24 +2225,54 @@ function StudentLearning() {
                   <Volume2 size={16} /> Voice output
                 </label>
               </div>
+              {!nickname ? (
+                <form className="learning-nickname-form" onSubmit={saveNickname}>
+                  <p>Before we begin, what should I call you?</p>
+                  <label className="learning-field">
+                    Your nickname
+                    <input
+                      autoComplete="nickname"
+                      maxLength={40}
+                      required
+                      value={nicknameDraft}
+                      onChange={(event) => setNicknameDraft(event.target.value)}
+                    />
+                  </label>
+                  <button className="learning-button" type="submit">Start learning</button>
+                </form>
+              ) : (
               <div className="learning-conversation" aria-live="polite">
-                {messages.length === 0 && <p className="learning-muted">Say hello or ask a question about this topic.</p>}
+                <div className="learning-message learning-message-assistant">
+                  <strong>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</strong>
+                  <p>Welcome, {nickname}. We will work through this topic together. What would you like to understand first?</p>
+                </div>
                 {messages.map((item, index) => (
                   <div className={`learning-message learning-message-${item.role}`} key={`${item.createdAt || index}-${index}`}>
-                    <strong>{item.role === "assistant" ? "Tutor" : "You"}</strong>
+                    <strong>{item.role === "assistant" ? (voiceProfile === "boy" ? "Rishi" : "Daisy") : nickname}</strong>
                     <p>{item.content}</p>
                   </div>
                 ))}
-                {busy && <p className="learning-muted" role="status">The tutor is preparing a response…</p>}
+                {busy && <p className="learning-muted" role="status">{voiceProfile === "boy" ? "Rishi" : "Daisy"} is thinking…</p>}
+                <div ref={conversationEndRef} />
               </div>
-              <form className="learning-chat-form" onSubmit={(event) => { event.preventDefault(); sendMessage(); }}>
+              )}
+              {nickname && <form className="learning-chat-form" onSubmit={(event) => { event.preventDefault(); sendMessage(); }}>
                 <textarea
                   aria-label="Message the AI tutor"
                   maxLength={2000}
-                  placeholder="Ask a question about this topic…"
+                  placeholder="Ask a question about this topic"
                   rows={2}
                   value={message}
-                  onChange={(event) => setMessage(event.target.value)}
+                  onChange={(event) => {
+                    voiceProviders.output?.cancel();
+                    setMessage(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey) {
+                      event.preventDefault();
+                      sendMessage();
+                    }
+                  }}
                 />
                 <button
                   aria-label={voiceInputState === "recording" ? "Stop recording" : "Speak to tutor"}
@@ -2068,9 +2285,10 @@ function StudentLearning() {
                   <Mic size={17} />
                 </button>
                 <button aria-label="Send message" className="learning-button" disabled={busy || !message.trim()} type="submit">
-                  <Send size={16} />
+                  <Send size={16} /> Send
                 </button>
               </form>
+              }
               {voiceInputState === "recording" && (
                 <p className="learning-help" role="status">Listening… Tap the microphone again to stop recording.</p>
               )}
@@ -2078,7 +2296,7 @@ function StudentLearning() {
                 <p className="learning-help" role="status">Requesting microphone access…</p>
               )}
               {voiceInputState === "transcribing" && (
-                <p className="learning-help" role="status">Transcribing locally… First use may download the offline speech model.</p>
+                <p className="learning-help" role="status">Transcribing locally. First use may download the offline speech model.</p>
               )}
               {voiceError && <p className="learning-alert learning-alert-error" role="status">{voiceError}</p>}
             </section>
@@ -2110,140 +2328,130 @@ function StudentLearning() {
     );
   }
 
+  if (selectedProgramId && selectedProgram) {
+    return (
+      <div className="learning-center">
+        <button
+          className="learning-back-button"
+          onClick={() => setSelectedProgramId("")}
+          type="button"
+        >
+          <ArrowLeft size={16} /> All courses
+        </button>
+        <header className="learning-heading">
+          <div>
+            <p className="learning-eyebrow">Thrive course</p>
+            <h1>{selectedProgram.title}</h1>
+            <p>{selectedProgram.description}</p>
+          </div>
+        </header>
+        {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
+        {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
+        <div className="learning-module-cards">
+          {selectedProgram.modules.map((module) => (
+            <article className="learning-panel learning-module-card" key={module._id}>
+              <div>
+                <h2>{module.title}</h2>
+                <p>{module.shortDescription || module.description}</p>
+              </div>
+              <div className="learning-module-card-meta">
+                <strong>{displayPrice(module.price, module.currency)}</strong>
+                <span>
+                  {module.progress.completed
+                    ? "Completed"
+                    : `${module.progress.completedTopics} topic(s) completed`}
+                </span>
+              </div>
+              {module.hasAccess ? (
+                <button
+                  className="learning-button"
+                  onClick={() => openModule(selectedProgram._id, module._id)}
+                  type="button"
+                >
+                  {module.progress.completed ? "Review topics" : "Open topics"}
+                  <ChevronRight size={15} />
+                </button>
+              ) : (
+                <button
+                  className="learning-button"
+                  disabled={module.purchaseStatus === "PENDING" || module.purchaseStatus === "ACTIVE"}
+                  onClick={() => requestPurchase({ moduleId: module._id })}
+                  type="button"
+                >
+                  {module.purchaseStatus === "PENDING"
+                    ? "Payment pending"
+                    : module.purchaseStatus === "ACTIVE"
+                      ? "Prerequisite required"
+                      : module.purchaseStatus === "EXPIRED"
+                        ? `Repurchase · ${displayPrice(module.price, module.currency)}`
+                        : Number(module.price) === 0
+                          ? "Start free module"
+                          : `Pay ${displayPrice(module.price, module.currency)}`}
+                </button>
+              )}
+            </article>
+          ))}
+          {!selectedProgram.modules.length && (
+            <p className="learning-empty-state">This course has no available modules yet.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="learning-center">
       <header className="learning-heading">
         <div>
-          <p className="learning-eyebrow">CodeClash learning</p>
-          <h1>Learn with an AI tutor</h1>
-          <p>Choose a module to learn at your pace. Your progress and certificates are saved to your account.</p>
+          <p className="learning-eyebrow">Thrive learning</p>
+          <h1>Thrive</h1>
+          <p>Choose a course and learn at your own pace.</p>
         </div>
-        <BookOpen size={24} aria-hidden="true" />
       </header>
       {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
       {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
-      <section className="learning-certificate-strip">
-        <div><strong>{dashboard.totals.completedModules}</strong><span>modules completed</span></div>
-        <div><strong>{dashboard.totals.certificates}</strong><span>certificates earned</span></div>
-        {dashboard.certificates.slice(0, 3).map((certificate) => (
-          <div className="learning-certificate-mini" key={certificate._id}>
-            <Check size={15} /><span>{certificate.moduleId?.title || "Completed module"}</span>
-          </div>
-        ))}
-      </section>
       {programs.length === 0 ? (
-        <section className="learning-panel"><p className="learning-muted">No learning programs are published yet.</p></section>
+        <section className="learning-panel"><p className="learning-muted">No courses are available yet.</p></section>
       ) : (
         <div className="learning-program-grid">
-          {programs.map((program) => (
-            <section className="learning-panel learning-program-card" key={program._id}>
+          {visiblePrograms.map((program) => {
+            const isFree = program.modules.length > 0 &&
+              program.modules.every((module) => Number(module.price) === 0);
+            const isSaved = savedProgramIds.includes(String(program._id));
+            return (
+            <article className="learning-panel learning-program-card" key={program._id}>
               <div className="learning-program-header">
-                <div><span className="learning-program-language">{program.category || program.language || "Course"}</span><h2>{program.title}</h2></div>
+                <button
+                  className="learning-course-open"
+                  onClick={() => openProgram(program._id)}
+                  type="button"
+                >
+                  <h2>{program.title}</h2>
+                </button>
+                {isFree && <span className="learning-free-badge">Free</span>}
               </div>
-              {program.shortDescription && <p>{program.shortDescription}</p>}
-              <p>{program.description}</p>
-              {program.category && <span className="learning-module-progress">{program.category} · {program.difficulty}</span>}
-              {program.technologies?.length > 0 && (
-                <p className="learning-muted">Subjects: {program.technologies.join(", ")}</p>
-              )}
-              {program.features?.length > 0 && (
-                <ul className="learning-course-features">{program.features.map((feature, index) => <li key={`${feature}-${index}`}>{feature}</li>)}</ul>
-              )}
-              {program.prerequisites?.length > 0 && (
-                <p className="learning-muted">Requirements: {program.prerequisites.join(", ")}</p>
-              )}
-              {program.learningOutcomes?.length > 0 && (
-                <p className="learning-muted">Learning outcomes: {program.learningOutcomes.join(", ")}</p>
-              )}
-              {program.modules.map((module) => (
-                <div className="learning-catalog-module" key={module._id}>
-                  <div className="learning-catalog-module-copy">
-                    <strong>{module.sequence}. {module.title}</strong>
-                    <span>{module.shortDescription || module.description}</span>
-                    <span>{module.difficulty} · {module.estimatedDurationMinutes} min · {displayPrice(module.price, module.currency)}</span>
-                    {module.prerequisites?.length > 0 && (
-                      <span>
-                        Prerequisites: {module.prerequisites.map((id) =>
-                          program.modules.find((item) => String(item._id) === String(id))?.title || "Required module",
-                        ).join(", ")}
-                      </span>
-                    )}
-                    <span className="learning-module-progress">
-                      {module.progress.completed ? "Completed" : `${module.progress.completedTopics} topic(s) completed`}
-                    </span>
-                  </div>
-                  {module.hasAccess ? (
-                    <button className="learning-button learning-button-small" onClick={() => openModule(program._id, module._id)} type="button">
-                      Resume <ChevronRight size={14} />
-                    </button>
-                  ) : (
-                    <button
-                      className="learning-button learning-button-secondary learning-button-small"
-                      disabled={module.purchaseStatus === "PENDING" || module.purchaseStatus === "ACTIVE"}
-                      onClick={() => requestPurchase({ moduleId: module._id })}
-                      type="button"
-                    >
-                      {module.purchaseStatus === "PENDING"
-                        ? "Payment pending"
-                        : module.purchaseStatus === "ACTIVE"
-                          ? "Prerequisite required"
-                          : module.purchaseStatus === "EXPIRED"
-                            ? `Access expired · Repurchase · ${displayPrice(module.price, module.currency)}`
-                            : `Purchase module · ${displayPrice(module.price, module.currency)}`}
-                    </button>
-                  )}
-                  <small className="learning-access-duration">
-                    {module.accessDurationDays
-                      ? `Access for ${module.accessDurationDays} days from ${module.price === 0 ? "activation" : "payment"}`
-                      : "Lifetime access"}
-                    {module.hasAccess && module.accessExpiresAt
-                      ? ` · Expires ${new Date(module.accessExpiresAt).toLocaleDateString()}`
-                      : ""}
-                  </small>
-                </div>
-              ))}
-            </section>
-          ))}
+              <button
+                className="learning-course-description"
+                onClick={() => openProgram(program._id)}
+                type="button"
+              >
+                {program.shortDescription || program.description}
+              </button>
+              <button
+                aria-label={isSaved ? `Remove ${program.title} from saved courses` : `Save ${program.title}`}
+                aria-pressed={isSaved}
+                className="learning-save-course"
+                onClick={() => saveCourse(program._id)}
+                type="button"
+              >
+                {isSaved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                {isSaved ? "Saved" : "Save"}
+              </button>
+            </article>
+            );
+          })}
         </div>
       )}
-      {dashboard.certificates.length > 0 && (
-        <section className="learning-panel learning-earned-certificates">
-          <h2>Earned certificates</h2>
-          <div className="learning-request-list">
-            {dashboard.certificates.map((certificate) => (
-              <div className="learning-request-row" key={certificate._id}>
-                <div>
-                  <strong>{certificate.moduleId?.title || "Completed module"}</strong>
-                  <span>{certificate.programId?.title || "Learning program"}</span>
-                  <small>Certificate code: {certificate.code}</small>
-                </div>
-                <div className="learning-certificate-actions">
-                  <small>{new Date(certificate.earnedAt).toLocaleDateString()}</small>
-                  <button className="learning-link-button" onClick={() => downloadCertificate(certificate)} type="button">
-                    Download PDF
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-          {dashboard.certificates.length < dashboard.totals.certificates && (
-            <button
-              className="learning-button learning-button-secondary"
-              disabled={loadingMore}
-              onClick={() => {
-                setLoadingMore(true);
-                loadStudentData(dashboard.page + 1, true);
-              }}
-              type="button"
-            >
-              {loadingMore ? "Loading…" : "Load more certificates"}
-            </button>
-          )}
-        </section>
-      )}
-      <p className="learning-interview-note">
-        A completed module certificate may make you eligible to apply for an AMUX technical interview. It does not guarantee an internship or job.
-      </p>
     </div>
   );
 }

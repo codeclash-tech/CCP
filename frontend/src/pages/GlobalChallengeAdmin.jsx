@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Save,
   Send,
+  Trash2,
   X,
 } from "lucide-react";
 import api from "../services/api";
@@ -85,6 +86,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
   const [rankings, setRankings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingQuestionId, setDeletingQuestionId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
@@ -214,6 +216,72 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
       setError(previewError.message || "Could not load the question preview.");
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const deleteQuestion = async (questionId) => {
+    const id = String(questionId);
+    if (id === currentQuestionId) {
+      setError("The active Global Challenge question cannot be deleted.");
+      return;
+    }
+    const question = questions.find((item) => String(item._id || item.id) === id);
+    if (!question || !window.confirm(`Permanently delete "${question.title}" from the database?`)) return;
+
+    const previousQueue = questionIds;
+    const nextQueue = previousQueue.filter((queuedId) => queuedId !== id);
+    let queueSaved = false;
+    setDeletingQuestionId(id);
+    setError("");
+    setNotice("");
+    try {
+      if (previousQueue.includes(id) && challenge?.published) {
+        await api.put("/weekly-assessments/admin/global-challenge", {
+          name: challenge.name,
+          startAt: challenge.startAt,
+          questionIds: nextQueue,
+        });
+        queueSaved = true;
+      }
+      await api.delete(`/challenges/${id}`);
+      setQuestionIds(nextQueue);
+      setQuestions((current) =>
+        current.filter((item) => String(item._id || item.id) !== id),
+      );
+      setChallenge((current) => {
+        if (!current) return current;
+        const withoutQuestion = (items = []) =>
+          items.filter((item) => String(item?._id || item) !== id);
+        return {
+          ...current,
+          questionIds: withoutQuestion(current.questionIds),
+          ...(current.draft
+            ? { draft: { ...current.draft, questionIds: withoutQuestion(current.draft.questionIds) } }
+            : {}),
+        };
+      });
+      if (String(previewQuestion?._id || previewQuestion?.id) === id) {
+        setPreviewQuestion(null);
+      }
+      setNotice("Question permanently deleted.");
+    } catch (deleteError) {
+      if (queueSaved) {
+        try {
+          await api.put("/weekly-assessments/admin/global-challenge", {
+            name: challenge.name,
+            startAt: challenge.startAt,
+            questionIds: previousQueue,
+          });
+        } catch (restoreError) {
+          setError(
+            `${deleteError.message || "Could not delete the question."} The question queue could not be restored: ${restoreError.message}`,
+          );
+          return;
+        }
+      }
+      setError(deleteError.message || "Could not delete the question.");
+    } finally {
+      setDeletingQuestionId("");
     }
   };
 
@@ -469,6 +537,16 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
                         disabled={saving}
                         aria-label={`Remove ${question?.title || "question"} from the queue`}
                       ><X size={16} /></button>
+                      {id !== currentQuestionId && (
+                        <button
+                          type="button"
+                          className="weekly-rotation-remove"
+                          onClick={() => deleteQuestion(id)}
+                          disabled={saving || Boolean(deletingQuestionId)}
+                          aria-label={`Permanently delete ${question?.title || "question"}`}
+                          title="Delete question permanently"
+                        ><Trash2 size={15} /></button>
+                      )}
                     </div>
                   </li>
                 );
@@ -518,6 +596,14 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
                         onClick={() => toggleQuestion(id)}
                         disabled={saving}
                       ><Plus size={15} /> Add</button>
+                      <button
+                        type="button"
+                        className="weekly-rotation-remove"
+                        onClick={() => deleteQuestion(id)}
+                        disabled={saving || Boolean(deletingQuestionId)}
+                        aria-label={`Permanently delete ${question.title}`}
+                        title="Delete question permanently"
+                      ><Trash2 size={15} /></button>
                     </div>
                   </div>
                 );

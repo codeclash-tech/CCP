@@ -30,22 +30,7 @@ import {
 
 const MAX_PAGE_SIZE = 50;
 const MAX_SESSION_MESSAGES = 40;
-function normalizeTutorLanguage(language) {
-  const normalized = String(language || "auto").trim().toLowerCase();
-  return /^[a-z]{2,8}(?:-[a-z0-9]{2,8})*$/.test(normalized) ? normalized : "auto";
-}
-
-function detectReplyLanguage(text) {
-  if (/[\u0B80-\u0BFF]/u.test(text)) return "ta";
-  if (/[\u0D00-\u0D7F]/u.test(text)) return "ml";
-  if (/[\u0C00-\u0C7F]/u.test(text)) return "te";
-  if (/[\u0C80-\u0CFF]/u.test(text)) return "kn";
-  if (/[\u0980-\u09FF]/u.test(text)) return "bn";
-  if (/[\u0900-\u097F]/u.test(text)) return "hi";
-  if (/[\u0A80-\u0AFF]/u.test(text)) return "gu";
-  if (/[\u0A00-\u0A7F]/u.test(text)) return "pa";
-  if (/[\u0B00-\u0B7F]/u.test(text)) return "or";
-  if (/[\u0D80-\u0DFF]/u.test(text)) return "si";
+function normalizeTutorLanguage() {
   return "en";
 }
 
@@ -699,10 +684,9 @@ export async function createLearningProgram(userId, input) {
     learningOutcomes: input.learningOutcomes,
     thumbnailUrl,
     displayOrder: input.displayOrder,
-    status: "PUBLISHED",
+    status: "DRAFT",
     createdBy: userId,
     updatedBy: userId,
-    publishedAt: new Date(),
   });
   await program.save();
   return program;
@@ -745,6 +729,13 @@ export async function updateLearningProgram(userId, programId, input) {
       throw requestError("Program status must be DRAFT or PUBLISHED.");
     }
     if (input.status === "PUBLISHED" && program.status !== "PUBLISHED") {
+      const moduleCount = await LearningModule.countDocuments({
+        programId: program._id,
+        deletedAt: null,
+      });
+      if (!moduleCount) {
+        throw requestError("Add at least one module before publishing this course.");
+      }
       program.publishedAt = new Date();
     }
     program.status = input.status;
@@ -1352,12 +1343,14 @@ export async function askLearningTutor(
   message,
   language,
   inputTranscribedFromSpeech = false,
+  studentName = "",
 ) {
   const prompt = String(message || "").trim();
   if (!prompt || prompt.length > 2000) {
     throw requestError("Your message must contain between 1 and 2000 characters.");
   }
   language = normalizeTutorLanguage(language);
+  const displayName = String(studentName || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 40);
   const { session, module, topic } = await getLearningSession(userId, sessionId);
   const progress = await LearningProgress.findOne({ userId, moduleId: module._id })
     .select("completedTopicIds completedExerciseIds assessmentPassed")
@@ -1370,6 +1363,7 @@ export async function askLearningTutor(
     const provider = createTutorProvider(config);
     const reply = await provider.generateReply({
       topic,
+      studentName: displayName,
       approvedContent: approvedTopicContext(topic),
       progressContext: {
         completedTopics: progress?.completedTopicIds?.length || 0,
@@ -1406,7 +1400,7 @@ export async function askLearningTutor(
     return {
       session,
       reply: reply.content,
-      replyLanguage: detectReplyLanguage(reply.content),
+      replyLanguage: "en",
     };
   } catch (error) {
     await LearningAiUsage.create({

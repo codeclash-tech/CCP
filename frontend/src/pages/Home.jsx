@@ -14,6 +14,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import "../styles/productPages.css";
+import { useAuth } from "../context/AuthContext";
 
 const cards = [
   {
@@ -57,6 +58,7 @@ const targetAudiences = [
 ];
 
 export default function Home() {
+  const { user } = useAuth();
   const isDesktop =
     typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   if (isDesktop) {
@@ -64,6 +66,7 @@ export default function Home() {
       <main className="product-page desktop-dashboard">
         <header className="desktop-dashboard-intro">
           <div>
+            <p className="home-welcome">Welcome, {user?.name || "there"}</p>
             <p className="product-eyebrow">CODECLASH · AN AMUX PRODUCT</p>
             <h1>Build skill. Beat the clock.</h1>
             <p>
@@ -142,7 +145,15 @@ export default function Home() {
   }
   return (
     <main className="home-page">
+      <p className="home-welcome">Welcome, {user?.name || "there"}</p>
       <style>{`
+        .home-welcome {
+          margin: 0 0 14px;
+          color: var(--text-muted);
+          font-size: 13px;
+          font-weight: 600;
+        }
+
         .home-page {
           width: 100%;
           max-width: 1600px;

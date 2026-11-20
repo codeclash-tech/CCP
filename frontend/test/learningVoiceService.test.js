@@ -6,7 +6,7 @@ import {
   getVoiceProfileChoices,
 } from "../src/services/learningVoiceService.js";
 
-test("speech input provider selects the requested language and returns recognized text", () => {
+test("speech input provider requests English transcription and returns recognized text", () => {
   let recognition;
   class MockRecognition {
     constructor() {
@@ -17,19 +17,30 @@ test("speech input provider selects the requested language and returns recognize
   }
   const provider = createSpeechInputProvider({ SpeechRecognition: MockRecognition });
   let transcript = "";
+  let interimTranscript = "";
   provider.start({
     language: "ta",
     onTranscript: (value) => { transcript = value; },
+    onInterim: (value) => { interimTranscript = value; },
     onError: () => assert.fail("Unexpected recognition error"),
   });
-  assert.equal(recognition.lang, "ta-IN");
-  recognition.onresult({ results: [[{ transcript: "வணக்கம்" }]] });
-  assert.equal(transcript, "வணக்கம்");
+  assert.equal(recognition.lang, "en-US");
+  recognition.onresult({
+    resultIndex: 0,
+    results: [{ isFinal: false, 0: { transcript: "My code is " } }],
+  });
+  assert.equal(interimTranscript, "My code is ");
+  recognition.onresult({
+    resultIndex: 0,
+    results: [{ isFinal: true, 0: { transcript: "My code is not working." } }],
+  });
+  assert.equal(transcript, "My code is not working.");
 });
 
 test("desktop speech input captures microphone audio, resamples it, and transcribes locally", async () => {
   let processor;
   let transcriptionRequest;
+  let transcriptionCalls = 0;
   let stoppedTracks = 0;
   const states = [];
   const track = { stop: () => { stoppedTracks += 1; } };
@@ -62,9 +73,9 @@ test("desktop speech input captures microphone audio, resamples it, and transcri
         getUserMedia: async (constraints) => {
           assert.equal(constraints.audio.channelCount, 1);
           assert.deepEqual(constraints.audio.sampleRate, { ideal: 16000 });
-          assert.equal(constraints.audio.echoCancellation, false);
-          assert.equal(constraints.audio.noiseSuppression, false);
-          assert.equal(constraints.audio.autoGainControl, false);
+          assert.equal(constraints.audio.echoCancellation, true);
+          assert.equal(constraints.audio.noiseSuppression, true);
+          assert.equal(constraints.audio.autoGainControl, true);
           return { getTracks: () => [track] };
         },
       },
@@ -72,6 +83,7 @@ test("desktop speech input captures microphone audio, resamples it, and transcri
     codeClashDesktop: {
       speech: {
         transcribe: async (request) => {
+          transcriptionCalls += 1;
           transcriptionRequest = request;
           return "  What is a variable?  ";
         },
@@ -80,20 +92,22 @@ test("desktop speech input captures microphone audio, resamples it, and transcri
   });
   let transcript = "";
   const stop = await provider.start({
-    language: "en",
+    language: "ta",
     onTranscript: (value) => { transcript = value; },
     onError: (error) => assert.fail(error),
     onStateChange: (state) => states.push(state),
   });
   processor.onaudioprocess({
-    inputBuffer: { getChannelData: () => new Float32Array(48000).fill(0.25) },
+    inputBuffer: { getChannelData: () => new Float32Array(48000 * 31).fill(0.25) },
   });
+  await stop();
   await stop();
 
   assert.equal(transcriptionRequest.sampleRate, 16000);
-  assert.equal(transcriptionRequest.samples.length, 16000);
+  assert.equal(transcriptionRequest.samples.length, 16000 * 31);
   assert.equal(transcriptionRequest.samples[0], 0.25);
   assert.equal(transcriptionRequest.language, "en");
+  assert.equal(transcriptionCalls, 1);
   assert.equal(transcript, "What is a variable?");
   assert.equal(stoppedTracks, 1);
   assert.deepEqual(states, ["requesting", "recording", "transcribing", "idle"]);

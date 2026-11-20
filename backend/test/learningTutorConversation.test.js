@@ -94,37 +94,40 @@ test("Groq tutor receives the student's current question and preserves the sessi
     const result = await askLearningTutor(
       userId,
       sessionId,
-      "Can you show me an example?",
-      "auto",
+      "I am not understand this. I I still don't understand.",
+      "ta",
       true,
+      "Kai",
     );
     const conversation = requestBody.messages.slice(1);
 
     assert.deepEqual(conversation.map(({ role, content }) => ({ role, content })), [
       { role: "user", content: "What is a variable?" },
       { role: "assistant", content: "It is a named place to store a value." },
-      { role: "user", content: "Can you show me an example?" },
+      { role: "user", content: "I am not understand this. I I still don't understand." },
     ]);
     assert.match(requestBody.messages[0].content, /A variable stores a value/);
+    assert.match(requestBody.messages[0].content, /Student nickname: "Kai"/);
     assert.match(requestBody.messages[0].content, /Use friendly analogies/);
     assert.match(
       requestBody.messages[0].content,
-      /User input is transcribed from a Tamil speaker speaking English/,
+      /English speech transcript and may contain recognition errors/,
     );
     assert.match(
       requestBody.messages[0].content,
-      /Detect the exact language used in the student's latest message/,
+      /Always reply in clear, simple English/,
     );
     assert.match(
       requestBody.messages[0].content,
-      /Do not use markdown/,
+      /Never use emojis, markdown/,
     );
     assert.equal(result.reply, "Let's practice with a simple example.");
     assert.equal(result.replyLanguage, "en");
+    assert.equal(session.language, "en");
     assert.deepEqual(
       session.messages.slice(-2).map(({ role, content }) => ({ role, content })),
       [
-        { role: "user", content: "Can you show me an example?" },
+        { role: "user", content: "I am not understand this. I I still don't understand." },
         { role: "assistant", content: "Let's practice with a simple example." },
       ],
     );

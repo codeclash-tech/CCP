@@ -11,9 +11,10 @@ import {
   listLearningPrograms,
   serializeStudentModule,
   setLearningModuleStatus,
+  updateLearningProgram,
 } from "../src/services/learningService.js";
 
-test("course creation accepts only a name and description and publishes no modules", async () => {
+test("course creation accepts a name and description and remains unpublished until modules are added", async () => {
   const originalSave = LearningProgram.prototype.save;
   const originalInsertMany = LearningModule.insertMany;
   let insertedModules = false;
@@ -32,11 +33,11 @@ test("course creation accepts only a name and description and publishes no modul
     });
 
     assert.equal(course.title, "Computer Networks");
-    assert.equal(course.status, "PUBLISHED");
+    assert.equal(course.status, "DRAFT");
     assert.equal(course.language, "");
     assert.equal(course.price, undefined);
     assert.equal(course.category, "");
-    assert.ok(course.publishedAt);
+    assert.equal(course.publishedAt, null);
     assert.equal(insertedModules, false);
   } finally {
     LearningProgram.prototype.save = originalSave;
@@ -52,6 +53,31 @@ test("course creation requires only the course name and description", async () =
     }),
     /Full description is required/,
   );
+});
+
+test("a course cannot be published before at least one module exists", async () => {
+  const originalFindById = LearningProgram.findById;
+  const originalModuleCount = LearningModule.countDocuments;
+  const program = {
+    _id: "507f1f77bcf86cd799439011",
+    status: "DRAFT",
+    async save() {
+      return this;
+    },
+  };
+  LearningProgram.findById = async () => program;
+  LearningModule.countDocuments = async () => 0;
+
+  try {
+    await assert.rejects(
+      updateLearningProgram("admin-1", program._id, { status: "PUBLISHED" }),
+      /Add at least one module before publishing/,
+    );
+    assert.equal(program.status, "DRAFT");
+  } finally {
+    LearningProgram.findById = originalFindById;
+    LearningModule.countDocuments = originalModuleCount;
+  }
 });
 
 test("modules can be created one at a time with basic details and sensible defaults", async () => {

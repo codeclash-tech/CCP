@@ -104,12 +104,17 @@ test("role navigation keeps admin links exclusive and removes settings/create sh
   assert.equal(
     ROLE_NAVIGATION[ASSESSMENT_ROLES.CANDIDATE].find(({ path }) => path === "/learning")
       ?.desktopOnly,
-    true,
+    undefined,
   );
   assert.equal(
     ROLE_NAVIGATION[ASSESSMENT_ROLES.SUPER_ADMIN].find(({ path }) => path === "/admin/learning")
       ?.desktopOnly,
-    true,
+    undefined,
+  );
+  assert.equal(
+    ROLE_NAVIGATION[ASSESSMENT_ROLES.CANDIDATE].find(({ path }) => path === "/learning")
+      ?.label,
+    "Thrive",
   );
   for (const links of Object.values(ROLE_NAVIGATION)) {
     assert.equal(

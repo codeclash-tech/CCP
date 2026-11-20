@@ -95,13 +95,18 @@ Tutor speech input captures audio in the renderer and transcribes it locally in
 Electron's main process and a persistent, bundled Python `faster-whisper`
 worker. The worker starts once with the app, loads its model once, and accepts
 mono 16 kHz float32 audio over stdin without writing recordings to disk. It
-selects `distil-large-v3` when system RAM is at least 8 GiB and `small.en` on
-lower-memory machines, uses int8 CPU or int8/float16 CUDA inference, and
-transcribes English literally for the tutor. Browser echo cancellation, noise
+selects the English-only `tiny.en` model below 4 GiB of system RAM and
+`base.en` otherwise. Set `CODECLASH_SPEECH_MODEL` to `tiny.en`, `base.en`, or
+`small.en` to compare supported English models. CTranslate2 selects an
+available integer compute type for the CPU or CUDA device. Transcription uses
+English recognition mode, not translation, with no grammar-correction prompt.
+The recording is sent once after the student stops; there are no interim
+transcripts. Browser echo cancellation, noise
 suppression, and automatic gain control are disabled to preserve quieter
 consonants. The model downloads on first use and is cached in the user's app
 data; first setup needs internet and substantial free disk space. Microphone
-audio remains on-device. English speech input is supported by this pipeline;
+audio remains on-device. Recordings are not automatically cut off at 30
+seconds. English speech input is supported by this pipeline;
 the existing Tamil tutor response and voice output remain available. Tutor
 text input remains available if speech recognition is unavailable.
 

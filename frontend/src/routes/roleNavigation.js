@@ -17,7 +17,7 @@ export const ROLE_NAVIGATION = {
     { path: "/weekly-assessment", label: "Daily Challenge", icon: LockKeyhole },
     { path: "/rankings", label: "Rankings", icon: BarChart3 },
     { path: "/profile", label: "Profile", icon: UserRound },
-    { path: "/learning", label: "AI Learning", icon: BookOpen, desktopOnly: true },
+    { path: "/learning", label: "Thrive", icon: BookOpen },
   ],
   [ASSESSMENT_ROLES.ORGANIZATION_USER]: [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,7 +25,7 @@ export const ROLE_NAVIGATION = {
     { path: "/weekly-assessment", label: "Daily Challenge", icon: LockKeyhole },
     { path: "/rankings", label: "Rankings", icon: BarChart3 },
     { path: "/profile", label: "Profile", icon: UserRound },
-    { path: "/learning", label: "AI Learning", icon: BookOpen, desktopOnly: true },
+    { path: "/learning", label: "Thrive", icon: BookOpen },
   ],
   [ASSESSMENT_ROLES.SUPER_ADMIN]: [
     {
@@ -40,7 +40,7 @@ export const ROLE_NAVIGATION = {
     },
     { path: "/admin/rankings", label: "Global Rankings", icon: BarChart3 },
     { path: "/profile", label: "Profile", icon: UserRound },
-    { path: "/admin/learning", label: "Learning Content", icon: BookOpen, desktopOnly: true },
+    { path: "/admin/learning", label: "Thrive", icon: BookOpen },
   ],
 };
 

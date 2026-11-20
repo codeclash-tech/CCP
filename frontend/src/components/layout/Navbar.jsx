@@ -4,6 +4,7 @@ import { Code2, LogOut, Menu, UserRound, X } from "lucide-react";
 
 import UserAvatar from "../user/UserAvatar";
 import { useAuth } from "../../context/AuthContext";
+import RoleNavigation from "./RoleNavigation";
 
 export default function Navbar({ navigationOpen = false, onToggleNavigation }) {
   const location = useLocation();
@@ -34,20 +35,6 @@ export default function Navbar({ navigationOpen = false, onToggleNavigation }) {
   return (
     <header className="app-navbar">
       <div className="app-navbar-brand-group">
-        {user && onToggleNavigation && (
-          <button
-            className="app-navbar-mobile-toggle"
-            type="button"
-            aria-label={
-              navigationOpen ? "Close navigation" : "Open navigation"
-            }
-            aria-expanded={navigationOpen}
-            aria-controls="role-navigation"
-            onClick={onToggleNavigation}
-          >
-            {navigationOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-        )}
         <Link to="/" className="app-navbar-brand">
           <Code2 size={27} aria-hidden="true" />
           <span>CodeClash</span>
@@ -55,6 +42,28 @@ export default function Navbar({ navigationOpen = false, onToggleNavigation }) {
       </div>
 
       {user ? (
+        <>
+        <div
+          className="app-navbar-navigation"
+          onMouseEnter={() => onToggleNavigation?.(true)}
+          onMouseLeave={() => onToggleNavigation?.(false)}
+        >
+          <button
+            className="app-navbar-menu-toggle"
+            type="button"
+            aria-label={navigationOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={navigationOpen}
+            aria-controls="role-navigation"
+            onClick={() => onToggleNavigation?.(!navigationOpen)}
+          >
+            {navigationOpen ? <X size={17} /> : <Menu size={17} />}
+            <span>Menu</span>
+          </button>
+          <RoleNavigation
+            open={navigationOpen}
+            onNavigate={() => onToggleNavigation?.(false)}
+          />
+        </div>
         <div className="app-navbar-account">
           <div className="app-navbar-account-menu">
             <button
@@ -94,6 +103,7 @@ export default function Navbar({ navigationOpen = false, onToggleNavigation }) {
             )}
           </div>
         </div>
+        </>
       ) : (
         <Link to="/login" className="app-navbar-sign-in">
           Sign in

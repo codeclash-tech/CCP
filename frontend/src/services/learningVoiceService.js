@@ -1,5 +1,4 @@
 const SPEECH_SAMPLE_RATE = 16000;
-const MAX_SPEECH_DURATION_SECONDS = 30;
 
 const LANGUAGE_LOCALES = {
   auto: "en-IN",
@@ -28,6 +27,16 @@ function resampleAudio(chunks, sourceSampleRate) {
   if (!inputLength || !Number.isFinite(sourceSampleRate) || sourceSampleRate <= 0) {
     return new Float32Array();
   }
+  if (sourceSampleRate === SPEECH_SAMPLE_RATE) {
+    const output = new Float32Array(inputLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      output.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return output;
+  }
+
   const input = new Float32Array(inputLength);
   let offset = 0;
   for (const chunk of chunks) {
@@ -74,7 +83,7 @@ function createDesktopSpeechInputProvider(browser, speech) {
   }
 
   return {
-    async start({ language = "en", onTranscript, onError, onStateChange = () => {} }) {
+    async start({ onTranscript, onError, onStateChange = () => {} }) {
       let stream;
       let context;
       let source;
@@ -82,14 +91,14 @@ function createDesktopSpeechInputProvider(browser, speech) {
       let mute;
       try {
         onStateChange("requesting");
-        // Ask for raw mono audio and avoid browser DSP that can suppress quiet consonants.
+        // Request mono audio with echo and noise filtering for cleaner speech capture.
         stream = await mediaDevices.getUserMedia({
           audio: {
             channelCount: 1,
             sampleRate: { ideal: SPEECH_SAMPLE_RATE },
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
           },
         });
         context = new AudioContext({ sampleRate: SPEECH_SAMPLE_RATE });
@@ -99,14 +108,9 @@ function createDesktopSpeechInputProvider(browser, speech) {
         mute = context.createGain();
         mute.gain.value = 0;
         const chunks = [];
-        let capturedSamples = 0;
-        const maxSamples = Math.floor(context.sampleRate * MAX_SPEECH_DURATION_SECONDS);
         processor.onaudioprocess = (event) => {
-          if (capturedSamples >= maxSamples) return;
           const input = event.inputBuffer.getChannelData(0);
-          const length = Math.min(input.length, maxSamples - capturedSamples);
-          chunks.push(new Float32Array(input.subarray(0, length)));
-          capturedSamples += length;
+          chunks.push(new Float32Array(input));
         };
         source.connect(processor);
         processor.connect(mute);
@@ -114,11 +118,9 @@ function createDesktopSpeechInputProvider(browser, speech) {
         onStateChange("recording");
 
         let stopped = false;
-        let timer;
         const stop = async ({ transcribe = true } = {}) => {
           if (stopped) return;
           stopped = true;
-          clearTimeout(timer);
           processor.onaudioprocess = null;
           processor.disconnect();
           source.disconnect();
@@ -139,7 +141,7 @@ function createDesktopSpeechInputProvider(browser, speech) {
             const transcript = await speech.transcribe({
               samples,
               sampleRate: SPEECH_SAMPLE_RATE,
-              language,
+              language: "en",
             });
             if (typeof transcript === "string" && transcript.trim()) {
               onTranscript(transcript.trim());
@@ -152,7 +154,6 @@ function createDesktopSpeechInputProvider(browser, speech) {
             onStateChange("idle");
           }
         };
-        timer = setTimeout(() => { void stop(); }, MAX_SPEECH_DURATION_SECONDS * 1000);
         return stop;
       } catch (error) {
         if (processor) processor.disconnect();
@@ -177,15 +178,29 @@ export function createSpeechInputProvider(browser = globalThis) {
   if (typeof Recognition !== "function") return null;
 
   return {
-    start({ language, onTranscript, onError }) {
+    start({
+      onTranscript,
+      onInterim = () => {},
+      onError,
+      onStateChange = () => {},
+    }) {
       const recognition = new Recognition();
-      recognition.lang = languageLocale(language);
-      recognition.interimResults = false;
+      recognition.lang = "en-US";
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
+      recognition.onstart = () => onStateChange("recording");
       recognition.onresult = (event) => {
-        const transcript = event.results?.[0]?.[0]?.transcript;
-        if (typeof transcript === "string" && transcript.trim()) onTranscript(transcript);
-        else onError("No speech was recognized. Please try again or type your question.");
+        let interimTranscript = "";
+        let finalTranscript = "";
+        for (let index = event.resultIndex || 0; index < event.results.length; index += 1) {
+          const result = event.results[index];
+          const transcript = result?.[0]?.transcript;
+          if (typeof transcript !== "string") continue;
+          if (result.isFinal !== false) finalTranscript += transcript;
+          else interimTranscript += transcript;
+        }
+        if (interimTranscript) onInterim(interimTranscript);
+        if (finalTranscript.trim()) onTranscript(finalTranscript.trim());
       };
       recognition.onerror = (event) => {
         const messages = {
@@ -194,7 +209,10 @@ export function createSpeechInputProvider(browser = globalThis) {
           network: "The browser speech service is unavailable. Try the CodeClash desktop app's offline speech input.",
         };
         onError(messages[event.error] || "Speech input was unavailable. Check microphone permission or type your question.");
+        onStateChange("idle");
       };
+      recognition.onend = () => onStateChange("idle");
+      onStateChange("requesting");
       recognition.start();
       return () => recognition.stop();
     },

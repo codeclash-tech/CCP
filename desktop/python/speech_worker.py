@@ -10,8 +10,7 @@ import numpy as np
 from faster_whisper import WhisperModel
 
 SAMPLE_RATE = 16000
-MAX_DURATION_SECONDS = 30
-INITIAL_PROMPT = "Indian speaker using Tamil or English, possibly with mixed-language words, asking a question or giving instructions."
+SUPPORTED_MODELS = {"tiny.en", "base.en", "small.en"}
 
 
 def write_message(message: dict[str, Any]) -> None:
@@ -20,26 +19,38 @@ def write_message(message: dict[str, Any]) -> None:
 
 
 def create_model(model_name: str) -> tuple[WhisperModel, str, str]:
-    # Use the GPU only when CTranslate2 can see CUDA; otherwise keep the worker on CPU int8.
+    if model_name not in SUPPORTED_MODELS:
+        raise ValueError("The speech worker only supports tiny.en, base.en, and small.en.")
+
     if ctranslate2.get_cuda_device_count() > 0:
         try:
+            supported_types = ctranslate2.get_supported_compute_types("cuda")
+            compute_type = next(
+                (value for value in ("int8_float16", "float16", "int8", "float32") if value in supported_types),
+                "float32",
+            )
             model = WhisperModel(
                 model_name,
                 device="cuda",
-                compute_type="int8_float16",
+                compute_type=compute_type,
                 download_root=os.environ.get("CODECLASH_SPEECH_MODEL_CACHE"),
             )
-            return model, "cuda", "int8_float16"
+            return model, "cuda", compute_type
         except Exception:
             traceback.print_exc(file=sys.stderr)
 
+    supported_types = ctranslate2.get_supported_compute_types("cpu")
+    compute_type = next(
+        (value for value in ("int8", "int8_float32", "int16", "float32") if value in supported_types),
+        "float32",
+    )
     model = WhisperModel(
         model_name,
         device="cpu",
-        compute_type="int8",
+        compute_type=compute_type,
         download_root=os.environ.get("CODECLASH_SPEECH_MODEL_CACHE"),
     )
-    return model, "cpu", "int8"
+    return model, "cpu", compute_type
 
 
 def transcribe(model: WhisperModel, request: dict[str, Any]) -> str:
@@ -55,27 +66,28 @@ def transcribe(model: WhisperModel, request: dict[str, Any]) -> str:
         raise ValueError("Audio data has an invalid format.")
 
     audio = np.frombuffer(audio_bytes, dtype=np.float32)
-    if not 0 < audio.size <= SAMPLE_RATE * MAX_DURATION_SECONDS:
-        raise ValueError("Record a speech clip that is 30 seconds or shorter.")
+    if audio.size == 0:
+        raise ValueError("Audio data is empty.")
     if not np.isfinite(audio).all():
         raise ValueError("Audio data contains invalid samples.")
-    if float(np.mean(audio.astype(np.float64) ** 2)) < 0.000001:
+    if float(np.dot(audio, audio)) / audio.size < 0.000001:
         raise ValueError("No speech was detected. Speak closer to the microphone and try again.")
 
     segments, _ = model.transcribe(
         audio,
+        language="en",
+        task="transcribe",
         beam_size=1,
         vad_filter=True,
         vad_parameters={"min_silence_duration_ms": 400},
         condition_on_previous_text=False,
         without_timestamps=True,
-        initial_prompt=INITIAL_PROMPT,
     )
     return "".join(segment.text for segment in segments).strip()
 
 
 def main() -> int:
-    model_name = os.environ.get("CODECLASH_SPEECH_MODEL", "large-v3")
+    model_name = os.environ.get("CODECLASH_SPEECH_MODEL", "base.en")
     try:
         model, device, compute_type = create_model(model_name)
     except Exception:

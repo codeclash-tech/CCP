@@ -11,7 +11,6 @@ import { AuthProvider } from "../context/AuthContext";
 import Navbar from "../components/layout/Navbar";
 import DesktopTitleBar from "../components/layout/DesktopTitleBar";
 import Footer from "../components/layout/Footer";
-import RoleNavigation from "../components/layout/RoleNavigation";
 import { useAuth } from "../context/AuthContext";
 import {
   ASSESSMENT_ROLES,
@@ -47,7 +46,6 @@ function AppLayout({ children }) {
   const { user } = useAuth();
   const isDesktop =
     typeof window !== "undefined" && Boolean(window.codeClashDesktop);
-  const closeNavigation = () => setNavigationOpen(false);
 
   useEffect(() => {
     const updateFullscreenState = () => {
@@ -63,23 +61,21 @@ function AppLayout({ children }) {
     <div
       className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
     >
-      {isDesktop && !isFullscreen && <DesktopTitleBar />}
+      {isDesktop && !isFullscreen && (
+        <DesktopTitleBar
+          navigationOpen={navigationOpen}
+          onToggleNavigation={(open) => setNavigationOpen(Boolean(open))}
+        />
+      )}
       {!isFullscreen && !isDesktop && (
         <Navbar
           navigationOpen={navigationOpen}
-          onToggleNavigation={() => setNavigationOpen((open) => !open)}
+          onToggleNavigation={(open) => setNavigationOpen(Boolean(open))}
         />
       )}
       <div
         className={`app-shell-body${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
       >
-        {!isFullscreen && user && (
-          <RoleNavigation
-            open={navigationOpen}
-            onNavigate={closeNavigation}
-            desktop={isDesktop}
-          />
-        )}
         <main className="app-shell-content">
           <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
         </main>
