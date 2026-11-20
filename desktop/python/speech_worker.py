@@ -64,7 +64,6 @@ def transcribe(model: WhisperModel, request: dict[str, Any]) -> str:
 
     segments, _ = model.transcribe(
         audio,
-        language="en",
         beam_size=1,
         vad_filter=True,
         vad_parameters={"min_silence_duration_ms": 400},
@@ -76,7 +75,7 @@ def transcribe(model: WhisperModel, request: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    model_name = os.environ.get("CODECLASH_SPEECH_MODEL", "distil-large-v3")
+    model_name = os.environ.get("CODECLASH_SPEECH_MODEL", "large-v3")
     try:
         model, device, compute_type = create_model(model_name)
     except Exception:

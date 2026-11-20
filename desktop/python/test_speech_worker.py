@@ -8,7 +8,7 @@ import speech_worker
 
 
 class SpeechWorkerTests(unittest.TestCase):
-    def test_transcribes_float32_audio_with_literal_english_settings(self):
+    def test_transcribes_float32_audio_with_multilingual_auto_detection_settings(self):
         audio = np.array([0.1, -0.2, 0.3], dtype=np.float32)
         request = {
             "sampleRate": 16000,
@@ -31,7 +31,6 @@ class SpeechWorkerTests(unittest.TestCase):
         self.assertEqual(
             calls[0][1],
             {
-                "language": "en",
                 "beam_size": 1,
                 "vad_filter": True,
                 "vad_parameters": {"min_silence_duration_ms": 400},

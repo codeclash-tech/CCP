@@ -30,7 +30,18 @@ import {
 
 const MAX_PAGE_SIZE = 50;
 const MAX_SESSION_MESSAGES = 40;
-const supportedTutorLanguages = new Set(["en", "ta"]);
+const supportedTutorLanguages = new Set([
+  "en",
+  "ta",
+  "hi",
+  "ml",
+  "te",
+  "bn",
+  "kn",
+  "mr",
+  "gu",
+  "pa",
+]);
 
 function requestError(message, statusCode = 400) {
   const error = new Error(message);

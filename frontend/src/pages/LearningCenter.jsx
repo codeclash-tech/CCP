@@ -2006,6 +2006,14 @@ function StudentLearning() {
                   >
                     <option value="en">English</option>
                     <option value="ta">தமிழ்</option>
+                    <option value="hi">हिन्दी</option>
+                    <option value="ml">മലയാളം</option>
+                    <option value="te">తెలుగు</option>
+                    <option value="bn">বাংলা</option>
+                    <option value="kn">ಕನ್ನಡ</option>
+                    <option value="mr">मराठी</option>
+                    <option value="gu">ગુજરાતી</option>
+                    <option value="pa">ਪੰਜਾਬੀ</option>
                   </select>
                 </label>
                 <label className="learning-field">

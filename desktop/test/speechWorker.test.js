@@ -29,9 +29,9 @@ function createWorkerProcess(onRequest) {
   return child;
 }
 
-test("speech worker selects the lighter English model on low-memory systems", () => {
-  assert.equal(selectSpeechModel(SPEECH_MODEL_RAM_THRESHOLD_BYTES - 1), "small.en");
-  assert.equal(selectSpeechModel(SPEECH_MODEL_RAM_THRESHOLD_BYTES), "distil-large-v3");
+test("speech worker selects multilingual models on low and high-memory systems", () => {
+  assert.equal(selectSpeechModel(SPEECH_MODEL_RAM_THRESHOLD_BYTES - 1), "small");
+  assert.equal(selectSpeechModel(SPEECH_MODEL_RAM_THRESHOLD_BYTES), "large-v3");
 });
 
 test("speech worker starts once and transfers 16 kHz PCM in memory", async () => {
@@ -48,7 +48,7 @@ test("speech worker starts once and transfers 16 kHz PCM in memory", async () =>
       spawnCount += 1;
       assert.equal(executable, "python");
       assert.match(args[0], /speech_worker\.py$/);
-      assert.equal(options.env.CODECLASH_SPEECH_MODEL, "distil-large-v3");
+      assert.equal(options.env.CODECLASH_SPEECH_MODEL, "large-v3");
       child = createWorkerProcess((request, process) => {
         requestAudio = Buffer.from(request.audioBase64, "base64");
         process.stdout.write(JSON.stringify({ id: request.id, text: "  my transcript  " }) + "\n");
@@ -75,7 +75,7 @@ test("speech worker starts once and transfers 16 kHz PCM in memory", async () =>
   await worker.stop();
 });
 
-test("speech worker rejects unsupported language and audio formats", async () => {
+test("speech worker validates audio formats and accepts multilingual language hints", async () => {
   const worker = new PersistentSpeechWorker({
     isPackaged: false,
     resourcesPath: "resources",
@@ -86,9 +86,5 @@ test("speech worker rejects unsupported language and audio formats", async () =>
   await assert.rejects(
     worker.transcribe({ samples: new Float32Array(10), sampleRate: 8000, language: "en" }),
     /16 kHz/,
-  );
-  await assert.rejects(
-    worker.transcribe({ samples: new Float32Array(10), sampleRate: 16000, language: "ta" }),
-    /supports English/,
   );
 });

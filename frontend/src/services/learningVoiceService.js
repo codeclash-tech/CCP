@@ -1,6 +1,27 @@
 const SPEECH_SAMPLE_RATE = 16000;
 const MAX_SPEECH_DURATION_SECONDS = 30;
 
+const LANGUAGE_LOCALES = {
+  en: "en-IN",
+  ta: "ta-IN",
+  hi: "hi-IN",
+  ml: "ml-IN",
+  te: "te-IN",
+  bn: "bn-IN",
+  kn: "kn-IN",
+  mr: "mr-IN",
+  gu: "gu-IN",
+  pa: "pa-IN",
+};
+
+function languageLocale(language) {
+  return LANGUAGE_LOCALES[String(language || "en")] || "en-IN";
+}
+
+function languagePrefix(language) {
+  return String(language || "en").slice(0, 2).toLowerCase();
+}
+
 function resampleAudio(chunks, sourceSampleRate) {
   const inputLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
   if (!inputLength || !Number.isFinite(sourceSampleRate) || sourceSampleRate <= 0) {
@@ -52,7 +73,7 @@ function createDesktopSpeechInputProvider(browser, speech) {
   }
 
   return {
-    async start({ onTranscript, onError, onStateChange = () => {} }) {
+    async start({ language = "en", onTranscript, onError, onStateChange = () => {} }) {
       let stream;
       let context;
       let source;
@@ -117,7 +138,7 @@ function createDesktopSpeechInputProvider(browser, speech) {
             const transcript = await speech.transcribe({
               samples,
               sampleRate: SPEECH_SAMPLE_RATE,
-              language: "en",
+              language,
             });
             if (typeof transcript === "string" && transcript.trim()) {
               onTranscript(transcript.trim());
@@ -157,7 +178,7 @@ export function createSpeechInputProvider(browser = globalThis) {
   return {
     start({ language, onTranscript, onError }) {
       const recognition = new Recognition();
-      recognition.lang = language === "ta" ? "ta-IN" : "en-US";
+      recognition.lang = languageLocale(language);
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       recognition.onresult = (event) => {
@@ -195,7 +216,7 @@ export function createSpeechOutputProvider(browser = globalThis) {
     speak(text, { language, profile }) {
       synthesis.cancel();
       const utterance = new Utterance(text);
-      utterance.lang = language === "ta" ? "ta-IN" : "en-US";
+      utterance.lang = languageLocale(language);
       utterance.voice = getVoiceProfileChoices(synthesis.getVoices(), language)[profile] || null;
       if (!utterance.voice) {
         throw new Error(`No native ${profile} voice is installed for ${utterance.lang}.`);
@@ -223,7 +244,7 @@ function voiceGender(voice) {
 }
 
 export function getVoiceProfileChoices(voices, language) {
-  const prefix = language === "ta" ? "ta" : "en";
+  const prefix = languagePrefix(language);
   const matchingVoices = voices.filter((voice) =>
     String(voice.lang || "").toLowerCase().startsWith(prefix),
   );

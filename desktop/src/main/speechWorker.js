@@ -13,10 +13,10 @@ export const SPEECH_REQUEST_TIMEOUT_MS = 3 * 60 * 1000;
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 export function selectSpeechModel(totalMemoryBytes) {
-  // Keep the larger English model on machines with at least 8 GiB of system RAM.
+  // Use multilingual Whisper models so the tutor can recognize Tamil and other Indian languages.
   return totalMemoryBytes < SPEECH_MODEL_RAM_THRESHOLD_BYTES
-    ? "small.en"
-    : "distil-large-v3";
+    ? "small"
+    : "large-v3";
 }
 
 function validateAudioRequest(request) {
@@ -26,9 +26,6 @@ function validateAudioRequest(request) {
   }
   if (sampleRate !== SPEECH_SAMPLE_RATE) {
     throw new Error("Microphone audio must be mono 16 kHz audio.");
-  }
-  if (language !== "en") {
-    throw new Error("Speech recognition currently supports English.");
   }
   if (
     samples.length === 0 ||
@@ -178,6 +175,7 @@ export class PersistentSpeechWorker {
     const payload = JSON.stringify({
       id,
       sampleRate: SPEECH_SAMPLE_RATE,
+      language: request.language,
       audioBase64: audio,
     });
 

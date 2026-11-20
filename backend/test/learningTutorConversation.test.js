@@ -111,6 +111,14 @@ test("Groq tutor receives the student's current question and preserves the sessi
       requestBody.messages[0].content,
       /User input is transcribed from a Tamil speaker speaking English/,
     );
+    assert.match(
+      requestBody.messages[0].content,
+      /Detect the exact language used in the student's latest message/,
+    );
+    assert.match(
+      requestBody.messages[0].content,
+      /Do not use markdown/,
+    );
     assert.equal(result.reply, "Let's practice with a simple example.");
     assert.deepEqual(
       session.messages.slice(-2).map(({ role, content }) => ({ role, content })),
