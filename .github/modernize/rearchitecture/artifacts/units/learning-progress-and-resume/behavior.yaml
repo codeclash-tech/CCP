@@ -1,0 +1,30 @@
+unit: learning-progress-and-resume
+side_effects:
+  - source_loc: backend/src/models/LearningSession.js:19
+    effect: "Creates or resumes one topic session for the learner/module/topic/version."
+    must_preserve: true
+  - source_loc: backend/src/models/LearningProgress.js:75
+    effect: "Stores objective evidence, mastery, profiles, attempts, and completion."
+    must_preserve: true
+branches:
+  - source_loc: backend/src/services/learningService.js:2547
+    condition: "Learner lacks entitlement or topic prerequisites."
+    behavior: "Deny session start/continue."
+    must_preserve: true
+  - source_loc: backend/src/services/learningService.js:2555
+    condition: "Matching session already exists."
+    behavior: "Reuse it and preserve messages/progress."
+    must_preserve: true
+error_paths:
+  - source_loc: backend/src/services/learningService.js:2590
+    trigger: "Module/topic version mismatch."
+    outcome: "403 session mismatch/no state mutation."
+    contract: "Actionable topic version error."
+    must_preserve: true
+concurrency:
+  model: sync
+  tx_boundary:
+    source_loc: backend/src/models/LearningProgress.js:88
+    scope: "Optimistic concurrency protects unique progress and repeated updates."
+    isolation: "optimisticConcurrency"
+    must_preserve: true

@@ -1,0 +1,9 @@
+unit: learning-progress-and-resume
+bindings:
+  - type: route-declaration
+    name: "POST /api/learning/sessions"
+    source_loc: backend/src/routes/learningRoutes.js:42
+    target: learningController.startLearningSession
+    must_appear_in_target: true
+    notes: "Authenticate, student role, and entitlement checks remain mandatory."
+runtime_config: []

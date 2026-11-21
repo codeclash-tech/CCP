@@ -1,0 +1,6 @@
+unit: module-publishing
+commit: false
+candidate_splits:
+  - id: backend/src/models/LearningModule.js:1-190
+    drivers: [data_ownership_split, lifecycle_split]
+    rationale: "Draft curriculum, published topic snapshots, and live module metadata share an aggregate; split candidates should be assessed against MongoDB atomic publication requirements."

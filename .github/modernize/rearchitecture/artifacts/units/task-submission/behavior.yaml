@@ -1,0 +1,30 @@
+unit: task-submission
+side_effects:
+  - source_loc: backend/src/services/learningService.js:3002
+    effect: "Records one task attempt and compatible objective evidence."
+    must_preserve: true
+  - source_loc: backend/src/services/executionService.js:1
+    effect: "Executes Java submission through isolated secure engine."
+    must_preserve: true
+branches:
+  - source_loc: backend/src/services/learningService.js:3106
+    condition: "Idempotency key already exists."
+    behavior: "Return prior result only for matching task and response hash; reject scope mismatch."
+    must_preserve: true
+  - source_loc: backend/src/services/learningService.js:3131
+    condition: "Task objective/criterion does not match active objective."
+    behavior: "Return 409 and apply no evidence."
+    must_preserve: true
+error_paths:
+  - source_loc: backend/src/services/learningService.js:3180
+    trigger: "Secure engine system error."
+    outcome: "503; progress unchanged."
+    contract: "Actionable execution unavailable error."
+    must_preserve: true
+concurrency:
+  model: sync
+  tx_boundary:
+    source_loc: backend/src/services/learningService.js:3430
+    scope: "Optimistic progress update around attempt/evidence; concurrent duplicate reconciles through existing key."
+    isolation: "optimistic concurrency"
+    must_preserve: true

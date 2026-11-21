@@ -1,0 +1,6 @@
+unit: admin-curriculum-authoring
+commit: false
+candidate_splits:
+  - id: backend/src/services/learningService.js:1499-1573
+    drivers: [concern_split]
+    rationale: "Proposal validation and provider orchestration are a cohesive authoring use case, but may be extracted from broad learningService if implementation complexity grows."

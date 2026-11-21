@@ -1,0 +1,49 @@
+user_intent:
+  raw_request: "Implement the CodeClash AI Tutor redesign in place without weakening preserved platform behavior."
+  inferred_acceptance:
+    - "simplified title/description/pasted-content authoring with reviewable AI preview"
+    - "persistent unified conversation with objective evidence and mastery"
+    - "backend-authoritative stages, idempotency, hints, and adaptive teaching"
+    - "preserve auth, entitlement, versioning, provider abstraction, and secure Java execution"
+  cleanup_required: false
+strategy: minimal_runtime
+runtime_reachable:
+  - backend/src/routes/learningRoutes.js
+  - backend/src/controllers/learningController.js
+  - backend/src/services/learningService.js
+  - backend/src/services/learningObjectiveEngine.js
+  - backend/src/models/LearningSession.js
+  - backend/src/models/LearningProgress.js
+  - backend/src/models/LearningModule.js
+  - frontend/src/pages/LearningCenter.jsx
+must_rewrite:
+  - path: backend/src/routes/learningRoutes.js
+    reason: "must expose the redesign state/session/idempotency contracts while retaining existing auth middleware"
+  - path: backend/src/controllers/learningController.js
+    reason: "must pass submission identity and server-authoritative session context"
+  - path: backend/src/services/learningService.js
+    reason: "must own stages, hints, progression, persisted conversation, and idempotent evidence orchestration"
+  - path: backend/src/services/learningObjectiveEngine.js
+    reason: "must remain evidence integrator but gain strict criterion/version/source validation"
+  - path: backend/src/models/LearningSession.js
+    reason: "must persist stage, active objective, hint state, and idempotency/replay metadata"
+  - path: backend/src/models/LearningProgress.js
+    reason: "must persist objective evidence, attempt identities, and server-authoritative progression"
+  - path: backend/src/models/LearningModule.js
+    reason: "must support approved curriculum preview/draft and publish snapshot contracts"
+  - path: frontend/src/pages/LearningCenter.jsx
+    reason: "must replace low-level authoring and separate tutor/task flows with approved preview and persistent conversation"
+copy_as_is:
+  - backend/src/middleware/auth.js
+  - backend/src/middleware/rbac.js
+  - backend/src/services/learningAiProvider.js
+  - backend/src/services/executionService.js
+  - backend/src/models/LearningModuleVersion.js
+  - backend/src/models/LearningTopicVersion.js
+legacy_allowed_to_remain:
+  - "Unrelated challenge platform routes and models"
+  - "Low-level topic fields may remain as compatibility storage while default authoring no longer exposes them"
+defer_cleanup:
+  - "Do not remove legacy topic fields or unrelated Learning Center components unless implementation proves they are unreachable"
+full_rewrite_reason: null
+implementation_rule: "Implementation scope is must_rewrite plus necessary seams/shared modules. Source anchors are evidence only, not a rewrite target list."

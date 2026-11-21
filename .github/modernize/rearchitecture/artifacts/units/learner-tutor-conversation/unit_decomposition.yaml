@@ -1,0 +1,6 @@
+unit: learner-tutor-conversation
+commit: false
+candidate_splits:
+  - id: backend/src/services/learningService.js:2600-2750
+    drivers: [concern_split, lifecycle_split]
+    rationale: "Provider prompting, server stage resolution, evidence evaluation, and persistence are currently combined and may need separate orchestration/state services."

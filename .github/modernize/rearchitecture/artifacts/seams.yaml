@@ -1,0 +1,66 @@
+seams:
+  - id: backend/src/middleware/auth.js:5
+    description: "Tutoring and authoring routes keep existing authentication/RBAC frozen."
+    source: declared
+    cut_between:
+      migrated_side: learner-tutor-conversation
+      frozen_side: learning-auth
+    protocol_shift: null
+    frozen_side_rule: "Do not refactor auth or RBAC behavior; all redesign routes continue to pass through authenticate and requireAssessmentRole."
+  - id: backend/src/services/learningAiProvider.js:1
+    description: "Tutor, proposal, and evaluation calls cross a provider abstraction boundary."
+    source: declared
+    cut_between:
+      migrated_side: learner-tutor-conversation
+      frozen_side: tutor-provider
+    protocol_shift: {from: provider-specific-response, to: approved-reply-schema}
+    frozen_side_rule: "Do not expose provider secrets or change provider selection/configuration semantics."
+    bridge_points:
+      - at: "Learning AI provider adapter"
+        from_form: "provider-specific chat/completion response"
+        to_form: "reply.content plus structured objectiveEvidence/usage"
+        mapping_rule: "Provider adapters preserve reply/provider/model/usage fields and return validated structured JSON to learning services."
+        edge_cases:
+          - "Malformed JSON -> provider validation failure and no publish/progress mutation"
+          - "Provider unavailable -> retryable 502/503 error and no evidence mutation"
+        idempotency_retry: "Provider calls may retry only where no progress/evidence mutation occurred."
+        fallback: "surface actionable provider unavailable/validation error"
+        must_preserve: true
+  - id: backend/src/services/executionService.js:1
+    description: "Java task submissions cross the secure execution HTTP boundary."
+    source: declared
+    cut_between:
+      migrated_side: task-submission
+      frozen_side: secure-java-execution
+    protocol_shift: {from: rest-json, to: rest-json}
+    frozen_side_rule: "Do not weaken Java-only execution, test limits, or engine isolation."
+    bridge_points:
+      - at: "backend/src/services/executionService.js"
+        from_form: "code, test cases, java language, time/memory limits"
+        to_form: "accepted/status/passed/total/results"
+        mapping_rule: "Map normalized Java submission and visible test cases to executionEngine execute; accept evidence only from a successful Java accepted result."
+        edge_cases:
+          - "SYSTEM_ERROR -> no progress mutation and 503"
+          - "Wrong answer/compile/runtime errors -> attempt result only, no falsely demonstrated criterion"
+        idempotency_retry: "Retry execution only through the task submission key; never create a second attempt/evidence row."
+        fallback: "return secure execution unavailable and preserve prior progress"
+        must_preserve: true
+  - id: frontend/src/pages/LearningCenter.jsx:209
+    description: "The React Learning Center is migrated to new server-authoritative contracts."
+    source: inferred
+    cut_between:
+      migrated_side: learning-center-ui
+      frozen_side: api-client
+    protocol_shift: {from: learning-rest-payload, to: ux-state-model}
+    frozen_side_rule: "Do not change existing API client auth/error behavior; consume redesign responses without overriding server state."
+    bridge_points:
+      - at: "LearningCenter API calls"
+        from_form: "REST response with server stage, objective, hint, evidence, and progress"
+        to_form: "React conversation/preview state"
+        mapping_rule: "Hydrate persistent conversation from session response; render stage/objective/hint data only as server-returned snapshots."
+        edge_cases:
+          - "409 stale/conflicting stage -> keep server snapshot and show actionable retry"
+          - "network retry -> reuse submission identity and avoid duplicating rendered messages"
+        idempotency_retry: "Reuse the same client submission key until the server confirms an attempt."
+        fallback: "resume from server state on refresh; do not maintain stage state independently"
+        must_preserve: true

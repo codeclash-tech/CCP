@@ -1,0 +1,52 @@
+contracts:
+  - name: curriculum proposal
+    unit: admin-curriculum-authoring
+    type: rest
+    stability: must_preserve
+    source_loc: backend/src/routes/learningRoutes.js:82
+    contract:
+      method: POST
+      path: /api/learning/admin/modules/:moduleId/topic-proposals
+      request: "title, description, subject, referenceContent"
+      response: "proposal; no topic publication"
+      error: "400 validation; 502 malformed/provider failure; auth/role errors"
+      auth: "Bearer access token; SUPER_ADMIN"
+    target_contract:
+      method: "generateLearningTopicProposal(adminId, moduleId, input)"
+      notes: "Proposal must remain non-published and validation must be server-side."
+    semantic_divergence: []
+  - name: persistent tutor message
+    unit: learner-tutor-conversation
+    type: rest
+    stability: frozen
+    source_loc: backend/src/routes/learningRoutes.js:44
+    contract:
+      method: POST
+      path: /api/learning/sessions/:sessionId/messages
+      request: "message, language, inputTranscribedFromSpeech, studentName"
+      response: "reply, replyLanguage, sessionId, objectiveProgress, progress"
+      error: "400 invalid message; 403 session mismatch; 409 completed/conflicting state"
+      auth: "Bearer access token; candidate or organization user"
+    target_contract:
+      method: "askLearningTutor(userId, sessionId, message, language, ...)"
+      notes: "Target response adds server-resolved stage/hint/active-objective state; client stage fields are ignored."
+    semantic_divergence:
+      - field: language
+        issue: "Existing normalizer forces English despite accepting a language argument."
+        source_loc: backend/src/services/learningService.js:20
+  - name: exercise submission
+    unit: task-submission
+    type: rest
+    stability: must_preserve
+    source_loc: backend/src/routes/learningRoutes.js:54
+    contract:
+      method: POST
+      path: /api/learning/modules/:moduleId/topics/:topicId/exercises/:exerciseId
+      request: "submission/response/code, subtopicId, sessionId, idempotencyKey"
+      response: "attempt status, feedback, evidence, objective progress"
+      error: "409 key mismatch/current objective mismatch; 503 execution/provider unavailable"
+      auth: "Bearer access token; candidate or organization user"
+    target_contract:
+      method: "submitLearningExercise(..., options containing sessionId/idempotencyKey)"
+      notes: "Same submission identity and scope must return one compatible evidence/attempt result."
+    semantic_divergence: []

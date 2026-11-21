@@ -1,0 +1,133 @@
+units:
+  - name: admin-curriculum-authoring
+    trigger: api
+    trigger_detail: "POST /api/learning/admin/modules/:moduleId/topic-proposals"
+    source_anchors:
+      - path: backend/src/controllers/learningController.js
+        line: 66
+    exported_signature:
+      - method: "{ proposal } generateLearningTopicProposal(adminId, moduleId, input)"
+        source_loc: backend/src/services/learningService.js:1499
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: module-publishing
+        via: "approved preview is published only through topic/module save"
+      - unit: learner-tutor-conversation
+        via: "provider abstraction generates structured proposal"
+    shared_refs:
+      - module: tutor-provider
+        used_fields: [generateReply, advancedSettings]
+      - module: learning-auth
+        used_fields: [authenticate, requireAssessmentRole]
+
+  - name: learner-tutor-conversation
+    trigger: api
+    trigger_detail: "POST /api/learning/sessions/:sessionId/messages"
+    source_anchors:
+      - path: backend/src/services/learningService.js
+        line: 2600
+    exported_signature:
+      - method: "LearningSession askLearningTutor(userId, sessionId, message, language, ...)"
+        source_loc: backend/src/services/learningService.js:2600
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: learning-progress-and-resume
+        via: "progress and active objective determine response"
+      - unit: task-submission
+        via: "task evidence appears in the same conversation"
+    shared_refs:
+      - module: tutor-provider
+        used_fields: [generateReply]
+      - module: learning-progress-store
+        used_fields: [objectiveEvidence, objectiveProfiles, completedObjectiveKeys]
+      - module: learning-auth
+        used_fields: [authenticate, requireAssessmentRole]
+
+  - name: task-submission
+    trigger: api
+    trigger_detail: "POST /api/learning/modules/:moduleId/topics/:topicId/exercises/:exerciseId"
+    source_anchors:
+      - path: backend/src/services/learningObjectiveEngine.js
+        line: 100
+    exported_signature:
+      - method: "Object submitLearningExercise(userId, moduleId, topicId, exerciseId, submission, subtopicId, options)"
+        source_loc: backend/src/services/learningService.js:3002
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: learner-tutor-conversation
+        via: "attempt result/feedback is part of conversation state"
+      - unit: learning-progress-and-resume
+        via: "active objective and evidence update progress"
+    shared_refs:
+      - module: secure-java-execution
+        used_fields: [execute]
+      - module: learning-progress-store
+        used_fields: [taskAttempts, objectiveEvidence]
+      - module: tutor-provider
+        used_fields: [generateReply]
+
+  - name: learning-progress-and-resume
+    trigger: api
+    trigger_detail: "POST /api/learning/sessions and GET student module/topic"
+    source_anchors:
+      - path: backend/src/models/LearningProgress.js
+        line: 75
+    exported_signature:
+      - method: "LearningSession requestLearningSession(userId, moduleId, topicId, language)"
+        source_loc: backend/src/services/learningService.js:2547
+        stability: must_preserve
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: module-publishing
+        via: "session and progress use module/topic version"
+    shared_refs:
+      - module: learning-progress-store
+        used_fields: [moduleVersion, objectiveEvidence, objectiveProfiles, taskAttempts, completedObjectiveKeys]
+      - module: entitlement-store
+        used_fields: [LearningPurchase]
+      - module: learning-auth
+        used_fields: [authenticate]
+
+  - name: module-publishing
+    trigger: api
+    trigger_detail: "PATCH /api/learning/admin/modules/:moduleId/status"
+    source_anchors:
+      - path: backend/src/models/LearningModuleVersion.js
+        line: 3
+      - path: backend/src/models/LearningTopicVersion.js
+        line: 3
+    exported_signature:
+      - method: "Topic createLearningTopic(moduleId, input)"
+        source_loc: backend/src/services/learningService.js:1576
+        stability: frozen
+    dynamic_entrypoints: []
+    depends_on: []
+    shared_refs:
+      - module: learning-progress-store
+        used_fields: [moduleVersion]
+      - module: learning-auth
+        used_fields: [requireAssessmentRole]
+
+  - name: learning-center-ui
+    trigger: page
+    trigger_detail: "Learning Center React route"
+    source_anchors:
+      - path: frontend/src/pages/LearningCenter.jsx
+        line: 209
+    exported_signature: []
+    dynamic_entrypoints: []
+    depends_on:
+      - unit: admin-curriculum-authoring
+        via: "admin authoring/proposal/preview calls"
+      - unit: learner-tutor-conversation
+        via: "session and message calls"
+      - unit: task-submission
+        via: "exercise submission calls"
+    shared_refs:
+      - module: api-client
+        used_fields: [api]
+      - module: learning-progress-store
+        used_fields: [objectiveProgress, taskResults]

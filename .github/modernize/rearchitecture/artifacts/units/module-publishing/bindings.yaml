@@ -1,0 +1,9 @@
+unit: module-publishing
+bindings:
+  - type: route-declaration
+    name: "PATCH /api/learning/admin/modules/:moduleId/status"
+    source_loc: backend/src/routes/learningRoutes.js:71
+    target: learningController.changeModuleStatus
+    must_appear_in_target: true
+    notes: "SUPER_ADMIN role remains mandatory."
+runtime_config: []

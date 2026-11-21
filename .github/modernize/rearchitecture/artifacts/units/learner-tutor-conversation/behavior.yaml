@@ -1,0 +1,27 @@
+unit: learner-tutor-conversation
+side_effects:
+  - source_loc: backend/src/services/learningService.js:2600
+    effect: "Appends user/assistant messages and may append objective evidence/mastery updates."
+    must_preserve: true
+branches:
+  - source_loc: backend/src/services/learningService.js:2620
+    condition: "No active objective or all objectives mastered."
+    behavior: "Return 409 rather than advance objective or teach."
+    must_preserve: true
+  - source_loc: backend/src/services/learningObjectiveEngine.js:100
+    condition: "AI evidence quote is absent from learner response or below confidence."
+    behavior: "Reject that criterion evidence without changing mastery."
+    must_preserve: true
+error_paths:
+  - source_loc: backend/src/models/LearningSession.js:19
+    trigger: "Session not owned by user or version mismatch."
+    outcome: "403/404 session lookup failure."
+    contract: "No message or evidence mutation."
+    must_preserve: true
+concurrency:
+  model: sync
+  tx_boundary:
+    source_loc: backend/src/services/learningService.js:2680
+    scope: "Message provider call, evidence evaluation, progress save, and session save need replay-safe ordering."
+    isolation: "optimistic concurrency"
+    must_preserve: true

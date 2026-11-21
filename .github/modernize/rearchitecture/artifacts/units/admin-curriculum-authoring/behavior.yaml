@@ -1,0 +1,30 @@
+unit: admin-curriculum-authoring
+side_effects:
+  - source_loc: backend/src/services/learningService.js:1499
+    effect: "Calls AI provider and records proposal usage; creates no topic or enrollment-visible state."
+    must_preserve: true
+  - source_loc: backend/src/services/learningService.js:1576
+    effect: "Creates a topic only after the explicit create/update save action."
+    must_preserve: true
+branches:
+  - source_loc: backend/src/services/learningService.js:1505
+    condition: "Title, description/reference content, or size limits are invalid."
+    behavior: "Return an actionable 400 validation error."
+    must_preserve: true
+  - source_loc: backend/src/services/learningService.js:1540
+    condition: "AI output is malformed/incomplete."
+    behavior: "Return proposal validation failure and record unsuccessful usage."
+    must_preserve: true
+error_paths:
+  - source_loc: backend/src/services/learningService.js:1525
+    trigger: "Provider unavailable or throws."
+    outcome: "Actionable unavailable error; no topic mutation."
+    contract: "Usage failure recorded; 502/503-adjacent service error."
+    must_preserve: true
+concurrency:
+  model: sync
+  tx_boundary:
+    source_loc: backend/src/services/learningService.js:1576
+    scope: "Proposal generation does not write module/topic state."
+    isolation: "No transaction"
+    must_preserve: true

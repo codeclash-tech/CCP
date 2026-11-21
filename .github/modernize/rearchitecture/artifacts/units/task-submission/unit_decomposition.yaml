@@ -1,0 +1,6 @@
+unit: task-submission
+commit: false
+candidate_splits:
+  - id: backend/src/services/learningService.js:3002-3458
+    drivers: [execution_model_split, concern_split]
+    rationale: "Java, math, and theory evaluations have distinct execution and evidence semantics and may benefit from separate typed evaluators behind a shared attempt envelope."

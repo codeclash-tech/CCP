@@ -1,0 +1,15 @@
+unit: learning-center-ui
+bindings:
+  - type: route-declaration
+    name: "Learning Center page"
+    source_loc: frontend/src/pages/LearningCenter.jsx:209
+    target: LearningCenter component
+    must_appear_in_target: true
+    notes: "Desktop/mobile layout and existing route guards remain."
+  - type: route-declaration
+    name: "API client"
+    source_loc: frontend/src/services/api.js:1
+    target: LearningCenter API calls
+    must_appear_in_target: true
+    notes: "Bearer and error handling behavior remain."
+runtime_config: []

@@ -1,0 +1,6 @@
+unit: learning-progress-and-resume
+commit: false
+candidate_splits:
+  - id: backend/src/models/LearningProgress.js:75-90
+    drivers: [data_ownership_split, concern_split]
+    rationale: "Conversation stage state and mastery evidence are separate state concerns but may remain in one progress aggregate if atomic resume semantics require it."

@@ -1,0 +1,15 @@
+unit: task-submission
+bindings:
+  - type: route-declaration
+    name: "POST /api/learning/modules/:moduleId/topics/:topicId/exercises/:exerciseId"
+    source_loc: backend/src/routes/learningRoutes.js:54
+    target: learningController.submitExercise
+    must_appear_in_target: true
+    notes: "Student auth, tutor limiter, and execution limiter remain mandatory."
+runtime_config:
+  - key: SECURE execution URL/timeouts
+    source_loc: backend/src/services/executionService.js:3
+    source: env
+    default_value: "localhost:8080 or production Render URL"
+    must_appear_in_target: true
+    notes: "Preserve existing secure engine boundary and Java-only constraint."

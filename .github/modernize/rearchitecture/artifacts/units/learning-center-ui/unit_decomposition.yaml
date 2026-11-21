@@ -1,0 +1,6 @@
+unit: learning-center-ui
+commit: false
+candidate_splits:
+  - id: frontend/src/pages/LearningCenter.jsx:209
+    drivers: [concern_split, reuse_split]
+    rationale: "Curriculum authoring and persistent tutor UI are distinct workflows and may be split into focused components while sharing API/state utilities."

@@ -1,0 +1,43 @@
+flows:
+  - name: persisted tutor session
+    medium: database
+    key: LearningSession(userId,moduleId,topicId,moduleVersion)
+    writer:
+      unit: learner-tutor-conversation
+      source_loc: backend/src/models/LearningSession.js:19
+    reader:
+      unit: task-submission
+      source_loc: backend/src/services/learningService.js:3120
+    pairing: matched
+    must_preserve: true
+    must_confirm: null
+    verification_hint: "Start a session, send a message, submit a task, refresh, and confirm the same session/version/objective is reused."
+    notes: "One topic-specific session must carry messages and server stage state."
+  - name: objective evidence to mastery
+    medium: database
+    key: LearningProgress.objectiveEvidence/completedObjectiveKeys
+    writer:
+      unit: learner-tutor-conversation
+      source_loc: backend/src/services/learningService.js:2680
+    reader:
+      unit: learning-progress-and-resume
+      source_loc: backend/src/services/learningObjectiveEngine.js:40
+    pairing: matched
+    must_preserve: true
+    must_confirm: null
+    verification_hint: "Retry a valid tutor response and confirm evidence count/mastery is unchanged."
+    notes: "Evidence is the source for criterion counts and server-authoritative mastery."
+  - name: published version to learner snapshot
+    medium: database
+    key: moduleVersion/topicSnapshot
+    writer:
+      unit: module-publishing
+      source_loc: backend/src/models/LearningTopicVersion.js:3
+    reader:
+      unit: learning-progress-and-resume
+      source_loc: backend/src/services/learningService.js:2547
+    pairing: matched
+    must_preserve: true
+    must_confirm: null
+    verification_hint: "Publish module v1, create learner progress, publish v2, and confirm the learner remains on v1."
+    notes: "Session and progress moduleVersion must remain aligned."

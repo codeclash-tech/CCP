@@ -1,0 +1,15 @@
+unit: learner-tutor-conversation
+bindings:
+  - type: route-declaration
+    name: "POST /api/learning/sessions/:sessionId/messages"
+    source_loc: backend/src/routes/learningRoutes.js:44
+    target: learningController.sendTutorMessage
+    must_appear_in_target: true
+    notes: "Authenticate, student role, and tutor limiter are mandatory."
+runtime_config:
+  - key: AI_TIMEOUT_MS
+    source_loc: backend/src/config/env.js
+    source: env
+    default_value: "not fixed"
+    must_appear_in_target: true
+    notes: "Provider timeout and failure behavior remain server-side."

@@ -1,0 +1,15 @@
+unit: admin-curriculum-authoring
+bindings:
+  - type: route-declaration
+    name: "POST /api/learning/admin/modules/:moduleId/topic-proposals"
+    source_loc: backend/src/routes/learningRoutes.js:82
+    target: learningController.createTopicProposal
+    must_appear_in_target: true
+    notes: "Authenticate, SUPER_ADMIN, and tutor limiter remain mandatory."
+runtime_config:
+  - key: AI_PROVIDER
+    source_loc: backend/src/config/env.js
+    source: env
+    default_value: "ollama"
+    must_appear_in_target: true
+    notes: "Provider selection remains server-side."

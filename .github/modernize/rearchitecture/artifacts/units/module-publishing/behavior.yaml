@@ -1,0 +1,30 @@
+unit: module-publishing
+side_effects:
+  - source_loc: backend/src/services/learningService.js:1576
+    effect: "Adds topic and creates a module edit revision/snapshot."
+    must_preserve: true
+  - source_loc: backend/src/models/LearningTopicVersion.js:3
+    effect: "Stores topic snapshots by module version."
+    must_preserve: true
+branches:
+  - source_loc: backend/src/services/learningService.js:1580
+    condition: "Topic input or module is invalid."
+    behavior: "Reject before revision/snapshot mutation."
+    must_preserve: true
+  - source_loc: backend/src/models/LearningModule.js:180
+    condition: "Module status change publishes a version."
+    behavior: "Increment published version and snapshot learner-visible content."
+    must_preserve: true
+error_paths:
+  - source_loc: backend/src/services/learningService.js:1597
+    trigger: "Topic update without explicit valid approval/published curriculum."
+    outcome: "No learner-visible curriculum change before approved save."
+    contract: "Server validation/actionable error."
+    must_preserve: true
+concurrency:
+  model: sync
+  tx_boundary:
+    source_loc: backend/src/models/LearningModuleVersion.js:3
+    scope: "Published module/topic snapshot creation."
+    isolation: "unique module/version/topic indexes"
+    must_preserve: true

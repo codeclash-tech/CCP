@@ -1,0 +1,81 @@
+modules:
+  - name: learning-auth
+    kind: utility
+    source_loc: backend/src/middleware/auth.js:5
+    used_by_units: [admin-curriculum-authoring, learner-tutor-conversation, learning-progress-and-resume, module-publishing]
+    fields:
+      - name: authenticate
+        type: function(req,res,next)
+      - name: requireAssessmentRole
+        type: function(...roles)
+    god_class: false
+    split_candidate: false
+    migration_strategy: copy
+    notes: "Preserve mandatory bearer auth and role checks."
+  - name: tutor-provider
+    kind: utility
+    source_loc: backend/src/services/learningAiProvider.js:1
+    used_by_units: [admin-curriculum-authoring, learner-tutor-conversation, task-submission]
+    fields:
+      - name: generateReply
+        type: function(options)
+      - name: advancedSettings
+        type: object
+    god_class: false
+    split_candidate: false
+    migration_strategy: wrap
+    notes: "Keep provider selection and secrets server-side; proposal, tutor, and task evaluation use the same abstraction."
+  - name: learning-progress-store
+    kind: store
+    source_loc: backend/src/models/LearningProgress.js:75
+    used_by_units: [learner-tutor-conversation, task-submission, learning-progress-and-resume, module-publishing]
+    fields:
+      - name: moduleVersion
+        type: Number
+      - name: objectiveEvidence
+        type: ObjectiveEvidence[]
+      - name: objectiveProfiles
+        type: ObjectiveProfile[]
+      - name: taskAttempts
+        type: TaskAttempt[]
+      - name: completedObjectiveKeys
+        type: String[]
+      - name: completedExerciseIds
+        type: ObjectId[]
+    god_class: false
+    split_candidate: false
+    migration_strategy: extract
+    notes: "Progress persistence must gain stage/hint-state indexes and replay-safe constraints."
+  - name: entitlement-store
+    kind: store
+    source_loc: backend/src/services/learningService.js:2547
+    used_by_units: [learning-progress-and-resume]
+    fields:
+      - name: LearningPurchase
+        type: mongoose.Model
+    god_class: false
+    split_candidate: false
+    migration_strategy: copy
+    notes: "Keep purchase and expiry checks in the session start/continue path."
+  - name: secure-java-execution
+    kind: utility
+    source_loc: backend/src/services/executionService.js:1
+    used_by_units: [task-submission]
+    fields:
+      - name: execute
+        type: "execute(code,testCases,language,limits)"
+    god_class: false
+    split_candidate: false
+    migration_strategy: wrap
+    notes: "Only Java remains supported; preserve timeout, memory, and engine isolation."
+  - name: api-client
+    kind: utility
+    source_loc: frontend/src/services/api.js:1
+    used_by_units: [learning-center-ui]
+    fields:
+      - name: api
+        type: axios-instance
+    god_class: false
+    split_candidate: false
+    migration_strategy: copy
+    notes: "Preserve bearer/API error handling used by the existing Learning Center."

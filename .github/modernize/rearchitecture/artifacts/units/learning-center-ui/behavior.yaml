@@ -1,0 +1,27 @@
+unit: learning-center-ui
+side_effects:
+  - source_loc: frontend/src/pages/LearningCenter.jsx:209
+    effect: "Maintains topic draft and preview/conversation UI state."
+    must_preserve: true
+branches:
+  - source_loc: frontend/src/pages/LearningCenter.jsx:2392
+    condition: "Default authoring lacks title, description, or pasted content."
+    behavior: "Do not expose low-level curriculum fields or submit an invalid draft."
+    must_preserve: true
+  - source_loc: frontend/src/pages/LearningCenter.jsx:2114
+    condition: "Preview open and objective/task selected."
+    behavior: "Show reviewable preview/evaluation without publishing."
+    must_preserve: true
+error_paths:
+  - source_loc: frontend/src/pages/LearningCenter.jsx:475
+    trigger: "Validation or API error."
+    outcome: "Actionable in-page error; no optimistic publication/mastery."
+    contract: "No client-only stage advancement."
+    must_preserve: true
+concurrency:
+  model: event-loop
+  tx_boundary:
+    source_loc: frontend/src/pages/LearningCenter.jsx:209
+    scope: "Browser state mirrors server snapshot; no local transaction."
+    isolation: "client state"
+    must_preserve: true
