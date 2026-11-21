@@ -41,10 +41,16 @@ test("Ollama tutor uses configured model and only the supplied lesson context", 
   assert.match(requestBody.messages[0].content, /Explain that a variable stores a value/);
   assert.match(requestBody.messages[0].content, /Do not fetch, cite, or invent external/);
   assert.match(requestBody.messages[0].content, /Teach one incomplete objective at a time/);
-  assert.match(requestBody.messages[0].content, /masteredObjectiveIndexes/);
+  assert.match(requestBody.messages[0].content, /objectiveEvidence/);
+  assert.match(requestBody.messages[0].content, /application validates evidence and alone decides mastery/);
   assert.match(requestBody.messages[0].content, /highest priority/);
   assert.equal(response.content, "Let's review the idea together.");
-  assert.deepEqual(response.masteredObjectiveIndexes, []);
+  assert.deepEqual(response.objectiveEvidence, []);
+  assert.deepEqual(response.usage, {
+    promptTokens: null,
+    completionTokens: null,
+    totalTokens: null,
+  });
 });
 
 test("Ollama tutor reports provider failures instead of returning a fallback answer", async () => {
@@ -66,6 +72,78 @@ test("Ollama tutor reports provider failures instead of returning a fallback ans
     }),
     (error) => error instanceof AiProviderError && error.statusCode === 503,
   );
+});
+
+test("legacy AI mastery index claims are ignored by the provider parser", async () => {
+  const provider = createTutorProvider(
+    {
+      AI_PROVIDER: "ollama",
+      AI_MODEL: "configured-model",
+      AI_BASE_URL: "http://localhost:11434",
+    },
+    {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          message: {
+            content: JSON.stringify({
+              reply: "Let's check that idea.",
+              masteredObjectiveIndexes: [0],
+            }),
+          },
+        }),
+      }),
+    },
+  );
+  const result = await provider.generateReply({
+    topic: { title: "Variables" },
+    approvedContent: "Approved lesson",
+    history: [],
+    language: "en",
+  });
+  assert.deepEqual(result.objectiveEvidence, []);
+  assert.equal(Object.hasOwn(result, "masteredObjectiveIndexes"), false);
+});
+
+test("tutor parser extracts cited criterion evidence and clamps its confidence", async () => {
+  const provider = createTutorProvider(
+    {
+      AI_PROVIDER: "ollama",
+      AI_MODEL: "configured-model",
+      AI_BASE_URL: "http://localhost:11434",
+    },
+    {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          message: {
+            content: JSON.stringify({
+              reply: "That explanation shows how it works.",
+              objectiveEvidence: [{
+                objectiveKey: "objective-1",
+                criteria: [{
+                  criterionKey: "criterion-1",
+                  demonstrated: true,
+                  evidenceQuote: "It routes packets",
+                  confidence: 1.4,
+                  rationale: "Explains the routing role.",
+                }],
+              }],
+            }),
+          },
+        }),
+      }),
+    },
+  );
+  const result = await provider.generateReply({
+    topic: { title: "Routing" },
+    approvedContent: "Approved lesson",
+    history: [],
+  });
+
+  assert.equal(result.objectiveEvidence[0].criteria[0].evidenceQuote, "It routes packets");
+  assert.equal(result.objectiveEvidence[0].criteria[0].confidence, 1);
+  assert.equal(result.objectiveEvidence[0].criteria[0].rationale, "Explains the routing role.");
 });
 
 test("Groq tutor sends configured model, bearer key, approved prompt, and conversation history", async () => {
@@ -128,14 +206,71 @@ test("Groq tutor sends configured model, bearer key, approved prompt, and conver
     { temperature: 0.4, top_p: 0.9, max_completion_tokens: 300, top_k: undefined },
   );
   assert.match(body.messages[0].content, /Explain that a variable stores a value/);
-  assert.match(body.messages[0].content, /Use only the topic's objective content/);
+  assert.match(body.messages[0].content, /Use only the active objective and its approved knowledge/);
   assert.match(body.messages[0].content, /When the answer is incorrect or incomplete/);
   assert.match(body.messages[0].content, /Never claim assessment completion/);
   assert.deepEqual(response, {
     content: "Let's try a small example.",
-    masteredObjectiveIndexes: [],
+    objectiveEvidence: [],
     provider: "groq",
     model: "openai/gpt-oss-20b",
+    usage: {
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+    },
+  });
+});
+
+test("AI providers expose token usage only when the provider reports it", async () => {
+  const ollama = createTutorProvider(
+    {
+      AI_PROVIDER: "ollama",
+      AI_MODEL: "configured-model",
+      AI_BASE_URL: "http://localhost:11434",
+    },
+    {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          message: { content: "Reply" },
+          prompt_eval_count: 7,
+          eval_count: 5,
+        }),
+      }),
+    },
+  );
+  const groq = createTutorProvider(
+    {
+      AI_PROVIDER: "groq",
+      AI_MODEL: "configured-model",
+      AI_BASE_URL: "https://api.groq.com/openai/v1",
+      AI_API_KEY: "test-key",
+    },
+    {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "Reply" } }],
+          usage: { prompt_tokens: 11, completion_tokens: 13, total_tokens: 24 },
+        }),
+      }),
+    },
+  );
+  const [ollamaReply, groqReply] = await Promise.all([
+    ollama.generateReply({ topic: { title: "Test" }, approvedContent: "", history: [] }),
+    groq.generateReply({ topic: { title: "Test" }, approvedContent: "", history: [] }),
+  ]);
+
+  assert.deepEqual(ollamaReply.usage, {
+    promptTokens: 7,
+    completionTokens: 5,
+    totalTokens: 12,
+  });
+  assert.deepEqual(groqReply.usage, {
+    promptTokens: 11,
+    completionTokens: 13,
+    totalTokens: 24,
   });
 });
 

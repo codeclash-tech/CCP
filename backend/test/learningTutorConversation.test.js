@@ -29,6 +29,18 @@ test("Groq tutor receives the student's current question and preserves the sessi
       title: "Variables",
       description: "Store values in named variables.",
       objectives: ["Explain that a variable stores a value."],
+      objectiveDefinitions: [{
+        key: "variable-storage",
+        title: "Explain variables",
+        description: "Explain that a variable stores a value.",
+        expectedOutcome: "Explain what a variable stores.",
+        masteryCriteria: [{
+          key: "purpose",
+          description: "Explain what a variable stores.",
+          evaluationMethod: "EXPLANATION",
+          requiredEvidenceCount: 1,
+        }],
+      }],
     }],
   });
   const objectiveProgress = new LearningProgress({
@@ -72,6 +84,8 @@ test("Groq tutor receives the student's current question and preserves the sessi
           completedObjectiveKeys: [],
           completedExerciseIds: [],
           assessmentPassed: false,
+          objectiveEvidence: [],
+          objectiveProfiles: [],
         }),
       }),
     })],
@@ -98,7 +112,16 @@ test("Groq tutor receives the student's current question and preserves the sessi
           message: {
             content: JSON.stringify({
               reply: "A variable stores a value. What can you use a variable to store?",
-              masteredObjectiveIndexes: [0, 999],
+              objectiveEvidence: [{
+                objectiveKey: "variable-storage",
+                criteria: [{
+                  criterionKey: "purpose",
+                  demonstrated: true,
+                  evidenceQuote: "A variable stores a value",
+                  confidence: 0.96,
+                  demonstratedConcepts: ["A variable stores a value."],
+                }],
+              }],
             }),
           },
         }],
@@ -140,7 +163,7 @@ test("Groq tutor receives the student's current question and preserves the sessi
     assert.equal(result.reply, "A variable stores a value. What can you use a variable to store?");
     assert.equal(result.replyLanguage, "en");
     assert.equal(session.language, "en");
-    assert.deepEqual(objectiveProgress.completedObjectiveKeys, [`${topicId}:0`]);
+    assert.deepEqual(objectiveProgress.completedObjectiveKeys, [`${topicId}:variable-storage`]);
     assert.deepEqual(objectiveProgress.completedTopicIds.map(String), [String(topicId)]);
     assert.equal(result.progress.progressPercentage, 100);
     assert.deepEqual(

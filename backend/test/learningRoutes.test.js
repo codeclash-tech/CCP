@@ -48,6 +48,7 @@ test("Super Admin learning authoring routes require authenticated admin role", (
   assert.equal(route.route.stack[0].name, "authenticate");
   assert.equal(authorize(route.route.stack[1].handle, { role: "ADMIN" }).continued, true);
   assert.equal(authorize(route.route.stack[1].handle, { role: "USER" }).statusCode, 403);
+  assert.equal(authorize(route.route.stack[1].handle, { role: "USER" }).statusCode, 403);
 });
 
 test("tutor messaging has a dedicated rate limiter after authorization", () => {
@@ -66,6 +67,9 @@ test("module publication and topic authoring are Super Admin-only", () => {
   for (const [path, method] of [
     ["/admin/modules/:moduleId/status", "patch"],
     ["/admin/modules/:moduleId/topics", "post"],
+    ["/admin/modules/:moduleId/topic-proposals", "post"],
+    ["/admin/modules/:moduleId/topics/:topicId/preview", "post"],
+    ["/admin/modules/:moduleId/topic-preview", "post"],
     ["/admin/modules/:moduleId/topics/:topicId", "patch"],
     ["/admin/modules/:moduleId/topics/order", "put"],
   ]) {
@@ -73,6 +77,9 @@ test("module publication and topic authoring are Super Admin-only", () => {
     assert.ok(route);
     assert.equal(route.route.stack[0].name, "authenticate");
     assert.equal(authorize(route.route.stack[1].handle, { role: "ADMIN" }).continued, true);
+    if (path.endsWith("topic-proposals") || path.endsWith("preview")) {
+      assert.equal(route.route.stack[2].handle, learningTutorLimiter);
+    }
   }
 });
 

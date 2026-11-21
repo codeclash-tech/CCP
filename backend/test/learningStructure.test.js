@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import LearningModule from "../src/models/LearningModule.js";
 import LearningModuleVersion from "../src/models/LearningModuleVersion.js";
+import LearningCertificate from "../src/models/LearningCertificate.js";
+import LearningProgress from "../src/models/LearningProgress.js";
+import LearningPurchase from "../src/models/LearningPurchase.js";
 import LearningProgram from "../src/models/LearningProgram.js";
 import LearningTopicVersion from "../src/models/LearningTopicVersion.js";
 import {
@@ -208,6 +211,73 @@ test("student course catalog omits published courses without a published module"
     assert.equal(filter.deletedAt, null);
   } finally {
     LearningModule.distinct = originalDistinct;
+  }
+});
+
+test("student module summaries include earned certificate download details", async () => {
+  const originalDistinct = LearningModule.distinct;
+  const originalProgramFind = LearningProgram.find;
+  const originalProgramCount = LearningProgram.countDocuments;
+  const originalModuleFind = LearningModule.find;
+  const originalPurchaseFind = LearningPurchase.find;
+  const originalProgressFind = LearningProgress.find;
+  const originalCertificateFind = LearningCertificate.find;
+  const programId = "507f1f77bcf86cd799439011";
+  const moduleId = "507f1f77bcf86cd799439012";
+  const certificateId = "507f1f77bcf86cd799439013";
+  const chain = (result) => ({
+    sort() { return this; },
+    skip() { return this; },
+    limit() { return this; },
+    select() { return this; },
+    async lean() { return result; },
+  });
+  LearningModule.distinct = async () => [programId];
+  LearningProgram.find = () => chain([{
+    _id: programId,
+    title: "Foundations",
+    status: "PUBLISHED",
+  }]);
+  LearningProgram.countDocuments = async () => 1;
+  LearningModule.find = () => chain([{
+    _id: moduleId,
+    programId,
+    title: "Basics",
+    status: "PUBLISHED",
+    price: 0,
+    sequence: 1,
+    prerequisites: [],
+  }]);
+  LearningPurchase.find = () => chain([]);
+  LearningProgress.find = () => chain([{
+    moduleId,
+    completedTopicIds: [],
+    completedObjectiveKeys: [],
+    completedAt: new Date(),
+    assessmentPassed: true,
+    progressPercentage: 100,
+  }]);
+  LearningCertificate.find = () => chain([{
+    _id: certificateId,
+    code: "THRIVE-001",
+    moduleId,
+  }]);
+
+  try {
+    const result = await listLearningPrograms("student-1", 1, 20);
+    assert.deepEqual(result.programs[0].modules[0].certificate, {
+      _id: certificateId,
+      code: "THRIVE-001",
+      moduleId,
+    });
+  } finally {
+    LearningModule.distinct = originalDistinct;
+    LearningProgram.find = originalProgramFind;
+    LearningProgram.countDocuments = originalProgramCount;
+    LearningModule.find = originalModuleFind;
+    LearningPurchase.find = originalPurchaseFind;
+    LearningProgress.find = originalProgressFind;
+    LearningCertificate.find = originalCertificateFind;
   }
 });
 

@@ -11,6 +11,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "super-admin:reset-password": "node src/scripts/resetSuperAdminPassword.js --confirm-password-reset",
+    "learning:calibrate": "node scripts/learning-theory-calibration.js",
+    "learning:runner-smoke": "node scripts/learning-runner-smoke.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

@@ -1,0 +1,53 @@
+{
+  "datasetVersion": 1,
+  "topic": {
+    "title": "Python fundamentals",
+    "description": "Evaluate foundational programming concepts."
+  },
+  "objectives": [
+    {
+      "key": "variable-purpose",
+      "title": "Explain the purpose of a variable",
+      "expectedOutcome": "Explain that variables associate names with values.",
+      "criterion": {
+        "key": "named-value",
+        "description": "Explain that a variable associates a name with a value that can be used or changed.",
+        "evaluationMethod": "EXPLANATION"
+      },
+      "cases": [
+        { "id": "fully-correct", "response": "A variable stores a value under a name so the program can use it.", "expectedDemonstrated": true },
+        { "id": "alternative-wording", "response": "It is a named place that holds data, such as a score.", "expectedDemonstrated": true },
+        { "id": "partial", "response": "It stores something.", "expectedDemonstrated": false },
+        { "id": "incorrect", "response": "A variable is the command that prints text.", "expectedDemonstrated": false },
+        { "id": "confident-incorrect", "response": "I am certain a variable permanently stores the program's source code.", "expectedDemonstrated": false },
+        { "id": "misconception", "response": "A variable is only a label and never contains or refers to a value.", "expectedDemonstrated": false },
+        { "id": "ambiguous", "response": "Maybe it is something the computer uses.", "expectedDemonstrated": false },
+        { "id": "irrelevant", "response": "I enjoy writing Python programs.", "expectedDemonstrated": false },
+        { "id": "correct-conclusion-invalid-reasoning", "response": "A variable stores a value because the name is automatically printed on screen.", "expectedDemonstrated": false },
+        { "id": "minor-language-error", "response": "Variable store value under name, program use it later.", "expectedDemonstrated": true }
+      ]
+    },
+    {
+      "key": "print-purpose",
+      "title": "Explain the purpose of print",
+      "expectedOutcome": "Explain that print displays output to a program's user.",
+      "criterion": {
+        "key": "display-output",
+        "description": "Explain that print displays information as program output.",
+        "evaluationMethod": "EXPLANATION"
+      },
+      "cases": [
+        { "id": "fully-correct", "response": "The print function displays information as output for the user to see.", "expectedDemonstrated": true },
+        { "id": "alternative-wording", "response": "It shows a result on the screen when the program runs.", "expectedDemonstrated": true },
+        { "id": "partial", "response": "It shows something.", "expectedDemonstrated": false },
+        { "id": "incorrect", "response": "Print reads input from the keyboard.", "expectedDemonstrated": false },
+        { "id": "confident-incorrect", "response": "Definitely, print saves the program to a file and does not display anything.", "expectedDemonstrated": false },
+        { "id": "misconception", "response": "Print stores a value in memory but never displays it.", "expectedDemonstrated": false },
+        { "id": "ambiguous", "response": "It does the output thing, I think.", "expectedDemonstrated": false },
+        { "id": "irrelevant", "response": "Python is popular for data analysis.", "expectedDemonstrated": false },
+        { "id": "correct-conclusion-invalid-reasoning", "response": "Print displays output because it creates a variable for every word.", "expectedDemonstrated": false },
+        { "id": "minor-language-error", "response": "Print show message as output when program run.", "expectedDemonstrated": true }
+      ]
+    }
+  ]
+}

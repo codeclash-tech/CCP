@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
+import { randomUUID } from "node:crypto";
 
 const messageSchema = new mongoose.Schema(
   {
+    messageId: { type: String, default: randomUUID, maxlength: 100 },
     role: { type: String, enum: ["user", "assistant"], required: true },
     content: { type: String, required: true, maxlength: 5000 },
     createdAt: { type: Date, default: Date.now },

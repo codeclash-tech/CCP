@@ -14,6 +14,8 @@ import {
   getStudentModule,
   getStudentTopic,
   deleteLearningTopic,
+  generateLearningTopicProposal,
+  previewLearningTutor,
   listAdminLearningPrograms,
   listAdminLearningPurchases,
   listLearningPrograms,
@@ -105,6 +107,25 @@ export async function createTopic(req, res) {
   requireObjectBody(req.body);
   return res.status(201).json({
     topic: await createLearningTopic(req.params.moduleId, req.body),
+  });
+}
+
+export async function createTopicProposal(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    proposal: await generateLearningTopicProposal(req.userId, req.params.moduleId, req.body),
+  });
+}
+
+export async function previewTopicTutor(req, res) {
+  requireObjectBody(req.body);
+  return res.json({
+    preview: await previewLearningTutor(
+      req.userId,
+      req.params.moduleId,
+      req.params.topicId,
+      req.body,
+    ),
   });
 }
 
@@ -267,8 +288,12 @@ export async function submitExercise(req, res) {
       req.params.moduleId,
       req.params.topicId,
       req.params.exerciseId,
-      req.body.code,
+      req.body.submission ?? req.body.response ?? req.body.code,
       req.body.subtopicId,
+      {
+        sessionId: req.body.sessionId,
+        idempotencyKey: req.body.idempotencyKey,
+      },
     ),
   );
 }

@@ -6,6 +6,7 @@ import {
   BookmarkCheck,
   Check,
   ChevronRight,
+  Download,
   Pencil,
   Mic,
   Save,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
+import MathContent from "../components/MathContent";
 import {
   createSpeechInputProvider,
   createSpeechOutputProvider,
@@ -49,8 +51,20 @@ const EMPTY_MODULE = {
 };
 const EMPTY_TOPIC = {
   title: "",
+  subject: "",
   description: "",
-  objectivesText: "",
+  estimatedDurationMinutes: "",
+  prerequisiteTopicIds: [],
+  coreKnowledgeText: "",
+  coreKnowledge: [],
+  coreKnowledgeKey: "core-explanation",
+  tutorInstructions: "",
+  validationInstructions: "",
+  objectiveDefinitions: [],
+  examples: [],
+  questions: [],
+  exercises: [],
+  subtopics: [],
 };
 function displayPrice(price, currencyInput = "INR") {
   const currency = /^[A-Z]{3}$/.test(currencyInput) ? currencyInput : "INR";
@@ -58,17 +72,105 @@ function displayPrice(price, currencyInput = "INR") {
     ? "Free"
     : new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(Number(price));
 }
+function formatMathVariables(variables = {}) {
+  return Object.entries(variables || {})
+    .map(([symbol, value]) => `${symbol}=${value}`)
+    .join("\n");
+}
+function parseMathVariables(text) {
+  const variables = {};
+  String(text || "").split(/\r?\n/).forEach((line, index) => {
+    const value = line.trim();
+    if (!value) return;
+    const match = value.match(/^([A-Za-z][A-Za-z0-9_]{0,15})\s*=\s*(.+)$/);
+    if (!match) {
+      variables[`invalid_${index + 1}`] = value;
+      return;
+    }
+    const numericValue = Number(match[2].trim());
+    variables[match[1]] = Number.isFinite(numericValue) ? numericValue : match[2].trim();
+  });
+  return variables;
+}
 function objectiveProgressKey(topicId, objectiveIndex) {
   return `${String(topicId)}:${objectiveIndex}`;
 }
 
 function createTopicDraft(topic = {}) {
+  const objectiveDefinitions = topic.objectiveDefinitions?.length
+    ? topic.objectiveDefinitions.map((objective) => ({
+        ...objective,
+        key: objective.key || objective._id,
+        masteryCriteria: (objective.masteryCriteria || []).map((criterion) => ({ ...criterion })),
+        requiredKnowledgeText: (objective.requiredKnowledge || []).join("\n"),
+        commonMisconceptionsText: (objective.commonMisconceptions || []).join("\n"),
+        prerequisites: [...(objective.prerequisites || [])],
+      }))
+    : (topic.objectives || []).map((objective, index) => ({
+        key: `legacy-${index + 1}`,
+        title: objective,
+        description: objective,
+        requiredKnowledgeText: "",
+        expectedOutcome: objective,
+        masteryCriteria: [{
+          key: "understanding",
+          description: objective,
+          evaluationMethod: "EXPLANATION",
+          requiredEvidenceCount: 1,
+        }],
+        commonMisconceptionsText: "",
+        prerequisites: [],
+      }));
+  const coreKnowledgeItems = topic.coreKnowledge || [];
+  const coreKnowledge = coreKnowledgeItems.find(
+    (item) => item.type === "EXPLANATION",
+  );
   return {
     title: topic.title || "",
+    subject: topic.subject || "",
     description: topic.description || "",
-    objectivesText: (topic.objectives || []).length
-      ? topic.objectives.join("\n")
+    estimatedDurationMinutes: topic.estimatedDurationMinutes || "",
+    prerequisiteTopicIds: (topic.prerequisiteTopicIds || []).map(String),
+    coreKnowledgeText: typeof coreKnowledge?.content === "string"
+      ? coreKnowledge.content
       : topic.explanation || "",
+    coreKnowledge: coreKnowledgeItems,
+    coreKnowledgeKey: coreKnowledge?.key || "core-explanation",
+    tutorInstructions: topic.tutorInstructions || "",
+    validationInstructions: topic.validationInstructions || "",
+    objectiveDefinitions,
+    examples: topic.examples || [],
+    questions: topic.questions || [],
+    exercises: (topic.exercises || []).map((exercise) => ({
+      ...exercise,
+      variablesText: formatMathVariables(exercise.variables),
+    })),
+    subtopics: (topic.subtopics || []).map((subtopic) => ({
+      ...subtopic,
+      exercises: (subtopic.exercises || []).map((exercise) => ({
+        ...exercise,
+        variablesText: formatMathVariables(exercise.variables),
+      })),
+    })),
+  };
+}
+
+function createObjectiveDraft(index) {
+  return {
+    key: `objective-${crypto.randomUUID()}`,
+    title: "",
+    description: "",
+    requiredKnowledgeText: "",
+    expectedOutcome: "",
+    masteryCriteria: [{
+      key: `criterion-${crypto.randomUUID()}`,
+      description: "",
+      evaluationMethod: "EXPLANATION",
+      requiredEvidenceCount: 1,
+    }],
+    commonMisconceptionsText: "",
+    prerequisites: [],
+    order: index,
   };
 }
 
@@ -115,6 +217,34 @@ function AdminLearning() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [adminPage, setAdminPage] = useState("courses");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewScenario, setPreviewScenario] = useState("NO_PRIOR_KNOWLEDGE");
+  const [previewMode, setPreviewMode] = useState("TUTOR");
+  const [previewObjectiveKey, setPreviewObjectiveKey] = useState("");
+  const [previewTaskId, setPreviewTaskId] = useState("");
+  const [previewInput, setPreviewInput] = useState("");
+  const [previewReasoning, setPreviewReasoning] = useState("");
+  const [previewMessages, setPreviewMessages] = useState([]);
+  const [previewEvidence, setPreviewEvidence] = useState([]);
+  const [previewResult, setPreviewResult] = useState(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState("");
+  const previewTasks = [
+    ...(topicDraft.exercises || []),
+    ...(topicDraft.subtopics || []).flatMap((subtopic) => subtopic.exercises || []),
+  ];
+  const selectedPreviewTask = previewTasks.find(
+    (task) => String(task._id) === previewTaskId,
+  ) || (previewTaskId.startsWith("index:")
+    ? previewTasks[Number(previewTaskId.slice(6))]
+    : null) || previewTasks[0];
+  const selectedPreviewObjectiveKey = previewObjectiveKey ||
+    selectedPreviewTask?.objectiveKeys?.[0] ||
+    topicDraft.objectiveDefinitions[0]?.key ||
+    "";
+  const selectedPreviewObjective = topicDraft.objectiveDefinitions.find(
+    (objective) => objective.key === selectedPreviewObjectiveKey,
+  );
 
   const loadAdminData = useCallback(async () => {
     setLoading(true);
@@ -350,13 +480,65 @@ function AdminLearning() {
       setTopicError("Add a short topic description.");
       return;
     }
-    const objectives = topicDraft.objectivesText
-      .split(/\r?\n/)
-      .map((objective) => objective.trim())
-      .filter(Boolean);
-    if (!objectives.length) {
-      setTopicError("Paste at least one learning objective.");
+    const objectiveDefinitions = topicDraft.objectiveDefinitions
+      .map((objective) => ({
+        ...objective,
+        title: objective.title.trim(),
+        description: objective.description.trim(),
+        expectedOutcome: objective.expectedOutcome.trim(),
+        requiredKnowledge: String(objective.requiredKnowledgeText || "")
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+        commonMisconceptions: String(objective.commonMisconceptionsText || "")
+          .split(/\r?\n/)
+          .map((item) => item.trim())
+          .filter(Boolean),
+        masteryCriteria: (objective.masteryCriteria || []).map((criterion) => ({
+          ...criterion,
+          description: String(criterion.description || "").trim(),
+          requiredEvidenceCount: Number(criterion.requiredEvidenceCount) || 1,
+        })),
+      }))
+      .filter((objective) => objective.title);
+    if (!objectiveDefinitions.length) {
+      setTopicError("Add at least one learning objective.");
       return;
+    }
+    if (objectiveDefinitions.some((objective) =>
+      !objective.description ||
+      !objective.expectedOutcome ||
+      !objective.masteryCriteria.length ||
+      objective.masteryCriteria.some((criterion) => !criterion.description),
+    )) {
+      setTopicError("Each objective needs an expected outcome and at least one specific mastery criterion.");
+      return;
+    }
+    if (
+      Number(topicDraft.estimatedDurationMinutes) < 1 ||
+      (topicDraft.estimatedDurationMinutes &&
+        !Number.isInteger(Number(topicDraft.estimatedDurationMinutes)))
+    ) {
+      setTopicError("Estimated duration must be a positive whole number of minutes.");
+      return;
+    }
+    const objectiveKeys = objectiveDefinitions.map((objective) => objective.key);
+    if (new Set(objectiveKeys).size !== objectiveKeys.length) {
+      setTopicError("Learning objective identifiers must be unique.");
+      return;
+    }
+    const coreKnowledge = (topicDraft.coreKnowledge || [])
+      .filter((item) => item.key !== topicDraft.coreKnowledgeKey);
+    if (topicDraft.coreKnowledgeText.trim()) {
+      coreKnowledge.push({
+        key: topicDraft.coreKnowledgeKey,
+        type: "EXPLANATION",
+        schemaVersion: 1,
+        title: "Core explanation",
+        content: topicDraft.coreKnowledgeText.trim(),
+        objectiveKeys,
+        order: 0,
+      });
     }
     setSaving(true);
     setTopicError("");
@@ -364,9 +546,20 @@ function AdminLearning() {
     try {
       const topic = {
         title: topicDraft.title.trim(),
+        subject: topicDraft.subject.trim(),
         description: topicDraft.description.trim(),
-        explanation: objectives.join("\n"),
-        objectives,
+        estimatedDurationMinutes: topicDraft.estimatedDurationMinutes
+          ? Number(topicDraft.estimatedDurationMinutes)
+          : null,
+        prerequisiteTopicIds: topicDraft.prerequisiteTopicIds,
+        explanation: "",
+        coreKnowledge,
+        objectives: objectiveDefinitions.map((objective) => objective.title),
+        objectiveDefinitions,
+        examples: topicDraft.examples,
+        questions: topicDraft.questions,
+        exercises: topicDraft.exercises,
+        subtopics: topicDraft.subtopics,
       };
       if (editingTopicId) {
         await api.patch(`/learning/admin/modules/${moduleId}/topics/${editingTopicId}`, topic);
@@ -378,6 +571,8 @@ function AdminLearning() {
       setEditingTopicId("");
       setTopicError("");
       setTopicDraft(EMPTY_TOPIC);
+      setPreviewOpen(false);
+      resetTutorPreview("NO_PRIOR_KNOWLEDGE", "");
       setAdminPage("topics");
       await loadModule(moduleId);
       await loadAdminData();
@@ -389,17 +584,191 @@ function AdminLearning() {
     }
   };
 
+  const generateTopicProposal = async () => {
+    if (!moduleId || !topicDraft.title.trim()) {
+      setTopicError("Enter a topic title before generating a proposal.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    setTopicError("");
+    try {
+      const { data } = await api.post(
+        `/learning/admin/modules/${moduleId}/topic-proposals`,
+        {
+          title: topicDraft.title.trim(),
+          subject: topicDraft.subject.trim(),
+          description: topicDraft.description.trim(),
+          referenceContent: topicDraft.coreKnowledgeText.trim(),
+        },
+      );
+      const proposal = data.proposal;
+      const knowledge = proposal.coreKnowledge || [];
+      const explanation = knowledge.find((item) => item.type === "EXPLANATION");
+      setTopicDraft((current) => ({
+        ...current,
+        title: proposal.title,
+        subject: proposal.subject,
+        description: proposal.description,
+        estimatedDurationMinutes: String(proposal.estimatedDurationMinutes),
+        coreKnowledge: knowledge,
+        coreKnowledgeKey: explanation?.key || "core-explanation",
+        coreKnowledgeText: typeof explanation?.content === "string"
+          ? explanation.content
+          : current.coreKnowledgeText,
+        objectiveDefinitions: proposal.objectiveDefinitions.map((objective) => ({
+          ...objective,
+          requiredKnowledgeText: (objective.requiredKnowledge || []).join("\n"),
+          commonMisconceptionsText: (objective.commonMisconceptions || []).join("\n"),
+        })),
+        exercises: [
+          ...current.exercises,
+          ...(proposal.practiceTasks || []).map((task) => ({
+            type: "ACTIVITY",
+            title: task.title,
+            instructions: task.instructions,
+            objectiveKeys: task.objectiveKeys,
+            starterCode: "",
+            language: "java",
+            tests: [],
+          })),
+        ],
+      }));
+      setNotice("AI proposal ready. Review and edit the objectives, criteria, knowledge, and tasks before saving to approve it.");
+    } catch (proposalError) {
+      setError(proposalError.message || "Could not generate an AI topic proposal.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sendPreviewMessage = async (event) => {
+    event.preventDefault();
+    const text = previewInput.trim();
+    if (
+      !text ||
+      previewBusy ||
+      !moduleId ||
+      !topicDraft.objectiveDefinitions.length ||
+      (previewMode === "TASK" && !selectedPreviewTask)
+    ) return;
+    const objectiveKey = selectedPreviewObjectiveKey || topicDraft.objectiveDefinitions[0].key;
+    const objectiveIndex = topicDraft.objectiveDefinitions.findIndex((item) => item.key === objectiveKey);
+    const objectiveKeys = topicDraft.objectiveDefinitions.map((objective) => objective.key);
+    const coreKnowledge = (topicDraft.coreKnowledge || [])
+      .filter((item) => item.key !== topicDraft.coreKnowledgeKey);
+    if (topicDraft.coreKnowledgeText.trim()) {
+      coreKnowledge.push({
+        key: topicDraft.coreKnowledgeKey,
+        type: "EXPLANATION",
+        schemaVersion: 1,
+        title: "Core explanation",
+        content: topicDraft.coreKnowledgeText.trim(),
+        objectiveKeys,
+        order: 0,
+      });
+    }
+    const objectiveDefinitions = topicDraft.objectiveDefinitions.map((objective) => ({
+      ...objective,
+      requiredKnowledge: String(objective.requiredKnowledgeText || "")
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+      commonMisconceptions: String(objective.commonMisconceptionsText || "")
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    }));
+    const topicPayload = {
+      title: topicDraft.title.trim(),
+      subject: topicDraft.subject.trim(),
+      description: topicDraft.description.trim(),
+      estimatedDurationMinutes: topicDraft.estimatedDurationMinutes
+        ? Number(topicDraft.estimatedDurationMinutes)
+        : null,
+      prerequisiteTopicIds: topicDraft.prerequisiteTopicIds,
+      tutorInstructions: topicDraft.tutorInstructions,
+      validationInstructions: topicDraft.validationInstructions,
+      coreKnowledge,
+      objectives: objectiveDefinitions.map((objective) => objective.title),
+      objectiveDefinitions,
+      examples: topicDraft.examples,
+      questions: topicDraft.questions,
+      exercises: topicDraft.exercises,
+      subtopics: topicDraft.subtopics,
+    };
+    const nextMessages = [...previewMessages, { role: "user", content: text }];
+    setPreviewBusy(true);
+    setPreviewError("");
+    try {
+      const { data } = await api.post(
+        editingTopicId
+          ? `/learning/admin/modules/${moduleId}/topics/${editingTopicId}/preview`
+          : `/learning/admin/modules/${moduleId}/topic-preview`,
+        {
+          message: previewMode === "TASK" && selectedPreviewTask?.type === "CODE"
+            ? "Simulated Java submission."
+            : text,
+          history: previewMessages,
+          previousEvidence: previewEvidence,
+          scenario: previewScenario,
+          objectiveKey: objectiveKeys[objectiveIndex >= 0 ? objectiveIndex : 0],
+          topicDraft: topicPayload,
+          ...(previewMode === "TASK" ? {
+            taskSimulation: {
+              type: selectedPreviewTask.type || "CODE",
+              exerciseId: selectedPreviewTask._id,
+              exerciseIndex: previewTasks.indexOf(selectedPreviewTask),
+              submission: selectedPreviewTask.type === "MATH"
+                ? { answer: text, reasoning: previewReasoning }
+                : selectedPreviewTask.type === "CODE"
+                  ? { code: previewInput }
+                  : { response: text },
+            },
+          } : {}),
+        },
+      );
+      setPreviewMessages([
+        ...nextMessages,
+        { role: "assistant", content: data.preview.reply },
+      ]);
+      setPreviewEvidence((current) => [...current, ...data.preview.evidence]);
+      setPreviewResult(data.preview);
+      setPreviewInput("");
+      setPreviewReasoning("");
+    } catch (requestError) {
+      setPreviewError(requestError.message || "The tutor preview could not respond. Try again.");
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
+  const resetTutorPreview = (scenario = previewScenario, objectiveKey = previewObjectiveKey) => {
+    setPreviewScenario(scenario);
+    setPreviewObjectiveKey(objectiveKey);
+    setPreviewMessages([]);
+    setPreviewEvidence([]);
+    setPreviewResult(null);
+    setPreviewError("");
+    setPreviewInput("");
+    setPreviewReasoning("");
+  };
+
   const editTopic = (topic) => {
-    setAdminPage("topics-editor");
+    setAdminPage("topics-inline");
     setEditingTopicId(String(topic._id));
     setTopicError("");
     setTopicDraft(createTopicDraft(topic));
+    setPreviewOpen(false);
+    resetTutorPreview("NO_PRIOR_KNOWLEDGE", topic.objectiveDefinitions?.[0]?.key || "");
   };
 
   const cancelTopicEdit = () => {
     setEditingTopicId("");
     setTopicError("");
     setTopicDraft(EMPTY_TOPIC);
+    setPreviewOpen(false);
+    resetTutorPreview("NO_PRIOR_KNOWLEDGE", "");
   };
 
   const removeTopic = async (topicIdToRemove) => {
@@ -461,7 +830,7 @@ function AdminLearning() {
           type="button"
         >Modules</button>
         <button
-          className={["topics", "topics-editor"].includes(adminPage) ? "is-active" : ""}
+          className={["topics", "topics-editor", "topics-inline"].includes(adminPage) ? "is-active" : ""}
           disabled={!moduleId}
           onClick={() => setAdminPage("topics")}
           type="button"
@@ -707,12 +1076,19 @@ function AdminLearning() {
               )}
             </div>
           )}
-          {(newModule || moduleId) && adminPage === "modules" && (
+          {(newModule || moduleId) && ["modules", "topics-inline"].includes(adminPage) && (
             <form
               className="learning-form learning-form-divider"
-              onSubmit={saveModule}
+              onSubmit={(event) => {
+                if (adminPage !== "modules") {
+                  event.preventDefault();
+                  return;
+                }
+                saveModule(event);
+              }}
               onBlur={(event) => {
                 if (
+                  adminPage === "modules" &&
                   !event.currentTarget.contains(event.relatedTarget) &&
                   moduleForm.title?.trim() &&
                   moduleForm.description?.trim() &&
@@ -720,40 +1096,44 @@ function AdminLearning() {
                 ) void saveModule();
               }}
             >
-              <div className="learning-panel-title">
-                <h3>{newModule ? "Add a module" : "Edit module"}</h3>
-                {!newModule && <span className="learning-status-badge">{moduleForm.status}</span>}
-              </div>
-              <label className="learning-field">
-                Module name
-                <input
-                  required
-                  maxLength={160}
-                  placeholder="e.g. Components"
-                  value={moduleForm.title || ""}
-                  onChange={(event) => setModuleForm({ ...moduleForm, title: event.target.value })}
-                />
-              </label>
-              <label className="learning-field">
-                Description
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Briefly describe this module for students."
-                  value={moduleForm.description || ""}
-                  onChange={(event) => setModuleForm({ ...moduleForm, description: event.target.value })}
-                />
-              </label>
-              <label className="learning-field">
-                Fee (INR)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={moduleForm.price ?? 0}
-                  onChange={(event) => setModuleForm({ ...moduleForm, price: event.target.value })}
-                />
-              </label>
+              {adminPage === "modules" && (
+                <>
+                  <div className="learning-panel-title">
+                    <h3>{newModule ? "Add a module" : "Edit module"}</h3>
+                    {!newModule && <span className="learning-status-badge">{moduleForm.status}</span>}
+                  </div>
+                  <label className="learning-field">
+                    Module name
+                    <input
+                      required
+                      maxLength={160}
+                      placeholder="e.g. Components"
+                      value={moduleForm.title || ""}
+                      onChange={(event) => setModuleForm({ ...moduleForm, title: event.target.value })}
+                    />
+                  </label>
+                  <label className="learning-field">
+                    Description
+                    <textarea
+                      required
+                      rows={3}
+                      placeholder="Briefly describe this module for students."
+                      value={moduleForm.description || ""}
+                      onChange={(event) => setModuleForm({ ...moduleForm, description: event.target.value })}
+                    />
+                  </label>
+                  <label className="learning-field">
+                    Fee (INR)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={moduleForm.price ?? 0}
+                      onChange={(event) => setModuleForm({ ...moduleForm, price: event.target.value })}
+                    />
+                  </label>
+                </>
+              )}
               {!newModule && adminPage === "topics-inline" && (
                 <section className="learning-form learning-form-divider">
                   <div className="learning-panel-title">
@@ -783,7 +1163,17 @@ function AdminLearning() {
                     </div>
                   ))}
                   <div className="learning-form">
-                    <h5>{editingTopicId ? "Edit topic" : "Add a topic"}</h5>
+                    <div className="learning-panel-title">
+                      <h5>{editingTopicId ? "Edit topic" : "Add a topic"}</h5>
+                      <button
+                        className="learning-button learning-button-small learning-button-secondary"
+                        disabled={saving}
+                        onClick={generateTopicProposal}
+                        type="button"
+                      >
+                        Draft with AI
+                      </button>
+                    </div>
                     {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
                     <label className="learning-field">
                       Topic title
@@ -792,6 +1182,15 @@ function AdminLearning() {
                         placeholder="e.g. Components, Variables, Network layers"
                         value={topicDraft.title}
                         onChange={(event) => setTopicDraft({ ...topicDraft, title: event.target.value })}
+                      />
+                    </label>
+                    <label className="learning-field">
+                      Subject (optional)
+                      <input
+                        maxLength={100}
+                        placeholder="e.g. Computer Networks, Mathematics, Physics"
+                        value={topicDraft.subject}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, subject: event.target.value })}
                       />
                     </label>
                     <label className="learning-field">
@@ -806,14 +1205,47 @@ function AdminLearning() {
                       />
                     </label>
                     <label className="learning-field">
-                      What will students learn?
+                      Estimated learning time (minutes, optional)
+                      <input
+                        type="number"
+                        min="1"
+                        max="100000"
+                        step="1"
+                        value={topicDraft.estimatedDurationMinutes}
+                        onChange={(event) => setTopicDraft({
+                          ...topicDraft,
+                          estimatedDurationMinutes: event.target.value,
+                        })}
+                      />
+                    </label>
+                    {!!moduleForm.topics?.length && (
+                      <label className="learning-field">
+                        Prerequisite topics (optional)
+                        <select
+                          multiple
+                          value={topicDraft.prerequisiteTopicIds}
+                          onChange={(event) => setTopicDraft({
+                            ...topicDraft,
+                            prerequisiteTopicIds: [...event.target.selectedOptions].map((option) => option.value),
+                          })}
+                        >
+                          {moduleForm.topics
+                            .filter((topic) => String(topic._id) !== editingTopicId)
+                            .map((topic) => (
+                              <option key={topic._id} value={String(topic._id)}>{topic.title}</option>
+                            ))}
+                        </select>
+                        <small className="learning-help">Prerequisites must be earlier in the published topic order.</small>
+                      </label>
+                    )}
+                    <label className="learning-field">
+                      Core knowledge
                       <textarea
-                        required
                         rows={5}
                         maxLength={12000}
-                        placeholder="Explain the topic clearly. Include theory or code as appropriate."
-                        value={topicDraft.explanation}
-                        onChange={(event) => setTopicDraft({ ...topicDraft, explanation: event.target.value })}
+                        placeholder="Add the approved explanation, definitions, examples, formulas, or procedures the tutor may use."
+                        value={topicDraft.coreKnowledgeText}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, coreKnowledgeText: event.target.value })}
                       />
                     </label>
                     <label className="learning-field">
@@ -836,16 +1268,344 @@ function AdminLearning() {
                         onChange={(event) => setTopicDraft({ ...topicDraft, validationInstructions: event.target.value })}
                       />
                     </label>
-                    <label className="learning-field">
-                      Expected learning outcomes (one per line)
-                      <span className="learning-field-required">Required</span>
-                      <textarea
-                        required
-                        rows={2}
-                        value={topicDraft.objectivesText}
-                        onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })}
-                      />
-                    </label>
+                    <div className="learning-topic-editor-group">
+                      <div className="learning-panel-title">
+                        <div>
+                          <h5>Fixed learning objectives</h5>
+                          <p>Every enrolled student must demonstrate each objective in this order.</p>
+                        </div>
+                        <button
+                          className="learning-button learning-button-small learning-button-secondary"
+                          onClick={() => setTopicDraft({
+                            ...topicDraft,
+                            objectiveDefinitions: [
+                              ...topicDraft.objectiveDefinitions,
+                              createObjectiveDraft(topicDraft.objectiveDefinitions.length),
+                            ],
+                          })}
+                          type="button"
+                        >
+                          Add objective
+                        </button>
+                      </div>
+                      {topicDraft.objectiveDefinitions.map((objective, index) => (
+                        <div className="learning-topic-editor-card" key={objective.key}>
+                          <div className="learning-panel-title">
+                            <strong>Objective {index + 1}</strong>
+                            <span className="learning-actions">
+                              <button
+                                aria-label={`Move objective ${index + 1} up`}
+                                className="learning-link-button"
+                                disabled={index === 0}
+                                onClick={() => {
+                                  const definitions = [...topicDraft.objectiveDefinitions];
+                                  [definitions[index - 1], definitions[index]] = [
+                                    definitions[index],
+                                    definitions[index - 1],
+                                  ];
+                                  setTopicDraft({ ...topicDraft, objectiveDefinitions: definitions });
+                                }}
+                                type="button"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                aria-label={`Move objective ${index + 1} down`}
+                                className="learning-link-button"
+                                disabled={index === topicDraft.objectiveDefinitions.length - 1}
+                                onClick={() => {
+                                  const definitions = [...topicDraft.objectiveDefinitions];
+                                  [definitions[index], definitions[index + 1]] = [
+                                    definitions[index + 1],
+                                    definitions[index],
+                                  ];
+                                  setTopicDraft({ ...topicDraft, objectiveDefinitions: definitions });
+                                }}
+                                type="button"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                className="learning-link-button"
+                                onClick={() => setTopicDraft({
+                                  ...topicDraft,
+                                  objectiveDefinitions: topicDraft.objectiveDefinitions
+                                    .filter((_item, itemIndex) => itemIndex !== index),
+                                })}
+                                type="button"
+                              >
+                                Remove
+                              </button>
+                            </span>
+                          </div>
+                          <label className="learning-field">
+                            Objective title
+                            <input
+                              required
+                              maxLength={160}
+                              value={objective.title}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                objectiveDefinitions: updateTopicItem(
+                                  topicDraft.objectiveDefinitions,
+                                  index,
+                                  "title",
+                                  event.target.value,
+                                ),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            What must the student understand?
+                            <textarea
+                              required
+                              rows={2}
+                              maxLength={2000}
+                              value={objective.description || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                objectiveDefinitions: updateTopicItem(
+                                  topicDraft.objectiveDefinitions,
+                                  index,
+                                  "description",
+                                  event.target.value,
+                                ),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Expected student outcome
+                            <textarea
+                              required
+                              rows={2}
+                              maxLength={2000}
+                              value={objective.expectedOutcome || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                objectiveDefinitions: updateTopicItem(
+                                  topicDraft.objectiveDefinitions,
+                                  index,
+                                  "expectedOutcome",
+                                  event.target.value,
+                                ),
+                              })}
+                            />
+                          </label>
+                          <label className="learning-field">
+                            Required knowledge (one item per line)
+                            <textarea
+                              rows={2}
+                              value={objective.requiredKnowledgeText || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                objectiveDefinitions: updateTopicItem(
+                                  topicDraft.objectiveDefinitions,
+                                  index,
+                                  "requiredKnowledgeText",
+                                  event.target.value,
+                                ),
+                              })}
+                            />
+                          </label>
+                          <div className="learning-topic-editor-group">
+                            <div className="learning-panel-title">
+                              <h6>Mastery criteria</h6>
+                              <button
+                                className="learning-button learning-button-small learning-button-secondary"
+                                onClick={() => setTopicDraft({
+                                  ...topicDraft,
+                                  objectiveDefinitions: updateTopicItem(
+                                    topicDraft.objectiveDefinitions,
+                                    index,
+                                    "masteryCriteria",
+                                    [...objective.masteryCriteria, {
+                                      key: `criterion-${crypto.randomUUID()}`,
+                                      description: "",
+                                      evaluationMethod: "EXPLANATION",
+                                      requiredEvidenceCount: 1,
+                                    }],
+                                  ),
+                                })}
+                                type="button"
+                              >
+                                Add criterion
+                              </button>
+                            </div>
+                            {(objective.masteryCriteria || []).map((criterion, criterionIndex) => (
+                              <div className="learning-topic-editor-card" key={criterion.key}>
+                                <label className="learning-field">
+                                  What evidence demonstrates this criterion?
+                                  <textarea
+                                    required
+                                    rows={2}
+                                    maxLength={1000}
+                                    value={criterion.description}
+                                    onChange={(event) => {
+                                      const criteria = updateTopicItem(
+                                        objective.masteryCriteria,
+                                        criterionIndex,
+                                        "description",
+                                        event.target.value,
+                                      );
+                                      setTopicDraft({
+                                        ...topicDraft,
+                                        objectiveDefinitions: updateTopicItem(
+                                          topicDraft.objectiveDefinitions,
+                                          index,
+                                          "masteryCriteria",
+                                          criteria,
+                                        ),
+                                      });
+                                    }}
+                                  />
+                                </label>
+                                <label className="learning-field">
+                                  Evaluation method
+                                  <select
+                                    value={criterion.evaluationMethod || "EXPLANATION"}
+                                    onChange={(event) => {
+                                      const criteria = updateTopicItem(
+                                        objective.masteryCriteria,
+                                        criterionIndex,
+                                        "evaluationMethod",
+                                        event.target.value,
+                                      );
+                                      setTopicDraft({
+                                        ...topicDraft,
+                                        objectiveDefinitions: updateTopicItem(
+                                          topicDraft.objectiveDefinitions,
+                                          index,
+                                          "masteryCriteria",
+                                          criteria,
+                                        ),
+                                      });
+                                    }}
+                                  >
+                                    {[
+                                      ["EXPLANATION", "Explain in own words"],
+                                      ["IDENTIFICATION", "Identify a concept"],
+                                      ["PREDICTION", "Predict an outcome"],
+                                      ["COMPARISON", "Compare concepts"],
+                                      ["APPLICATION", "Apply to a new scenario"],
+                                      ["ANALYSIS", "Analyse a case"],
+                                      ["CALCULATION", "Solve with reasoning"],
+                                      ["DIAGRAM", "Interpret a diagram"],
+                                      ["PROCEDURE", "Explain a sequence"],
+                                      ["CODE", "Write code"],
+                                      ["DEBUGGING", "Debug code"],
+                                      ["PRACTICAL", "Perform a practical task"],
+                                    ].map(([value, label]) => (
+                                      <option key={value} value={value}>{label}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label className="learning-field">
+                                  Independent evidence required
+                                  <select
+                                    value={criterion.requiredEvidenceCount || 1}
+                                    onChange={(event) => {
+                                      const criteria = updateTopicItem(
+                                        objective.masteryCriteria,
+                                        criterionIndex,
+                                        "requiredEvidenceCount",
+                                        Number(event.target.value),
+                                      );
+                                      setTopicDraft({
+                                        ...topicDraft,
+                                        objectiveDefinitions: updateTopicItem(
+                                          topicDraft.objectiveDefinitions,
+                                          index,
+                                          "masteryCriteria",
+                                          criteria,
+                                        ),
+                                      });
+                                    }}
+                                  >
+                                    <option value={1}>1</option>
+                                    <option value={2}>2</option>
+                                    <option value={3}>3</option>
+                                  </select>
+                                </label>
+                                {objective.masteryCriteria.length > 1 && (
+                                  <button
+                                    className="learning-link-button"
+                                    onClick={() => setTopicDraft({
+                                      ...topicDraft,
+                                      objectiveDefinitions: updateTopicItem(
+                                        topicDraft.objectiveDefinitions,
+                                        index,
+                                        "masteryCriteria",
+                                        objective.masteryCriteria.filter(
+                                          (_item, itemIndex) => itemIndex !== criterionIndex,
+                                        ),
+                                      ),
+                                    })}
+                                    type="button"
+                                  >
+                                    Remove criterion
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <label className="learning-field">
+                            Common misconceptions (optional, one per line)
+                            <textarea
+                              rows={2}
+                              value={objective.commonMisconceptionsText || ""}
+                              onChange={(event) => setTopicDraft({
+                                ...topicDraft,
+                                objectiveDefinitions: updateTopicItem(
+                                  topicDraft.objectiveDefinitions,
+                                  index,
+                                  "commonMisconceptionsText",
+                                  event.target.value,
+                                ),
+                              })}
+                            />
+                          </label>
+                          <details className="learning-advanced-section">
+                            <summary>Preview tutoring and evaluation</summary>
+                            <div className="learning-topic-editor-card">
+                              <strong>{objective.title || "Objective title"}</strong>
+                              <p>{objective.expectedOutcome || "Add an expected outcome to preview the tutor focus."}</p>
+                              <small>
+                                The tutor will ground explanations in approved core knowledge and evaluate:
+                                {" "}
+                                {(objective.masteryCriteria || [])
+                                  .map((criterion) => `${criterion.evaluationMethod || "EXPLANATION"} — ${criterion.description || "criterion not defined"}`)
+                                  .join("; ")}
+                              </small>
+                            </div>
+                          </details>
+                          {index > 0 && (
+                            <fieldset className="learning-field">
+                              <legend>Additional earlier objective prerequisites</legend>
+                              {topicDraft.objectiveDefinitions.slice(0, index).map((prior) => (
+                                <label className="learning-checkbox-field" key={prior.key}>
+                                  <input
+                                    type="checkbox"
+                                    checked={(objective.prerequisites || []).includes(prior.key)}
+                                    onChange={(event) => setTopicDraft({
+                                      ...topicDraft,
+                                      objectiveDefinitions: updateTopicItem(
+                                        topicDraft.objectiveDefinitions,
+                                        index,
+                                        "prerequisites",
+                                        event.target.checked
+                                          ? [...new Set([...(objective.prerequisites || []), prior.key])]
+                                          : (objective.prerequisites || []).filter((key) => key !== prior.key),
+                                      ),
+                                    })}
+                                  />
+                                  {prior.title || "Untitled objective"}
+                                </label>
+                              ))}
+                            </fieldset>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                     <div className="learning-topic-editor-group">
                       <div className="learning-panel-title">
                         <h5>Examples (optional)</h5>
@@ -931,6 +1691,8 @@ function AdminLearning() {
                               instructions: "",
                               starterCode: "",
                               language: "java",
+                              variables: {},
+                              variablesText: "",
                               tests: [],
                             }],
                           })}
@@ -945,12 +1707,23 @@ function AdminLearning() {
                             Activity type
                             <select
                               value={exercise.type || "CODE"}
-                              onChange={(event) => setTopicDraft({
-                                ...topicDraft,
-                                exercises: updateTopicItem(topicDraft.exercises, index, "type", event.target.value),
-                              })}
+                              onChange={(event) => {
+                                const type = event.target.value;
+                                setTopicDraft({
+                                  ...topicDraft,
+                                  exercises: updateTopicItem(
+                                    topicDraft.exercises,
+                                    index,
+                                    "type",
+                                    type,
+                                  ).map((item, itemIndex) => itemIndex === index
+                                    ? { ...item, evaluationMethod: type === "MATH" ? "CALCULATION" : item.evaluationMethod || "EXPLANATION" }
+                                    : item),
+                                });
+                              }}
                             >
                               <option value="ACTIVITY">Written or discussion activity</option>
+                              <option value="MATH">Mathematics problem</option>
                               <option value="CODE">Coding exercise</option>
                             </select>
                           </label>
@@ -975,6 +1748,194 @@ function AdminLearning() {
                               })}
                             />
                           </label>
+                          {!!topicDraft.objectiveDefinitions.length && (
+                            <fieldset className="learning-field">
+                              <legend>Assesses these objectives</legend>
+                              {topicDraft.objectiveDefinitions.map((objective) => (
+                                <label className="learning-checkbox-field" key={objective.key}>
+                                  <input
+                                    type="checkbox"
+                                    checked={(exercise.objectiveKeys || []).includes(objective.key)}
+                                    onChange={(event) => {
+                                      const objectiveKeys = event.target.checked
+                                        ? [...new Set([...(exercise.objectiveKeys || []), objective.key])]
+                                        : (exercise.objectiveKeys || []).filter((key) => key !== objective.key);
+                                      const allowedCriteria = topicDraft.objectiveDefinitions
+                                        .filter((item) => objectiveKeys.includes(item.key))
+                                        .flatMap((item) => item.masteryCriteria.map((criterion) => criterion.key));
+                                      const nextExercise = {
+                                        ...exercise,
+                                        objectiveKeys,
+                                        criterionKeys: (exercise.criterionKeys || [])
+                                          .filter((key) => allowedCriteria.includes(key)),
+                                      };
+                                      setTopicDraft({
+                                        ...topicDraft,
+                                        exercises: updateTopicItem(topicDraft.exercises, index, "objectiveKeys", nextExercise.objectiveKeys)
+                                          .map((item, itemIndex) => itemIndex === index ? nextExercise : item),
+                                      });
+                                    }}
+                                  />
+                                  {objective.title || "Untitled objective"}
+                                </label>
+                              ))}
+                            </fieldset>
+                          )}
+                          {exercise.type !== "CODE" && (
+                            <>
+                              <label className="learning-field">
+                                Evaluation method
+                                <select
+                                  value={exercise.evaluationMethod || (exercise.type === "MATH" ? "CALCULATION" : "EXPLANATION")}
+                                  onChange={(event) => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(topicDraft.exercises, index, "evaluationMethod", event.target.value),
+                                  })}
+                                >
+                                  <option value="EXPLANATION">Explain a concept</option>
+                                  <option value="PREDICTION">Predict an outcome</option>
+                                  <option value="IDENTIFICATION">Identify an issue</option>
+                                  <option value="COMPARISON">Compare concepts</option>
+                                  <option value="APPLICATION">Apply knowledge</option>
+                                  <option value="ANALYSIS">Analyse a scenario</option>
+                                  <option value="CALCULATION">Calculate or show working</option>
+                                  <option value="PROCEDURE">Explain a procedure</option>
+                                </select>
+                              </label>
+                              <fieldset className="learning-field">
+                                <legend>Mastery criteria assessed</legend>
+                                {topicDraft.objectiveDefinitions
+                                  .filter((objective) => (exercise.objectiveKeys || []).includes(objective.key))
+                                  .flatMap((objective) => objective.masteryCriteria.map((criterion) => (
+                                    <label className="learning-checkbox-field" key={criterion.key}>
+                                      <input
+                                        type="checkbox"
+                                        checked={(exercise.criterionKeys || []).includes(criterion.key)}
+                                        onChange={(event) => {
+                                          const criterionKeys = event.target.checked
+                                            ? [...new Set([...(exercise.criterionKeys || []), criterion.key])]
+                                            : (exercise.criterionKeys || []).filter((key) => key !== criterion.key);
+                                          setTopicDraft({
+                                            ...topicDraft,
+                                            exercises: updateTopicItem(topicDraft.exercises, index, "criterionKeys", criterionKeys),
+                                          });
+                                        }}
+                                      />
+                                      {criterion.description}
+                                    </label>
+                                  )))}
+                                {!(exercise.objectiveKeys || []).length && (
+                                  <small className="learning-help">Link an objective first to choose its criteria.</small>
+                                )}
+                              </fieldset>
+                            </>
+                          )}
+                          {exercise.type === "MATH" && (
+                            <>
+                              <label className="learning-field">
+                                Formula values (symbol=value, one per line)
+                                <textarea
+                                  rows={2}
+                                  value={exercise.variablesText ?? formatMathVariables(exercise.variables)}
+                                  onChange={(event) => {
+                                    const variablesText = event.target.value;
+                                    setTopicDraft({
+                                      ...topicDraft,
+                                      exercises: updateTopicItem(
+                                        topicDraft.exercises,
+                                        index,
+                                        "variables",
+                                        parseMathVariables(variablesText),
+                                      ).map((item, itemIndex) => itemIndex === index
+                                        ? { ...item, variablesText }
+                                        : item),
+                                    });
+                                  }}
+                                />
+                                <small className="learning-help">Answers may use these symbols, for example distance / time. Only numeric substitutions are supported.</small>
+                              </label>
+                              <label className="learning-field">
+                                Expected answer
+                                <input
+                                  maxLength={200}
+                                  value={exercise.expectedAnswer || ""}
+                                  onChange={(event) => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(topicDraft.exercises, index, "expectedAnswer", event.target.value),
+                                  })}
+                                />
+                              </label>
+                              <label className="learning-field">
+                                Accepted equivalent answers (one per line)
+                                <textarea
+                                  rows={2}
+                                  value={(exercise.acceptedAnswers || []).join("\n")}
+                                  onChange={(event) => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(
+                                      topicDraft.exercises,
+                                      index,
+                                      "acceptedAnswers",
+                                      event.target.value.split(/\r?\n/).map((answer) => answer.trim()).filter(Boolean),
+                                    ),
+                                  })}
+                                />
+                              </label>
+                              <div className="learning-preview-options">
+                                <label className="learning-field">
+                                  Expected unit (optional)
+                                  <input
+                                    maxLength={40}
+                                    value={exercise.unit || ""}
+                                    onChange={(event) => setTopicDraft({
+                                      ...topicDraft,
+                                      exercises: updateTopicItem(topicDraft.exercises, index, "unit", event.target.value),
+                                    })}
+                                  />
+                                </label>
+                                <label className="learning-field">
+                                  Numeric tolerance
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="any"
+                                    value={exercise.numericTolerance ?? 0.000001}
+                                    onChange={(event) => setTopicDraft({
+                                      ...topicDraft,
+                                      exercises: updateTopicItem(
+                                        topicDraft.exercises,
+                                        index,
+                                        "numericTolerance",
+                                        Number(event.target.value),
+                                      ),
+                                    })}
+                                  />
+                                </label>
+                              </div>
+                              <label className="learning-checkbox-field">
+                                <input
+                                  type="checkbox"
+                                  checked={exercise.requireReasoning || false}
+                                  onChange={(event) => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(topicDraft.exercises, index, "requireReasoning", event.target.checked),
+                                  })}
+                                />
+                                Require written reasoning as well as a correct result
+                              </label>
+                              <label className="learning-checkbox-field">
+                                <input
+                                  type="checkbox"
+                                  checked={exercise.requireUnit || false}
+                                  onChange={(event) => setTopicDraft({
+                                    ...topicDraft,
+                                    exercises: updateTopicItem(topicDraft.exercises, index, "requireUnit", event.target.checked),
+                                  })}
+                                />
+                                Require the answer to include a unit
+                              </label>
+                            </>
+                          )}
                           {exercise.type === "CODE" && (
                             <>
                               <label className="learning-field">
@@ -1132,6 +2093,210 @@ function AdminLearning() {
                         </div>
                       ))}
                     </div>
+                    <section className="learning-topic-editor-group learning-preview">
+                      <div className="learning-panel-title">
+                        <div>
+                          <h5>Live tutor preview</h5>
+                          <p>Simulate a learner using this unsaved topic draft. Preview activity never changes student progress.</p>
+                        </div>
+                        <button
+                          className="learning-button learning-button-small learning-button-secondary"
+                          disabled={previewBusy || !topicDraft.objectiveDefinitions.length}
+                          onClick={() => {
+                            setPreviewOpen((open) => !open);
+                            resetTutorPreview();
+                          }}
+                          type="button"
+                        >
+                          {previewOpen ? "Close preview" : "Open preview"}
+                        </button>
+                      </div>
+                      {previewOpen && (
+                        <>
+                          <div className="learning-preview-options">
+                            <label className="learning-field">
+                              Preview mode
+                              <select
+                                value={previewMode}
+                                onChange={(event) => {
+                                  setPreviewMode(event.target.value);
+                                  resetTutorPreview();
+                                }}
+                                disabled={previewBusy}
+                              >
+                                <option value="TUTOR">Tutor response</option>
+                                <option value="TASK">Simulate an authored task</option>
+                              </select>
+                            </label>
+                            <label className="learning-field">
+                              Starting knowledge
+                              <select
+                                value={previewScenario}
+                                onChange={(event) => resetTutorPreview(event.target.value)}
+                                disabled={previewBusy}
+                              >
+                                <option value="NO_PRIOR_KNOWLEDGE">No prior knowledge</option>
+                                <option value="SOME_PRIOR_KNOWLEDGE">Some prior knowledge</option>
+                                <option value="MOST_OBJECTIVES_VERIFIED">Most of this objective understood</option>
+                                <option value="MISCONCEPTION">Has a common misconception</option>
+                              </select>
+                            </label>
+                            <label className="learning-field">
+                              Objective
+                              <select
+                                value={selectedPreviewObjectiveKey}
+                                onChange={(event) => resetTutorPreview(previewScenario, event.target.value)}
+                              >
+                                {topicDraft.objectiveDefinitions.map((objective, index) => (
+                                  <option key={objective.key} value={objective.key}>
+                                    {index + 1}. {objective.title || "Untitled objective"}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            {previewMode === "TASK" && (
+                              <label className="learning-field">
+                                Task
+                                <select
+                                  value={selectedPreviewTask
+                                    ? String(selectedPreviewTask._id || `index:${previewTasks.indexOf(selectedPreviewTask)}`)
+                                    : ""}
+                                  onChange={(event) => {
+                                    const nextIndex = event.target.value.startsWith("index:")
+                                      ? Number(event.target.value.slice(6))
+                                      : previewTasks.findIndex(
+                                        (task) => String(task._id) === event.target.value,
+                                      );
+                                    const nextTask = previewTasks[nextIndex];
+                                    setPreviewTaskId(nextTask?._id
+                                      ? String(nextTask._id)
+                                      : `index:${nextIndex}`);
+                                    resetTutorPreview(
+                                      previewScenario,
+                                      nextTask?.objectiveKeys?.[0] || previewObjectiveKey,
+                                    );
+                                  }}
+                                  disabled={previewBusy || !previewTasks.length}
+                                >
+                                  {previewTasks.map((task, index) => (
+                                    <option
+                                      key={task._id || `preview-task-${index}`}
+                                      value={String(task._id || `index:${index}`)}
+                                    >
+                                      {task.title || "Untitled task"} ({task.type || "CODE"})
+                                    </option>
+                                  ))}
+                                </select>
+                                {!previewTasks.length && <small className="learning-help">Add a task to this topic to simulate it.</small>}
+                              </label>
+                            )}
+                          </div>
+                          <div className="learning-preview-conversation" aria-live="polite">
+                            {previewMessages.length === 0 && (
+                              <p className="learning-muted">Send a learner response to see how the tutor teaches and evaluates this objective.</p>
+                            )}
+                            {previewMessages.map((item, index) => (
+                              <div className={`learning-message learning-message-${item.role}`} key={`${index}-${item.role}`}>
+                                <strong>{item.role === "user" ? "Simulated learner" : "Tutor"}</strong>
+                                <p>{item.content}</p>
+                              </div>
+                            ))}
+                            {previewBusy && <p className="learning-muted" role="status">Tutor is responding…</p>}
+                          </div>
+                          {previewError && <p className="learning-field-error" role="alert">{previewError}</p>}
+                          {previewResult && (
+                            <div className="learning-preview-evaluation" aria-live="polite">
+                              <p><b>Current objective:</b> {selectedPreviewObjective?.title || "Not selected"}</p>
+                              {previewResult.task && (
+                                <p><b>Task:</b> {previewResult.task.title} ({previewResult.task.type})</p>
+                              )}
+                              <strong>
+                                Evaluation: {(previewResult.evaluation?.correctness || previewResult.taskResult?.status || "pending").replaceAll("_", " ")}
+                              </strong>
+                              <p>{previewResult.reason}</p>
+                              <p><b>Mastery decision:</b> {previewResult.masteryDecision?.mastered ? "Mastered in simulation" : "Not mastered"}</p>
+                              <p><b>Next action:</b> {(previewResult.nextAction || previewResult.evaluation?.recommendedNextAction || "CONTINUE").replaceAll("_", " ")}</p>
+                              {previewResult.taskResult && (
+                                <p>
+                                  <b>Task result:</b> {previewResult.taskResult.status.replaceAll("_", " ")}
+                                  {" — "}{previewResult.taskResult.accepted ? "accepted" : "not accepted"}
+                                </p>
+                              )}
+                              <p><b>Evidence collected:</b> {previewResult.evidence.length}</p>
+                              {(previewResult.evaluation?.evidence || []).length > 0 && (
+                                <ul>
+                                  {previewResult.evaluation.evidence.map((item, index) => (
+                                    <li key={`${item.criterionKey}-${index}`}>
+                                      {item.criterionKey}: {item.demonstrated ? "demonstrated" : "not demonstrated"}
+                                      {item.evidenceQuote ? ` - "${item.evidenceQuote}"` : ""}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              <p><b>Criteria still missing:</b> {previewResult.missingCriteria.length
+                                ? previewResult.missingCriteria.map((criterion) => criterion.description).join("; ")
+                                : "None"}
+                              </p>
+                              {(previewResult.evaluation?.identifiedMisconceptions || []).length > 0 && (
+                                <p><b>Misconceptions:</b> {previewResult.evaluation.identifiedMisconceptions.join("; ")}</p>
+                              )}
+                              {(previewResult.taskResult?.visibleResults || []).map((result) => (
+                                <p key={`visible-test-${result.testCase}`}>
+                                  <b>Visible test {result.testCase}:</b> {result.status}
+                                  {result.output ? ` — ${result.output}` : ""}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                          <div className="learning-preview-form">
+                            {previewMode === "TASK" && selectedPreviewTask && (
+                              <div>
+                                <b>{selectedPreviewTask.title}:</b>{" "}
+                                <MathContent>{selectedPreviewTask.instructions}</MathContent>
+                              </div>
+                            )}
+                            <textarea
+                              aria-label={previewMode === "TASK" && selectedPreviewTask?.type === "CODE"
+                                ? "Simulated Java code"
+                                : "Simulated learner response"}
+                              maxLength={previewMode === "TASK" && selectedPreviewTask?.type === "CODE" ? 20000 : 5000}
+                              placeholder={previewMode === "TASK" && selectedPreviewTask?.type === "CODE"
+                                ? selectedPreviewTask.starterCode || "Enter Java code"
+                                : previewMode === "TASK" && selectedPreviewTask?.type === "MATH"
+                                  ? "Enter the mathematical answer"
+                                  : "Type a simulated learner response"}
+                              rows={previewMode === "TASK" && selectedPreviewTask?.type === "CODE" ? 8 : 2}
+                              value={previewInput}
+                              onChange={(event) => setPreviewInput(event.target.value)}
+                            />
+                            {previewMode === "TASK" &&
+                              selectedPreviewTask?.type === "MATH" &&
+                              selectedPreviewTask.requireReasoning && (
+                                <textarea
+                                  aria-label="Simulated calculation reasoning"
+                                  maxLength={5000}
+                                  placeholder="Show the calculation steps"
+                                  rows={3}
+                                  value={previewReasoning}
+                                  onChange={(event) => setPreviewReasoning(event.target.value)}
+                                />
+                              )}
+                            <button
+                              className="learning-button"
+                              disabled={previewBusy || !previewInput.trim()}
+                              onClick={sendPreviewMessage}
+                              type="button"
+                            >
+                              {previewBusy
+                                ? "Evaluating…"
+                                : previewMode === "TASK"
+                                  ? "Evaluate simulated task"
+                                  : "Send response"}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </section>
                     <div className="learning-actions">
                       <button className="learning-button" disabled={saving} onClick={saveTopic} type="button">
                         {editingTopicId ? "Save topic" : "Add topic"}
@@ -1149,17 +2314,21 @@ function AdminLearning() {
                   </div>
                 </section>
               )}
-              <div className="learning-actions learning-admin-form-actions">
-                <button className="learning-button" disabled={saving} type="submit">
-                  <Save size={15} /> {saving ? "Saving…" : "Save module"}
-                </button>
-              </div>
-              {!newModule && (
-                <div className="learning-actions">
-                  <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveModule} type="button">
-                    Delete module
-                  </button>
-                </div>
+              {adminPage === "modules" && (
+                <>
+                  <div className="learning-actions learning-admin-form-actions">
+                    <button className="learning-button" disabled={saving} type="submit">
+                      <Save size={15} /> {saving ? "Saving…" : "Save module"}
+                    </button>
+                  </div>
+                  {!newModule && (
+                    <div className="learning-actions">
+                      <button className="learning-button learning-button-secondary" disabled={saving} onClick={archiveModule} type="button">
+                        Delete module
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </form>
           )}
@@ -1206,7 +2375,9 @@ function AdminLearning() {
                   setEditingTopicId("");
                   setTopicDraft(EMPTY_TOPIC);
                   setTopicError("");
-                  setAdminPage("topics-editor");
+                  setPreviewOpen(false);
+                  resetTutorPreview("NO_PRIOR_KNOWLEDGE", "");
+                  setAdminPage("topics-inline");
                 }}
                 type="button"
               >Add topic</button>
@@ -1266,6 +2437,11 @@ function StudentLearning() {
   const [savedProgramIds, setSavedProgramIds] = useState([]);
   const [moduleData, setModuleData] = useState(null);
   const [topicContent, setTopicContent] = useState(null);
+  const [objectiveStates, setObjectiveStates] = useState([]);
+  const [taskResponses, setTaskResponses] = useState({});
+  const [taskResults, setTaskResults] = useState({});
+  const [taskBusyId, setTaskBusyId] = useState("");
+  const [topicComplete, setTopicComplete] = useState(false);
   const [topicId, setTopicId] = useState("");
   const [session, setSession] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -1382,16 +2558,28 @@ function StudentLearning() {
     () => new Set((moduleData?.progress?.completedObjectiveKeys || []).map(String)),
     [moduleData?.progress?.completedObjectiveKeys],
   );
-  const topicObjectives = selectedTopic?.objectives || [];
-  const completedTopicObjectiveCount = topicObjectives.reduce(
-    (count, _objective, index) =>
-      count + Number(completedObjectiveKeys.has(objectiveProgressKey(selectedTopic._id, index))),
-    0,
+  const completedTopicIds = new Set(
+    (moduleData?.progress?.completedTopicIds || []).map(String),
   );
-  const topicProgressPercentage = topicObjectives.length
-    ? Math.round((completedTopicObjectiveCount / topicObjectives.length) * 100)
-    : 0;
-
+  const currentObjective = selectedTopic?.objectiveDefinitions?.find((objective) =>
+    objectiveStates.some((state) =>
+      state.objectiveKey === objective.key && state.state !== "MASTERED",
+    ),
+  );
+  const availableTasks = currentObjective
+    ? [
+        ...(selectedTopic?.exercises || []).map((exercise) => ({ ...exercise, subtopicId: "" })),
+        ...(selectedTopic?.subtopics || []).flatMap((subtopic) =>
+          (subtopic.exercises || []).map((exercise) => ({
+            ...exercise,
+            subtopicId: String(subtopic._id),
+          })),
+        ),
+      ].filter((exercise) =>
+        !exercise.objectiveKeys?.length ||
+        exercise.objectiveKeys.includes(currentObjective.key),
+      )
+    : [];
   const beginSession = async (module, topic) => {
     if (!topic) return;
     voiceProviders.output?.cancel();
@@ -1400,6 +2588,10 @@ function StudentLearning() {
     setVoiceInputState("idle");
     setMessage("");
     setTopicContent(null);
+    setTopicComplete(false);
+    setObjectiveStates([]);
+    setTaskResponses({});
+    setTaskResults({});
     const { data } = await api.post("/learning/sessions", {
       moduleId: module._id,
       topicId: topic._id,
@@ -1409,6 +2601,14 @@ function StudentLearning() {
       `/learning/programs/${module.programId}/modules/${module._id}/topics/${topic._id}`,
     );
     setTopicContent(topicResponse.topic);
+    setObjectiveStates(topicResponse.objectiveProgress || []);
+    setTaskResults(Object.fromEntries(
+      (topicResponse.taskResults || []).map((result) => [String(result.taskId), result]),
+    ));
+    setTopicComplete(
+      (topicResponse.objectiveProgress || []).length > 0 &&
+      topicResponse.objectiveProgress.every((state) => state.state === "MASTERED"),
+    );
     setSession(data.session);
     setMessages(data.session.messages || []);
     setTopicId(String(topic._id));
@@ -1433,13 +2633,28 @@ function StudentLearning() {
       setModuleData(data);
       const topics = data.module.topics || [];
       const saved = JSON.parse(window.localStorage.getItem("ccp-learning-last-session") || "null");
+      const completed = new Set((data.progress.completedTopicIds || []).map(String));
+      const eligible = (topic) =>
+        (topic.prerequisiteTopicIds || []).every((requiredId) => completed.has(String(requiredId)));
       const preferredTopic = saved?.moduleId === String(moduleId)
         ? topics.find((topic) => String(topic._id) === saved.topicId)
         : null;
       const firstIncomplete = topics.find((topic) =>
-        !(data.progress.completedTopicIds || []).some((id) => String(id) === String(topic._id)),
+        !completed.has(String(topic._id)) && eligible(topic),
       );
-      await beginSession(data.module, preferredTopic || firstIncomplete || topics[0]);
+      const nextTopic = (preferredTopic && eligible(preferredTopic) && !completed.has(String(preferredTopic._id))
+        ? preferredTopic
+        : firstIncomplete) || topics.find((topic) => eligible(topic) && !completed.has(String(topic._id)));
+      if (nextTopic) {
+        await beginSession(data.module, nextTopic);
+      } else {
+        setTopicId("");
+        setTopicContent(null);
+        setObjectiveStates([]);
+        setSession(null);
+        setMessages([]);
+        setTopicComplete(true);
+      }
     } catch (openError) {
       setError(openError.message || "Could not open this learning module.");
     }
@@ -1447,6 +2662,10 @@ function StudentLearning() {
 
   const selectTopic = async (topic) => {
     if (!moduleData) return;
+    if (completedTopicIds.has(String(topic._id))) return;
+    if (!(topic.prerequisiteTopicIds || []).every((requiredId) =>
+      completedTopicIds.has(String(requiredId)),
+    )) return;
     setError("");
     try {
       await beginSession(moduleData.module, topic);
@@ -1489,12 +2708,31 @@ function StudentLearning() {
       });
       setSession(data.session);
       setMessages(data.session.messages || []);
+      if (Array.isArray(data.objectiveProgress)) {
+        setObjectiveStates(data.objectiveProgress);
+      }
       if (data.progress) {
         setModuleData((current) => current && ({
           ...current,
           progress: data.progress,
           certificate: data.certificate || current.certificate,
         }));
+        const states = data.objectiveProgress || [];
+        if (states.length && states.every((state) => state.state === "MASTERED")) {
+          const completed = new Set((data.progress.completedTopicIds || []).map(String));
+          const eligibleNext = moduleData.module.topics.find((topic) =>
+            !completed.has(String(topic._id)) &&
+            (topic.prerequisiteTopicIds || []).every((requiredId) => completed.has(String(requiredId))),
+          );
+          if (eligibleNext) {
+            setNotice("Objective mastered. Moving to the next eligible topic.");
+            await beginSession(moduleData.module, eligibleNext);
+          } else {
+            setTopicComplete(true);
+            setSession(null);
+            setNotice("You have mastered every objective in this topic.");
+          }
+        }
         await loadStudentData();
         if (data.certificate) {
           setNotice(data.certificateEmailSent
@@ -1508,6 +2746,82 @@ function StudentLearning() {
       setError(sendError.message || "The tutor could not respond. Please try again.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const submitTask = async (event, exercise) => {
+    event.preventDefault();
+    if (!session || !selectedTopic || taskBusyId) return;
+    const taskId = String(exercise._id);
+    const response = taskResponses[taskId] ?? exercise.starterCode ?? "";
+    const submission = exercise.type === "CODE"
+      ? String(response)
+      : exercise.type === "MATH"
+        ? {
+            answer: String(taskResponses[`${taskId}:answer`] || ""),
+            reasoning: String(taskResponses[`${taskId}:reasoning`] || ""),
+          }
+        : { answer: String(response) };
+    if (
+      exercise.type === "MATH"
+        ? !submission.answer.trim()
+        : !String(response).trim()
+    ) return;
+    setTaskBusyId(taskId);
+    setError("");
+    try {
+      const { data } = await api.post(
+        `/learning/modules/${moduleData.module._id}/topics/${selectedTopic._id}/exercises/${taskId}`,
+        {
+          submission,
+          sessionId: session._id,
+          subtopicId: exercise.subtopicId || undefined,
+        },
+      );
+      setTaskResults((current) => ({
+        ...current,
+        [taskId]: {
+          accepted: data.accepted,
+          status: data.status,
+          feedback: data.feedback,
+          evaluation: data.evaluation,
+          visibleResults: data.visibleResults || [],
+        },
+      }));
+      setObjectiveStates(data.objectiveProgress || []);
+      if (data.progress) {
+        setModuleData((current) => current && ({
+          ...current,
+          progress: data.progress,
+          certificate: data.certificate || current.certificate,
+        }));
+        const states = data.objectiveProgress || [];
+        if (states.length && states.every((state) => state.state === "MASTERED")) {
+          const completed = new Set((data.progress.completedTopicIds || []).map(String));
+          const nextTopic = moduleData.module.topics.find((topic) =>
+            !completed.has(String(topic._id)) &&
+            (topic.prerequisiteTopicIds || []).every((requiredId) => completed.has(String(requiredId))),
+          );
+          if (nextTopic) {
+            setNotice("You demonstrated every objective. Moving to the next topic.");
+            await beginSession(moduleData.module, nextTopic);
+          } else {
+            setTopicComplete(true);
+            setSession(null);
+            setNotice("You have mastered every objective in this topic.");
+          }
+        }
+        await loadStudentData();
+        if (data.certificate) {
+          setNotice(data.certificateEmailSent
+            ? "You completed this module. Your certificate is ready and has been emailed."
+            : "You completed this module. Your certificate is ready to download.");
+        }
+      }
+    } catch (submitError) {
+      setError(submitError.message || "The task could not be evaluated. Your response is still available to retry.");
+    } finally {
+      setTaskBusyId("");
     }
   };
 
@@ -1625,8 +2939,9 @@ function StudentLearning() {
     const { module, progress } = moduleData;
     const completedTopics = progress.completedTopicIds || [];
     const moduleObjectives = module.topics.flatMap((topic) =>
-      (topic.objectives || []).map((_objective, index) =>
-        objectiveProgressKey(topic._id, index),
+      (topic.objectiveKeys || (topic.objectives || []).map((_objective, index) => index))
+        .map((objectiveKey) =>
+        objectiveProgressKey(topic._id, objectiveKey),
       ),
     );
     const moduleCompletedObjectives = moduleObjectives.filter((key) =>
@@ -1646,6 +2961,12 @@ function StudentLearning() {
               <p className="learning-eyebrow">{moduleData.program?.title || "Learning program"} · {module.title}</p>
               <h1>{selectedTopic?.title || "Choose a topic"}</h1>
               <p>{selectedTopic?.description || module.description}</p>
+              {selectedTopic && objectiveStates.length > 0 && (
+                <p className="learning-objective-summary" role="status">
+                  {objectiveStates.filter((state) => state.state === "MASTERED").length} of {objectiveStates.length} objectives mastered
+                  {currentObjective ? ` · Current objective: ${currentObjective.title}` : ""}
+                </p>
+              )}
             </div>
             <div className="learning-progress-summary">
               <span>Module objectives</span>
@@ -1657,37 +2978,16 @@ function StudentLearning() {
         {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
         {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
         <div className="learning-workspace-grid">
-          <aside className="learning-panel learning-topic-panel">
-            <h2>Topics</h2>
-            {module.topics.map((topic, index) => {
-              const isComplete = completedTopics.some((id) => String(id) === String(topic._id));
-              return (
-                <button
-                  className={`learning-topic-button${String(topic._id) === topicId ? " is-active" : ""}`}
-                  key={topic._id}
-                  onClick={() => selectTopic(topic)}
-                  type="button"
-                >
-                  <span>{isComplete ? <Check size={15} /> : <span className="learning-topic-number">{index + 1}</span>}</span>
-                  <span>{topic.title}</span>
-                  <ChevronRight size={15} />
-                </button>
-              );
-            })}
-            {moduleData.certificate && (
-              <div className="learning-certificate">
-                <Check size={17} />
-                <div>
-                  <strong>Module certificate</strong>
-                  <small>{moduleData.certificate.code}</small>
-                  <button className="learning-link-button" onClick={() => downloadCertificate(moduleData.certificate)} type="button">
-                    Download certificate
-                  </button>
-                </div>
-              </div>
-            )}
-          </aside>
           <section className="learning-panel learning-tutor-panel">
+            {topicComplete ? (
+              <div className="learning-topic-complete" role="status">
+                <Check size={24} />
+                <h2>Topic objectives mastered</h2>
+                <p>You have met every required learning objective for this topic.</p>
+                <p>Choose an available topic to continue; no extra lesson is needed here.</p>
+              </div>
+            ) : (
+            <>
               <div className="learning-panel-title">
                 <div><h2>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</h2><p>Learn one objective at a time with your tutor.</p></div>
               </div>
@@ -1743,9 +3043,105 @@ function StudentLearning() {
                 {busy && <p className="learning-muted" role="status">{voiceProfile === "boy" ? "Rishi" : "Daisy"} is thinking…</p>}
               </div>
               )}
+              {nickname && currentObjective && (
+                <section className="learning-task-area" aria-label="Objective practice tasks">
+                  <div className="learning-panel-title">
+                    <div>
+                      <h3>Try a task</h3>
+                      <p>Show what you understand about: {currentObjective.title}</p>
+                    </div>
+                  </div>
+                  {availableTasks.length === 0 ? (
+                    <p className="learning-muted">No separate task is configured for this objective. You can demonstrate your understanding in the conversation.</p>
+                  ) : availableTasks.map((exercise) => {
+                    const taskId = String(exercise._id);
+                    const result = taskResults[taskId];
+                    return (
+                      <form
+                        className="learning-task-card"
+                        key={taskId}
+                        onSubmit={(event) => submitTask(event, exercise)}
+                      >
+                        <div>
+                          <strong>{exercise.title}</strong>
+                          <div><MathContent>{exercise.instructions}</MathContent></div>
+                        </div>
+                        {exercise.type === "MATH" ? (
+                          <>
+                            <label className="learning-field">
+                              Your answer{exercise.unit ? ` (${exercise.unit})` : ""}
+                              <input
+                                aria-label={`${exercise.title} answer`}
+                                inputMode="decimal"
+                                maxLength={3000}
+                                value={taskResponses[`${taskId}:answer`] || ""}
+                                onChange={(event) => setTaskResponses((current) => ({
+                                  ...current,
+                                  [`${taskId}:answer`]: event.target.value,
+                                }))}
+                              />
+                            </label>
+                            {exercise.requireReasoning && (
+                              <label className="learning-field">
+                                How did you work it out?
+                                <textarea
+                                  rows={3}
+                                  maxLength={3000}
+                                  value={taskResponses[`${taskId}:reasoning`] || ""}
+                                  onChange={(event) => setTaskResponses((current) => ({
+                                    ...current,
+                                    [`${taskId}:reasoning`]: event.target.value,
+                                  }))}
+                                />
+                              </label>
+                            )}
+                          </>
+                        ) : (
+                          <label className="learning-field">
+                            {exercise.type === "CODE" ? "Your Java solution" : "Your response"}
+                            <textarea
+                              className={exercise.type === "CODE" ? "learning-task-code" : ""}
+                              maxLength={exercise.type === "CODE" ? 20000 : 5000}
+                              rows={exercise.type === "CODE" ? 9 : 4}
+                              value={taskResponses[taskId] ?? exercise.starterCode ?? ""}
+                              onChange={(event) => setTaskResponses((current) => ({
+                                ...current,
+                                [taskId]: event.target.value,
+                              }))}
+                            />
+                          </label>
+                        )}
+                        <button
+                          className="learning-button"
+                          disabled={Boolean(taskBusyId) || !session}
+                          type="submit"
+                        >
+                          {taskBusyId === taskId ? "Checking…" : "Submit response"}
+                        </button>
+                        {result && (
+                          <div
+                            className={`learning-task-result${result.accepted ? " is-success" : ""}`}
+                            aria-live="polite"
+                          >
+                            <strong>{result.accepted ? "Task completed" : String(result.status || "NEEDS_REVIEW").replaceAll("_", " ")}</strong>
+                            <p>{result.feedback}</p>
+                            {(result.visibleResults || []).map((visible, index) => (
+                              <pre key={`${visible.testCase || index}-${index}`}>
+                                Example {visible.testCase || index + 1}: {visible.status}
+                                {visible.output ? `\n${visible.output}` : ""}
+                              </pre>
+                            ))}
+                          </div>
+                        )}
+                      </form>
+                    );
+                  })}
+                </section>
+              )}
               {nickname && <form className="learning-chat-form" onSubmit={(event) => { event.preventDefault(); sendMessage(); }}>
                 <textarea
                   aria-label="Message the AI tutor"
+                  className="learning-chat-input"
                   maxLength={2000}
                   placeholder="Ask a question about this topic"
                   rows={2}
@@ -1786,45 +3182,30 @@ function StudentLearning() {
                 <p className="learning-help" role="status">Transcribing locally. First use may download the offline speech model.</p>
               )}
               {voiceError && <p className="learning-alert learning-alert-error" role="status">{voiceError}</p>}
+            </>
+            )}
           </section>
-          <aside className="learning-panel learning-lesson-panel learning-objective-card">
-            {selectedTopic ? (
-              <>
-                <div className="learning-panel-title">
-                  <div>
-                    <h2>{selectedTopic.title}</h2>
-                    <p>{selectedTopic.description}</p>
-                  </div>
-                  <strong className="learning-objective-count">
-                    {completedTopicObjectiveCount}/{topicObjectives.length}
-                  </strong>
-                </div>
-                <div className="learning-objective-progress">
-                  <span style={{ width: `${topicProgressPercentage}%` }} />
-                </div>
-                <p className="learning-objective-progress-label">
-                  {completedTopicObjectiveCount} of {topicObjectives.length} objectives complete
-                </p>
-                <div className="learning-objective-list">
-                  {topicObjectives.map((objective, index) => {
-                    const isComplete = completedObjectiveKeys.has(
-                      objectiveProgressKey(selectedTopic._id, index),
-                    );
-                    return (
-                      <div className="learning-objective-item" key={`${objective}-${index}`}>
-                        <span className={isComplete ? "is-complete" : ""}>
-                          {isComplete ? <Check size={14} /> : index + 1}
-                        </span>
-                        <p>{objective}</p>
-                      </div>
-                    );
-                  })}
-                  {!topicObjectives.length && (
-                    <p className="learning-muted">This topic has no learning objectives yet.</p>
-                  )}
-                </div>
-              </>
-            ) : <p className="learning-muted">Choose a topic to see its objectives.</p>}
+          <aside className="learning-panel learning-topic-panel">
+            <h2>Topics</h2>
+            {module.topics.map((topic, index) => {
+              const isComplete = completedTopics.some((id) => String(id) === String(topic._id));
+              const isPrerequisiteLocked = !(topic.prerequisiteTopicIds || []).every((requiredId) =>
+                completedTopics.some((id) => String(id) === String(requiredId)),
+              );
+              return (
+                <button
+                  className={`learning-topic-button${String(topic._id) === topicId ? " is-active" : ""}`}
+                  key={topic._id}
+                  onClick={() => selectTopic(topic)}
+                  disabled={isComplete || isPrerequisiteLocked}
+                  type="button"
+                >
+                  <span>{isComplete ? <Check size={15} /> : <span className="learning-topic-number">{index + 1}</span>}</span>
+                  <span>{topic.title}</span>
+                  {isPrerequisiteLocked ? <span className="learning-muted">Locked</span> : <ChevronRight size={15} />}
+                </button>
+              );
+            })}
           </aside>
         </div>
       </div>
@@ -1870,33 +3251,46 @@ function StudentLearning() {
                     : `${module.progress.completedTopics || 0} topics completed`}
                 </span>
               </div>
-              {module.hasAccess ? (
-                <button
-                  className="learning-button"
-                  onClick={() => openModule(selectedProgram._id, module._id)}
-                  type="button"
-                >
-                  Start now
-                  <ChevronRight size={15} />
-                </button>
-              ) : (
-                <button
-                  className="learning-button"
-                  disabled={module.purchaseStatus === "PENDING" || module.purchaseStatus === "ACTIVE"}
-                  onClick={() => requestPurchase({ moduleId: module._id })}
-                  type="button"
-                >
-                  {module.purchaseStatus === "PENDING"
-                    ? "Payment pending"
-                    : module.purchaseStatus === "ACTIVE"
-                      ? "Prerequisite required"
-                      : module.purchaseStatus === "EXPIRED"
-                        ? `Repurchase · ${displayPrice(module.price, module.currency)}`
-                        : Number(module.price) === 0
-                          ? "Start free module"
-                          : `Pay ${displayPrice(module.price, module.currency)}`}
-                </button>
-              )}
+              <div className="learning-module-card-actions">
+                {module.hasAccess ? (
+                  <button
+                    className="learning-button"
+                    onClick={() => openModule(selectedProgram._id, module._id)}
+                    type="button"
+                  >
+                    Start now
+                    <ChevronRight size={15} />
+                  </button>
+                ) : (
+                  <button
+                    className="learning-button"
+                    disabled={module.purchaseStatus === "PENDING" || module.purchaseStatus === "ACTIVE"}
+                    onClick={() => requestPurchase({ moduleId: module._id })}
+                    type="button"
+                  >
+                    {module.purchaseStatus === "PENDING"
+                      ? "Payment pending"
+                      : module.purchaseStatus === "ACTIVE"
+                        ? "Prerequisite required"
+                        : module.purchaseStatus === "EXPIRED"
+                          ? `Repurchase · ${displayPrice(module.price, module.currency)}`
+                          : Number(module.price) === 0
+                            ? "Start free module"
+                            : `Pay ${displayPrice(module.price, module.currency)}`}
+                  </button>
+                )}
+                {module.progress.completed && module.certificate && (
+                  <button
+                    aria-label={`Download certificate for ${module.title}`}
+                    className="learning-certificate-download"
+                    onClick={() => downloadCertificate(module.certificate)}
+                    title="Download certificate"
+                    type="button"
+                  >
+                    <Download size={17} />
+                  </button>
+                )}
+              </div>
             </article>
           ))}
           {!selectedProgram.modules.length && (

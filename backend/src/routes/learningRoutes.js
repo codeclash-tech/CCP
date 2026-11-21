@@ -70,6 +70,7 @@ router.post(
 router.post(
   "/modules/:moduleId/topics/:topicId/exercises/:exerciseId",
   ...student,
+  learningTutorLimiter,
   executionLimiter,
   asyncRoute(learningController.submitExercise),
 );
@@ -120,6 +121,24 @@ router.post(
   "/admin/modules/:moduleId/topics",
   ...admin,
   asyncRoute(learningController.createTopic),
+);
+router.post(
+  "/admin/modules/:moduleId/topic-proposals",
+  ...admin,
+  learningTutorLimiter,
+  asyncRoute(learningController.createTopicProposal),
+);
+router.post(
+  "/admin/modules/:moduleId/topics/:topicId/preview",
+  ...admin,
+  learningTutorLimiter,
+  asyncRoute(learningController.previewTopicTutor),
+);
+router.post(
+  "/admin/modules/:moduleId/topic-preview",
+  ...admin,
+  learningTutorLimiter,
+  asyncRoute(learningController.previewTopicTutor),
 );
 router.patch(
   "/admin/modules/:moduleId/topics/:topicId",
