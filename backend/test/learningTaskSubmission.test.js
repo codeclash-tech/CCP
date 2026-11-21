@@ -9,6 +9,7 @@ import LearningProgress from "../src/models/LearningProgress.js";
 import LearningProgram from "../src/models/LearningProgram.js";
 import LearningPurchase from "../src/models/LearningPurchase.js";
 import LearningSession from "../src/models/LearningSession.js";
+import config from "../src/config/env.js";
 import { executionService } from "../src/services/executionService.js";
 import { submitLearningExercise } from "../src/services/learningService.js";
 
@@ -98,6 +99,8 @@ function createFixture(exercise) {
     moduleVersion: 1,
     topicId,
     language: "en",
+    learningStage: "OBJECTIVE_VERIFICATION",
+    awaitingTeachingIntroduction: false,
   });
   return { userId, module, progress, session, topicId, exercise: module.topics[0].exercises[0] };
 }
@@ -141,6 +144,77 @@ test("mathematics task uses deterministic expression evaluation and records calc
     assert.equal(fixture.progress.taskAttempts.length, 1);
     assert.equal(runnerCalls, 0);
   });
+});
+
+test("incorrect deterministic answers receive a progressive hint without answer leakage", async () => {
+  const fixture = createFixture({
+    type: "MATH",
+    title: "Calculate the result",
+    instructions: "Evaluate the expression.",
+    objectiveKeys: ["task-objective"],
+    expectedAnswer: "4",
+    numericTolerance: 0,
+    requireReasoning: false,
+    tests: [],
+  });
+  const originalFetch = globalThis.fetch;
+  const originalConfig = {
+    AI_PROVIDER: config.AI_PROVIDER,
+    AI_MODEL: config.AI_MODEL,
+    AI_BASE_URL: config.AI_BASE_URL,
+    AI_API_KEY: config.AI_API_KEY,
+    AI_TIMEOUT_MS: config.AI_TIMEOUT_MS,
+  };
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "http://hint-provider/api/chat");
+    requestBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      json: async () => ({
+        message: {
+          content: JSON.stringify({
+            reply: "Think about the order in which the operations are applied.",
+          }),
+        },
+      }),
+    };
+  };
+  Object.assign(config, {
+    AI_PROVIDER: "ollama",
+    AI_MODEL: "hint-test-model",
+    AI_BASE_URL: "http://hint-provider",
+    AI_API_KEY: "",
+    AI_TIMEOUT_MS: "1000",
+  });
+
+  try {
+    await withLearningStubs({
+      ...fixture,
+      execute: async () => {
+        throw new Error("Mathematics must not use Java execution.");
+      },
+    }, async () => {
+      const result = await submitLearningExercise(
+        fixture.userId,
+        fixture.module._id,
+        fixture.topicId,
+        fixture.exercise._id,
+        { answer: "2" },
+        null,
+        { sessionId: fixture.session._id },
+      );
+
+      assert.equal(result.accepted, false);
+      assert.match(result.feedback, /order in which the operations are applied/i);
+      assert.match(requestBody.messages[0].content, /hint level 1/i);
+      assert.equal(JSON.stringify(requestBody).includes('"expectedAnswer"'), false);
+      assert.equal(fixture.progress.completedObjectiveKeys.length, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    Object.assign(config, originalConfig);
+  }
 });
 
 test("Java tasks use the secure runner, hide hidden test results, and replay idempotently", async () => {
@@ -193,11 +267,127 @@ test("Java tasks use the secure runner, hide hidden test results, and replay ide
     assert.equal(sentTests.length, 2);
     assert.equal(result.visibleResults.length, 1);
     assert.equal(JSON.stringify(result).includes("10 15"), false);
-    assert.equal(JSON.stringify(result).includes("25"), false);
+    assert.equal(result.visibleResults.some((visible) => visible.output === "25"), false);
     assert.deepEqual(fixture.progress.completedObjectiveKeys, [`${fixture.topicId}:task-objective`]);
     assert.equal(replay.accepted, true);
     assert.equal(fixture.progress.taskAttempts.length, 1);
     assert.equal(fixture.progress.taskAttempts[0].duplicateCount, 1);
+    assert.equal(fixture.session.learningStage, "TOPIC_COMPLETED");
+    assert.equal(fixture.session.messages.length, 2);
+  });
+});
+
+test("failed Java tasks receive a hint without sending hidden test outputs to the tutor", async () => {
+  const fixture = createFixture({
+    type: "CODE",
+    title: "Write a Java method",
+    instructions: "Return the sum of two values.",
+    language: "java",
+    objectiveKeys: ["task-objective"],
+    criterionKeys: ["task-criterion"],
+    tests: [
+      { input: "1 2", expectedOutput: "3", visible: true },
+      { input: "10 15", expectedOutput: "25", visible: false },
+    ],
+  });
+  const originalFetch = globalThis.fetch;
+  const originalConfig = {
+    AI_PROVIDER: config.AI_PROVIDER,
+    AI_MODEL: config.AI_MODEL,
+    AI_BASE_URL: config.AI_BASE_URL,
+    AI_API_KEY: config.AI_API_KEY,
+    AI_TIMEOUT_MS: config.AI_TIMEOUT_MS,
+  };
+  let requestBody;
+  globalThis.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return {
+      ok: true,
+      json: async () => ({
+        message: {
+          content: JSON.stringify({
+            reply: "Trace how each input value contributes to the result.",
+          }),
+        },
+      }),
+    };
+  };
+  Object.assign(config, {
+    AI_PROVIDER: "ollama",
+    AI_MODEL: "hint-test-model",
+    AI_BASE_URL: "http://hint-provider",
+    AI_API_KEY: "",
+    AI_TIMEOUT_MS: "1000",
+  });
+
+  try {
+    await withLearningStubs({
+      ...fixture,
+      execute: async () => ({
+        accepted: false,
+        status: "WRONG_ANSWER",
+        passed: 0,
+        total: 2,
+        results: [
+          { testCase: 1, status: "FAILED", output: "wrong", executionTime: 1 },
+          { testCase: 2, status: "FAILED", output: "secret-output", executionTime: 1 },
+        ],
+      }),
+    }, async () => {
+      const result = await submitLearningExercise(
+        fixture.userId,
+        fixture.module._id,
+        fixture.topicId,
+        fixture.exercise._id,
+        "class Solution { }",
+        null,
+        { sessionId: fixture.session._id },
+      );
+
+      assert.equal(result.accepted, false);
+      assert.match(result.feedback, /Trace how each input value/i);
+      assert.equal(JSON.stringify(requestBody).includes("secret-output"), false);
+      assert.equal(JSON.stringify(requestBody).includes("25"), false);
+      assert.equal(result.visibleResults.length, 1);
+      assert.equal(fixture.progress.completedObjectiveKeys.length, 0);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+    Object.assign(config, originalConfig);
+  }
+});
+
+test("verification tasks cannot be submitted during the teaching stage", async () => {
+    const fixture = createFixture({
+      type: "MATH",
+      title: "Calculate the result",
+      instructions: "Evaluate the expression.",
+      objectiveKeys: ["task-objective"],
+      expectedAnswer: "4",
+      numericTolerance: 0,
+      requireReasoning: false,
+      tests: [],
+    });
+    fixture.session.learningStage = "TEACHING";
+    await withLearningStubs({
+      ...fixture,
+      execute: async () => {
+        throw new Error("Mathematics must not use Java execution.");
+      },
+    }, async () => {
+      await assert.rejects(
+        submitLearningExercise(
+          fixture.userId,
+          fixture.module._id,
+          fixture.topicId,
+          fixture.exercise._id,
+          { answer: "4" },
+          null,
+          { sessionId: fixture.session._id },
+        ),
+        /Finish the teaching conversation before submitting a verification task/,
+      );
+      assert.equal(fixture.progress.taskAttempts.length, 0);
   });
 });
 

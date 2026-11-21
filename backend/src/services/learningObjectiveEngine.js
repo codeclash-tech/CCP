@@ -64,16 +64,35 @@ export function objectiveProgressKey(topicId, objectiveKey) {
   return `${String(topicId?._id || topicId)}:${String(objectiveKey)}`;
 }
 
-function hasMastery(completedKeys, topicId, objective) {
-  return completedKeys.has(objectiveProgressKey(topicId, objective.key)) ||
+function hasMastery(completedKeys, topicId, objective, evidence = [], moduleVersion = null) {
+  const completed = completedKeys.has(objectiveProgressKey(topicId, objective.key)) ||
     (objective.legacyIndex >= 0 &&
       completedKeys.has(objectiveProgressKey(topicId, objective.legacyIndex)));
+  if (!completed) return false;
+  const objectiveEvidence = evidence.filter((item) =>
+    String(item.topicId) === String(topicId) &&
+    String(item.objectiveKey) === objective.key &&
+    (moduleVersion === null || Number(item.moduleVersion) === Number(moduleVersion)),
+  );
+  if (objective.legacy && !objectiveEvidence.length) return true;
+  const independentEvidence = objectiveEvidence.filter((item) => item.sourceType !== "TUTOR");
+  return objective.masteryCriteria.length > 0 &&
+    objective.masteryCriteria.every((criterion) =>
+      criterionEvidenceCount(independentEvidence, topicId, moduleVersion, objective, criterion) >=
+        criterion.requiredEvidenceCount,
+    );
 }
 
-function prerequisiteObjectivesMet(objective, objectives, completedKeys, topicId) {
+function prerequisiteObjectivesMet(objective, objectives, completedKeys, topicId, evidence, moduleVersion) {
   return objective.prerequisites.every((key) => {
     const prerequisite = objectives.find((item) => item.key === key);
-    return prerequisite && hasMastery(completedKeys, topicId, prerequisite);
+    return prerequisite && hasMastery(
+      completedKeys,
+      topicId,
+      prerequisite,
+      evidence,
+      moduleVersion,
+    );
   });
 }
 
@@ -81,7 +100,9 @@ function criterionEvidenceCount(evidence, topicId, moduleVersion, objective, cri
   return evidence
     .filter((item) =>
       String(item.topicId) === String(topicId) &&
-      Number(item.moduleVersion) === Number(moduleVersion) &&
+      (moduleVersion === null ||
+        moduleVersion === undefined ||
+        Number(item.moduleVersion) === Number(moduleVersion)) &&
       String(item.objectiveKey) === objective.key,
     )
     .reduce(
@@ -96,13 +117,22 @@ export function getObjectiveProgress(topic, progress = {}, activeObjectiveKey = 
   const objectives = getTopicObjectives(topic);
   const completedKeys = new Set((progress.completedObjectiveKeys || []).map(String));
   const evidence = progress.objectiveEvidence || [];
+  const independentEvidence = evidence.filter((item) => item.sourceType !== "TUTOR");
   return objectives.map((objective) => {
-    const mastered = hasMastery(completedKeys, topic._id, objective);
+    const mastered = hasMastery(
+      completedKeys,
+      topic._id,
+      objective,
+      evidence,
+      progress.moduleVersion,
+    );
     const prerequisitesMet = prerequisiteObjectivesMet(
       objective,
       objectives,
       completedKeys,
       topic._id,
+      evidence,
+      progress.moduleVersion,
     );
     const profile = (progress.objectiveProfiles || []).find(
       (item) =>
@@ -129,7 +159,7 @@ export function getObjectiveProgress(topic, progress = {}, activeObjectiveKey = 
         criterionKey: criterion.key,
         requiredEvidenceCount: criterion.requiredEvidenceCount,
         demonstratedCount: criterionEvidenceCount(
-          evidence,
+          independentEvidence,
           topic._id,
           progress.moduleVersion,
           objective,
@@ -161,8 +191,15 @@ export function evaluateObjectiveEvidence({
   const objectives = getTopicObjectives(topic);
   const completed = new Set(completedObjectiveKeys.map(String));
   const target = objectives.find((objective) =>
-    !hasMastery(completed, topic._id, objective) &&
-    prerequisiteObjectivesMet(objective, objectives, completed, topic._id),
+    !hasMastery(completed, topic._id, objective, existingEvidence, moduleVersion) &&
+    prerequisiteObjectivesMet(
+      objective,
+      objectives,
+      completed,
+      topic._id,
+      existingEvidence,
+      moduleVersion,
+    ),
   );
   if (!target || !Array.isArray(proposals)) {
     return { evidence: [], masteredObjectiveKeys: [], targetObjectiveKey: target?.key || null };
@@ -255,10 +292,11 @@ export function evaluateObjectiveEvidence({
       }]
     : [];
   const evidence = [...existingEvidence, ...accepted];
+  const independentEvidence = evidence.filter((item) => item.sourceType !== "TUTOR");
   const mastered = target.masteryCriteria.length > 0 &&
     target.masteryCriteria.every((criterion) =>
       criterionEvidenceCount(
-        evidence,
+        independentEvidence,
         topic._id,
         moduleVersion,
         target,

@@ -112,6 +112,7 @@ test("Groq tutor receives the student's current question and preserves the sessi
           message: {
             content: JSON.stringify({
               reply: "A variable stores a value. What can you use a variable to store?",
+              teachingComplete: true,
               objectiveEvidence: [{
                 objectiveKey: "variable-storage",
                 criteria: [{
@@ -163,9 +164,10 @@ test("Groq tutor receives the student's current question and preserves the sessi
     assert.equal(result.reply, "A variable stores a value. What can you use a variable to store?");
     assert.equal(result.replyLanguage, "en");
     assert.equal(session.language, "en");
-    assert.deepEqual(objectiveProgress.completedObjectiveKeys, [`${topicId}:variable-storage`]);
-    assert.deepEqual(objectiveProgress.completedTopicIds.map(String), [String(topicId)]);
-    assert.equal(result.progress.progressPercentage, 100);
+    assert.equal(session.learningStage, "OBJECTIVE_VERIFICATION");
+    assert.deepEqual(objectiveProgress.completedObjectiveKeys, []);
+    assert.deepEqual(objectiveProgress.completedTopicIds, []);
+    assert.equal(result.progress, null);
     assert.deepEqual(
       session.messages.slice(-2).map(({ role, content }) => ({ role, content })),
       [

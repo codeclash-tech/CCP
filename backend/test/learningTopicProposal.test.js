@@ -146,3 +146,97 @@ test("malformed AI curriculum is rejected and recorded as a failed proposal", as
     assert.equal(usage[0].succeeded, false);
   });
 });
+
+test("source-based curriculum previews preserve pasted objectives and flag partial coverage", async () => {
+  const sourceContent = "A logical address identifies a network endpoint and helps a router forward packets.";
+  const objectivesText = [
+    "- Explain how a logical address identifies a network endpoint.",
+    "- Apply logical addressing to packet routing.",
+  ].join("\n");
+  const sourceProposal = {
+    objectiveDefinitions: [
+      {
+        key: "logical-address-purpose",
+        title: "Explain how a logical address identifies a network endpoint.",
+        description: "Explain how a logical address identifies a network endpoint.",
+        requiredKnowledge: ["A logical address identifies a network endpoint."],
+        expectedOutcome: "Explain the role of a logical address.",
+        masteryCriteria: [{
+          key: "purpose",
+          description: "Explain what a logical address identifies.",
+          evaluationMethod: "EXPLANATION",
+          requiredEvidenceCount: 1,
+        }],
+        commonMisconceptions: [],
+        prerequisites: [],
+      },
+      {
+        key: "apply-logical-address",
+        title: "Apply logical addressing to packet routing.",
+        description: "Apply logical addressing to packet routing.",
+        requiredKnowledge: ["A router forwards packets."],
+        expectedOutcome: "Apply logical addressing in a routing scenario.",
+        masteryCriteria: [{
+          key: "application",
+          description: "Apply the concept to a routing scenario.",
+          evaluationMethod: "APPLICATION",
+          requiredEvidenceCount: 1,
+        }],
+        commonMisconceptions: [],
+        prerequisites: ["logical-address-purpose"],
+      },
+    ],
+    coverageReport: [
+      {
+        objectiveKey: "logical-address-purpose",
+        status: "COVERED",
+        sourceExcerpt: "A logical address identifies a network endpoint",
+        notes: "The source directly states the identification role.",
+      },
+      {
+        objectiveKey: "apply-logical-address",
+        status: "PARTIAL",
+        sourceExcerpt: "helps a router forward packets",
+        notes: "The source does not describe a complete routing scenario.",
+      },
+    ],
+    practiceTasks: [
+      {
+        type: "ACTIVITY",
+        title: "Explain addressing",
+        instructions: "Explain what a logical address identifies.",
+        objectiveKeys: ["logical-address-purpose"],
+      },
+      {
+        type: "ACTIVITY",
+        title: "Apply addressing",
+        instructions: "Reason about a new packet-routing scenario.",
+        objectiveKeys: ["apply-logical-address"],
+      },
+    ],
+  };
+
+  await withStubs(JSON.stringify(sourceProposal), async () => {
+    const result = await generateLearningTopicProposal(
+      "507f1f77bcf86cd799439001",
+      "507f1f77bcf86cd799439002",
+      {
+        title: "Logical addressing",
+        description: "Understand network addressing.",
+        objectivesText,
+        referenceContent: sourceContent,
+      },
+    );
+
+    assert.deepEqual(result.proposal.objectives, [
+      "Explain how a logical address identifies a network endpoint.",
+      "Apply logical addressing to packet routing.",
+    ]);
+    assert.equal(result.proposal.objectiveDefinitions[0].title, result.proposal.objectives[0]);
+    assert.equal(result.proposal.coreKnowledge[0].content, sourceContent);
+    assert.equal(result.proposal.coverageReport[0].status, "COVERED");
+    assert.equal(result.proposal.coverageIssues.length, 1);
+    assert.equal(result.proposal.coverageIssues[0].status, "PARTIAL");
+    assert.equal(result.proposal.practiceTasks.length, 2);
+  });
+});

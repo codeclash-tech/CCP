@@ -99,6 +99,14 @@ test("written learning activities are evaluated, evidence-gated, and never invok
       return this;
     },
   };
+  const session = new LearningSession({
+    userId: progress.userId,
+    moduleId: module._id,
+    moduleVersion: 1,
+    topicId: module.topics[0]._id,
+    learningStage: "OBJECTIVE_VERIFICATION",
+    awaitingTeachingIntroduction: false,
+  });
   LearningModule.findOne = () => ({ select: async () => currentModule });
   LearningModule.findById = async () => module;
   LearningModuleVersion.findOne = () => ({ lean: async () => null });
@@ -114,7 +122,7 @@ test("written learning activities are evaluated, evidence-gated, and never invok
       return this;
     },
     async then(resolve, reject) {
-      return Promise.resolve(null).then(resolve, reject);
+      return Promise.resolve(session).then(resolve, reject);
     },
   });
   LearningSession.prototype.save = async function saveSession() { return this; };

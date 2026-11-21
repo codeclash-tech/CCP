@@ -53,6 +53,9 @@ const EMPTY_TOPIC = {
   title: "",
   subject: "",
   description: "",
+  objectivesText: "",
+  curriculumProposal: null,
+  curriculumApproved: false,
   estimatedDurationMinutes: "",
   prerequisiteTopicIds: [],
   coreKnowledgeText: "",
@@ -129,6 +132,11 @@ function createTopicDraft(topic = {}) {
     title: topic.title || "",
     subject: topic.subject || "",
     description: topic.description || "",
+    objectivesText: (topic.objectives?.length
+      ? topic.objectives
+      : objectiveDefinitions.map((objective) => objective.title)).join("\n"),
+    curriculumProposal: null,
+    curriculumApproved: false,
     estimatedDurationMinutes: topic.estimatedDurationMinutes || "",
     prerequisiteTopicIds: (topic.prerequisiteTopicIds || []).map(String),
     coreKnowledgeText: typeof coreKnowledge?.content === "string"
@@ -480,6 +488,10 @@ function AdminLearning() {
       setTopicError("Add a short topic description.");
       return;
     }
+    if (adminPage === "topics-editor" && !topicDraft.curriculumApproved) {
+      setTopicError("Review and approve the generated curriculum preview before saving.");
+      return;
+    }
     const objectiveDefinitions = topicDraft.objectiveDefinitions
       .map((objective) => ({
         ...objective,
@@ -599,6 +611,7 @@ function AdminLearning() {
           title: topicDraft.title.trim(),
           subject: topicDraft.subject.trim(),
           description: topicDraft.description.trim(),
+          objectivesText: topicDraft.objectivesText.trim(),
           referenceContent: topicDraft.coreKnowledgeText.trim(),
         },
       );
@@ -610,6 +623,7 @@ function AdminLearning() {
         title: proposal.title,
         subject: proposal.subject,
         description: proposal.description,
+        objectivesText: (proposal.objectives || []).join("\n"),
         estimatedDurationMinutes: String(proposal.estimatedDurationMinutes),
         coreKnowledge: knowledge,
         coreKnowledgeKey: explanation?.key || "core-explanation",
@@ -621,20 +635,28 @@ function AdminLearning() {
           requiredKnowledgeText: (objective.requiredKnowledge || []).join("\n"),
           commonMisconceptionsText: (objective.commonMisconceptions || []).join("\n"),
         })),
-        exercises: [
-          ...current.exercises,
-          ...(proposal.practiceTasks || []).map((task) => ({
-            type: "ACTIVITY",
-            title: task.title,
-            instructions: task.instructions,
-            objectiveKeys: task.objectiveKeys,
-            starterCode: "",
-            language: "java",
-            tests: [],
-          })),
-        ],
+        curriculumProposal: proposal,
+        curriculumApproved: false,
+        exercises: (proposal.practiceTasks || []).map((task) => ({
+          type: task.type || "ACTIVITY",
+          title: task.title,
+          instructions: task.instructions,
+          objectiveKeys: task.objectiveKeys,
+          criterionKeys: task.criterionKeys || [],
+          evaluationMethod: task.evaluationMethod || (task.type === "MATH" ? "CALCULATION" : "EXPLANATION"),
+          expectedAnswer: task.expectedAnswer || "",
+          acceptedAnswers: task.acceptedAnswers || [],
+          variables: task.variables || {},
+          unit: task.unit || "",
+          numericTolerance: task.numericTolerance ?? 0.000001,
+          requireReasoning: task.requireReasoning === true,
+          requireUnit: task.requireUnit === true,
+          starterCode: task.starterCode || "",
+          language: task.language || "java",
+          tests: task.tests || [],
+        })),
       }));
-      setNotice("AI proposal ready. Review and edit the objectives, criteria, knowledge, and tasks before saving to approve it.");
+      setNotice("Curriculum preview ready. Review every objective and content-coverage result, then approve it before saving.");
     } catch (proposalError) {
       setError(proposalError.message || "Could not generate an AI topic proposal.");
     } finally {
@@ -755,7 +777,7 @@ function AdminLearning() {
   };
 
   const editTopic = (topic) => {
-    setAdminPage("topics-inline");
+    setAdminPage("topics-editor");
     setEditingTopicId(String(topic._id));
     setTopicError("");
     setTopicDraft(createTopicDraft(topic));
@@ -2377,48 +2399,160 @@ function AdminLearning() {
                   setTopicError("");
                   setPreviewOpen(false);
                   resetTutorPreview("NO_PRIOR_KNOWLEDGE", "");
-                  setAdminPage("topics-inline");
+                  setAdminPage("topics-editor");
                 }}
                 type="button"
               >Add topic</button>
             </section>
           )}
           {adminPage === "topics-editor" && moduleId && !newModule && (
-            <section
-              className="learning-panel learning-topic-management"
-              onBlur={(event) => {
-                if (
-                  !event.currentTarget.contains(event.relatedTarget) &&
-                  topicDraft.title.trim() &&
-                  topicDraft.description.trim() &&
-                  topicDraft.objectivesText.trim() &&
-                  !saving
-                ) void saveTopic();
-              }}
-            >
+            <section className="learning-panel learning-topic-management">
               <h2>{editingTopicId ? "Edit topic" : "Create topic"}</h2>
+              <p className="learning-help">
+                Provide the source material and objectives. CodeClash will draft the teaching and verification structure for your review.
+              </p>
               {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
               <label className="learning-field">
-                Topic name
-                <input required maxLength={160} value={topicDraft.title} onChange={(event) => setTopicDraft({ ...topicDraft, title: event.target.value })} />
-              </label>
-              <label className="learning-field">
-                Description
-                <textarea required rows={2} maxLength={2000} value={topicDraft.description} onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })} />
-              </label>
-              <label className="learning-field">
-                Objective content
-                <textarea
+                Topic title
+                <input
                   required
-                  rows={8}
-                  maxLength={12000}
-                  placeholder="Paste one expected learning objective per line. This is the only content the tutor will teach."
-                  value={topicDraft.objectivesText}
-                  onChange={(event) => setTopicDraft({ ...topicDraft, objectivesText: event.target.value })}
+                  maxLength={160}
+                  value={topicDraft.title}
+                  onChange={(event) => setTopicDraft({
+                    ...topicDraft,
+                    title: event.target.value,
+                    curriculumProposal: null,
+                    curriculumApproved: false,
+                  })}
                 />
               </label>
+              <label className="learning-field">
+                Short description
+                <textarea
+                  required
+                  rows={2}
+                  maxLength={2000}
+                  value={topicDraft.description}
+                  onChange={(event) => setTopicDraft({
+                    ...topicDraft,
+                    description: event.target.value,
+                    curriculumProposal: null,
+                    curriculumApproved: false,
+                  })}
+                />
+              </label>
+              <label className="learning-field">
+                Learning objectives
+                <textarea
+                  required
+                  rows={6}
+                  maxLength={12000}
+                  placeholder={"Paste objectives as bullets or paragraphs.\n\n- Explain how a class groups related code.\n- Construct a basic program using the main method."}
+                  value={topicDraft.objectivesText}
+                  onChange={(event) => setTopicDraft({
+                    ...topicDraft,
+                    objectivesText: event.target.value,
+                    curriculumProposal: null,
+                    curriculumApproved: false,
+                  })}
+                />
+              </label>
+              <label className="learning-field">
+                Content delivery
+                <textarea
+                  required
+                  rows={14}
+                  maxLength={64000}
+                  placeholder="Paste the authoritative explanations, definitions, examples, code, formulas, procedures, or other learning material."
+                  value={topicDraft.coreKnowledgeText}
+                  onChange={(event) => setTopicDraft({
+                    ...topicDraft,
+                    coreKnowledgeText: event.target.value,
+                    curriculumProposal: null,
+                    curriculumApproved: false,
+                  })}
+                />
+              </label>
+              {!!moduleForm.topics?.length && (
+                <label className="learning-field">
+                  Prerequisite topics (optional)
+                  <select
+                    multiple
+                    value={topicDraft.prerequisiteTopicIds}
+                    onChange={(event) => setTopicDraft({
+                      ...topicDraft,
+                      prerequisiteTopicIds: [...event.target.selectedOptions].map((option) => option.value),
+                    })}
+                  >
+                    {moduleForm.topics
+                      .filter((topic) => String(topic._id) !== editingTopicId)
+                      .map((topic) => (
+                        <option key={topic._id} value={String(topic._id)}>{topic.title}</option>
+                      ))}
+                  </select>
+                </label>
+              )}
+              <button
+                className="learning-button learning-button-secondary"
+                disabled={saving || !topicDraft.title.trim() || !topicDraft.objectivesText.trim() || !topicDraft.coreKnowledgeText.trim()}
+                onClick={generateTopicProposal}
+                type="button"
+              >
+                {saving ? "Analyzing curriculum…" : "Generate curriculum preview"}
+              </button>
+              {topicDraft.curriculumProposal && (
+                <section className="learning-topic-editor-group" aria-label="Generated curriculum preview">
+                  <h3>Curriculum preview</h3>
+                  {topicDraft.curriculumProposal.coverageReport?.map((item) => {
+                    const objective = topicDraft.objectiveDefinitions.find(
+                      (candidate) => candidate.key === item.objectiveKey,
+                    );
+                    return (
+                      <article className="learning-topic-editor-card" key={item.objectiveKey}>
+                        <strong>{objective?.title || item.objectiveKey}</strong>
+                        <p>Source coverage: {item.status.toLowerCase()}</p>
+                        {item.sourceExcerpt && <blockquote>{item.sourceExcerpt}</blockquote>}
+                        {item.notes && <small>{item.notes}</small>}
+                      </article>
+                    );
+                  })}
+                  {!!topicDraft.curriculumProposal.coverageIssues?.length && (
+                    <p className="learning-field-error" role="alert">
+                      Some objectives are not fully supported by the supplied content. Edit the source material and regenerate before approval.
+                    </p>
+                  )}
+                  <div className="learning-topic-editor-card">
+                    <strong>Generated verification tasks</strong>
+                    <ul>
+                      {topicDraft.curriculumProposal.practiceTasks?.map((task) => (
+                        <li key={`${task.title}-${task.objectiveKeys.join("-")}`}>
+                          {task.title}: {task.instructions}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button
+                    className="learning-button"
+                    disabled={Boolean(topicDraft.curriculumProposal.coverageIssues?.length)}
+                    onClick={() => setTopicDraft((current) => ({
+                      ...current,
+                      curriculumApproved: true,
+                    }))}
+                    type="button"
+                  >
+                    {topicDraft.curriculumApproved ? "Curriculum approved" : "Approve curriculum"}
+                  </button>
+                </section>
+              )}
               <div className="learning-actions">
-                <button className="learning-button" disabled={saving} onClick={saveTopic} type="button">{saving ? "Saving…" : "Save topic"}</button>
+                <button
+                  className="learning-button"
+                  disabled={saving || !topicDraft.curriculumApproved}
+                  onClick={saveTopic}
+                  type="button"
+                >
+                  {saving ? "Saving…" : "Save approved topic"}
+                </button>
                 <button className="learning-button learning-button-secondary" onClick={() => setAdminPage("topics")} type="button">Cancel</button>
               </div>
             </section>
@@ -2566,6 +2700,10 @@ function StudentLearning() {
       state.objectiveKey === objective.key && state.state !== "MASTERED",
     ),
   );
+  const isVerificationStage = [
+    "OBJECTIVE_VERIFICATION",
+    "VERIFICATION_HINT",
+  ].includes(session?.learningStage);
   const availableTasks = currentObjective
     ? [
         ...(selectedTopic?.exercises || []).map((exercise) => ({ ...exercise, subtopicId: "" })),
@@ -2609,14 +2747,29 @@ function StudentLearning() {
       (topicResponse.objectiveProgress || []).length > 0 &&
       topicResponse.objectiveProgress.every((state) => state.state === "MASTERED"),
     );
-    setSession(data.session);
-    setMessages(data.session.messages || []);
+    let activeSession = data.session;
+    setSession(activeSession);
+    setMessages(activeSession.messages || []);
     setTopicId(String(topic._id));
     setLanguage("en");
     window.localStorage.setItem(
       "ccp-learning-last-session",
       JSON.stringify({ moduleId: String(module._id), topicId: String(topic._id) }),
     );
+    if (activeSession.awaitingTeachingIntroduction) {
+      setBusy(true);
+      try {
+        const { data: tutorStart } = await api.post(
+          `/learning/sessions/${activeSession._id}/messages`,
+          { beginLesson: true, language: "en", studentName: nickname },
+        );
+        activeSession = tutorStart.session;
+        setSession(activeSession);
+        setMessages(activeSession.messages || []);
+      } finally {
+        setBusy(false);
+      }
+    }
   };
 
   const openProgram = (programId) => {
@@ -2788,6 +2941,10 @@ function StudentLearning() {
           visibleResults: data.visibleResults || [],
         },
       }));
+      if (data.session) {
+        setSession(data.session);
+        setMessages(data.session.messages || []);
+      }
       setObjectiveStates(data.objectiveProgress || []);
       if (data.progress) {
         setModuleData((current) => current && ({
@@ -2817,6 +2974,9 @@ function StudentLearning() {
             ? "You completed this module. Your certificate is ready and has been emailed."
             : "You completed this module. Your certificate is ready to download.");
         }
+      }
+      if (data.session?.awaitingTeachingIntroduction) {
+        await beginSession(moduleData.module, selectedTopic);
       }
     } catch (submitError) {
       setError(submitError.message || "The task could not be evaluated. Your response is still available to retry.");
@@ -3032,7 +3192,7 @@ function StudentLearning() {
               <div className="learning-conversation" aria-live="polite" ref={conversationRef}>
                 <div className="learning-message learning-message-assistant">
                   <strong>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</strong>
-                  <p>Welcome, {nickname}. We will work through this topic together. What would you like to understand first?</p>
+                  <p>Welcome, {nickname}. Your lesson will begin with a story, then you can explore the ideas together.</p>
                 </div>
                 {messages.map((item, index) => (
                   <div className={`learning-message learning-message-${item.role}`} key={`${item.createdAt || index}-${index}`}>
@@ -3041,9 +3201,7 @@ function StudentLearning() {
                   </div>
                 ))}
                 {busy && <p className="learning-muted" role="status">{voiceProfile === "boy" ? "Rishi" : "Daisy"} is thinking…</p>}
-              </div>
-              )}
-              {nickname && currentObjective && (
+              {nickname && currentObjective && isVerificationStage && (
                 <section className="learning-task-area" aria-label="Objective practice tasks">
                   <div className="learning-panel-title">
                     <div>
@@ -3052,7 +3210,7 @@ function StudentLearning() {
                     </div>
                   </div>
                   {availableTasks.length === 0 ? (
-                    <p className="learning-muted">No separate task is configured for this objective. You can demonstrate your understanding in the conversation.</p>
+                    <p className="learning-muted">A verification task is not available for this objective yet. Please ask your course administrator to review this topic.</p>
                   ) : availableTasks.map((exercise) => {
                     const taskId = String(exercise._id);
                     const result = taskResults[taskId];
@@ -3137,6 +3295,8 @@ function StudentLearning() {
                     );
                   })}
                 </section>
+              )}
+              </div>
               )}
               {nickname && <form className="learning-chat-form" onSubmit={(event) => { event.preventDefault(); sendMessage(); }}>
                 <textarea

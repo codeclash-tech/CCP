@@ -41,6 +41,8 @@ test("Ollama tutor uses configured model and only the supplied lesson context", 
   assert.match(requestBody.messages[0].content, /Explain that a variable stores a value/);
   assert.match(requestBody.messages[0].content, /Do not fetch, cite, or invent external/);
   assert.match(requestBody.messages[0].content, /Teach one incomplete objective at a time/);
+  assert.match(requestBody.messages[0].content, /relatable, technically accurate story/);
+  assert.match(requestBody.messages[0].content, /never provide the final answer or complete solution/);
   assert.match(requestBody.messages[0].content, /objectiveEvidence/);
   assert.match(requestBody.messages[0].content, /application validates evidence and alone decides mastery/);
   assert.match(requestBody.messages[0].content, /highest priority/);
@@ -119,6 +121,7 @@ test("tutor parser extracts cited criterion evidence and clamps its confidence",
           message: {
             content: JSON.stringify({
               reply: "That explanation shows how it works.",
+              teachingComplete: true,
               objectiveEvidence: [{
                 objectiveKey: "objective-1",
                 criteria: [{
@@ -144,6 +147,7 @@ test("tutor parser extracts cited criterion evidence and clamps its confidence",
   assert.equal(result.objectiveEvidence[0].criteria[0].evidenceQuote, "It routes packets");
   assert.equal(result.objectiveEvidence[0].criteria[0].confidence, 1);
   assert.equal(result.objectiveEvidence[0].criteria[0].rationale, "Explains the routing role.");
+  assert.equal(result.teachingComplete, true);
 });
 
 test("Groq tutor sends configured model, bearer key, approved prompt, and conversation history", async () => {

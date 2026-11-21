@@ -255,6 +255,7 @@ export async function sendTutorMessage(req, res) {
       req.body.language,
       req.body.inputTranscribedFromSpeech === true,
       req.body.studentName,
+      req.body.beginLesson === true,
     ),
   );
 }

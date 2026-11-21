@@ -93,9 +93,10 @@ test("admin tutor preview evaluates a draft with backend evidence and does not p
 
     assert.equal(result.evaluation.correctness, "correct");
     assert.equal(result.evidence.length, 1);
+    assert.equal(result.masteryDecision.mastered, false);
     assert.deepEqual(result.simulatedProgress.objectiveProgress, [{
       objectiveKey: "variable-storage",
-      state: "MASTERED",
+      state: "EVIDENCE_REQUIRED",
     }]);
     assert.match(request.messages[0].content, /private curriculum preview/);
     assert.equal(module.topics.length, 0);

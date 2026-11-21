@@ -61,6 +61,7 @@ test("all approved criteria and their evidence thresholds are required for maste
   const firstEvidence = evaluateObjectiveEvidence({
     topic,
     moduleVersion: 2,
+    sourceType: "THEORY_TASK",
     proposals: [{
       objectiveKey: "explain-addressing",
       criteria: [
@@ -81,6 +82,7 @@ test("all approved criteria and their evidence thresholds are required for maste
   const secondEvidence = evaluateObjectiveEvidence({
     topic,
     moduleVersion: 2,
+    sourceType: "THEORY_TASK",
     existingEvidence: firstEvidence.evidence,
     proposals: [{
       objectiveKey: "explain-addressing",
@@ -103,6 +105,44 @@ test("all approved criteria and their evidence thresholds are required for maste
     objectiveEvidence: [...firstEvidence.evidence, ...secondEvidence.evidence],
   });
   assert.deepEqual(progress.map(({ state }) => state), ["MASTERED", "NOT_STARTED"]);
+});
+
+test("tutor conversation evidence cannot satisfy independent verification or legacy completion markers", () => {
+  const result = evaluateObjectiveEvidence({
+    topic,
+    moduleVersion: 1,
+    sourceType: "TUTOR",
+    completedObjectiveKeys: ["topic-1:explain-addressing"],
+    proposals: [{
+      objectiveKey: "explain-addressing",
+      criteria: [
+        {
+          criterionKey: "purpose",
+          demonstrated: true,
+          evidenceQuote: "A logical address helps route packets.",
+          confidence: 0.95,
+        },
+        {
+          criterionKey: "routing",
+          demonstrated: true,
+          evidenceQuote: "A logical address helps route packets.",
+          confidence: 0.95,
+        },
+      ],
+    }],
+    studentResponse: "A logical address helps route packets.",
+    evidenceId: "teaching-answer",
+    sessionId: "session-1",
+    messageIndex: 0,
+  });
+  const progress = getObjectiveProgress(topic, {
+    moduleVersion: 1,
+    completedObjectiveKeys: ["topic-1:explain-addressing"],
+    objectiveEvidence: result.evidence,
+  });
+
+  assert.deepEqual(result.masteredObjectiveKeys, []);
+  assert.equal(progress[0].state, "EVIDENCE_REQUIRED");
 });
 
 test("misconception evidence does not count as demonstrated mastery and duplicate evidence is idempotent", () => {
