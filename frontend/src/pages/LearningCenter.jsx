@@ -586,7 +586,7 @@ function AdminLearning() {
       setPreviewOpen(false);
       resetTutorPreview("NO_PRIOR_KNOWLEDGE", "");
       setAdminPage("topics");
-      await loadModule(moduleId);
+      await loadModule(moduleId, "topics");
       await loadAdminData();
       setAdminPage("topics");
     } catch (topicError) {
@@ -818,7 +818,7 @@ function AdminLearning() {
       await api.put(`/learning/admin/modules/${moduleId}/topics/order`, {
         topicIds: topics.map((topic) => topic._id),
       });
-      await loadModule(moduleId);
+      await loadModule(moduleId, "topics");
     } catch (topicError) {
       setError(topicError.message || "Could not reorder topics.");
     }
@@ -852,7 +852,7 @@ function AdminLearning() {
           type="button"
         >Modules</button>
         <button
-          className={["topics", "topics-editor", "topics-inline"].includes(adminPage) ? "is-active" : ""}
+          className={["topics", "topics-editor"].includes(adminPage) ? "is-active" : ""}
           disabled={!moduleId}
           onClick={() => setAdminPage("topics")}
           type="button"
@@ -1098,7 +1098,7 @@ function AdminLearning() {
               )}
             </div>
           )}
-          {(newModule || moduleId) && ["modules", "topics-inline"].includes(adminPage) && (
+          {(newModule || moduleId) && adminPage === "modules" && (
             <form
               className="learning-form learning-form-divider"
               onSubmit={(event) => {
@@ -2359,7 +2359,7 @@ function AdminLearning() {
               <h2>Topics for {moduleForm.title}</h2>
               <p className="learning-help">Each topic teaches only its pasted objective content.</p>
               <div className="learning-admin-topic-grid">
-                {(moduleForm.topics || []).map((topic) => (
+                {(moduleForm.topics || []).map((topic, index) => (
                   <article className="learning-admin-topic-card" key={topic._id}>
                     <button
                       className="learning-admin-topic-card-main"
@@ -2371,6 +2371,24 @@ function AdminLearning() {
                       <small>{topic.objectives?.length || 0} objectives</small>
                     </button>
                     <div className="learning-actions">
+                      <button
+                        className="learning-link-button"
+                        aria-label={`Move ${topic.title} up`}
+                        disabled={saving || index === 0}
+                        onClick={() => moveTopic(index, -1)}
+                        type="button"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        className="learning-link-button"
+                        aria-label={`Move ${topic.title} down`}
+                        disabled={saving || index === moduleForm.topics.length - 1}
+                        onClick={() => moveTopic(index, 1)}
+                        type="button"
+                      >
+                        ↓
+                      </button>
                       <button
                         className="learning-link-button"
                         aria-label={`Edit ${topic.title}`}
