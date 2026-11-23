@@ -364,9 +364,17 @@ export class OllamaTutorProvider {
         throw new AiProviderError("The AI tutor is temporarily unavailable.", 503);
       }
       const result = await response.json();
-      const rawContent = result?.message?.content;
-      if (typeof rawContent !== "string" || !rawContent.trim()) {
-        throw new AiProviderError("The AI tutor returned an empty response.", 503);
+      const message = result?.message || {};
+      const rawContent = typeof message.content === "string" && message.content.trim()
+        ? message.content
+        : typeof message.thinking === "string" && message.thinking.trim()
+          ? message.thinking
+          : "";
+      if (!rawContent.trim()) {
+        throw new AiProviderError(
+          `The AI tutor returned an empty response from ${this.model || "the configured model"}. Check that the model is pulled and AI_MODEL matches an installed model.`,
+          503,
+        );
       }
       return {
         ...parseTutorResponse(rawContent, topic.authoringProposal === true),
@@ -461,9 +469,17 @@ class GroqTutorProvider {
       });
       if (!response.ok) throw groqProviderError(response.status);
       const result = await response.json();
-      const rawContent = result?.choices?.[0]?.message?.content;
-      if (typeof rawContent !== "string" || !rawContent.trim()) {
-        throw new AiProviderError("The AI tutor returned an empty response.", 503);
+      const message = result?.choices?.[0]?.message || {};
+      const rawContent = typeof message.content === "string" && message.content.trim()
+        ? message.content
+        : typeof message.reasoning === "string" && message.reasoning.trim()
+          ? message.reasoning
+          : "";
+      if (!rawContent.trim()) {
+        throw new AiProviderError(
+          `The AI tutor returned an empty response from ${this.model || "the configured model"}. If this model produces reasoning tokens, increase num_predict so a final answer fits.`,
+          503,
+        );
       }
       return {
         ...parseTutorResponse(rawContent, topic.authoringProposal === true),
