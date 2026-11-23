@@ -120,7 +120,8 @@ function getApiErrorMessage(error) {
     }
     if ([500, 502, 503].includes(status)) {
       return (
-        data?.error || "Server error. Please try again in a few moments."
+        data?.error ||
+        "The AI tutor or server is temporarily unavailable. Your entered content is preserved. Please try again in a few moments."
       );
     }
     return data?.error || data?.message || "An error occurred";

@@ -220,6 +220,7 @@ test("Groq tutor sends configured model, bearer key, approved prompt, and conver
     objectiveEvidence: [],
     provider: "groq",
     model: "openai/gpt-oss-20b",
+    truncated: false,
     usage: {
       promptTokens: null,
       completionTokens: null,
@@ -278,7 +279,7 @@ test("truly empty Groq responses fail with an actionable message", async () => {
   );
   await assert.rejects(
     groq.generateReply({ topic: { title: "Test" }, approvedContent: "", history: [] }),
-    (error) => error instanceof AiProviderError && /num_predict|reasoning/i.test(error.message),
+    (error) => error instanceof AiProviderError && /num_predict|AI_MODEL/i.test(error.message),
   );
 });
 
@@ -338,8 +339,8 @@ test("Groq tutor reports authentication, model, and rate-limit failures safely",
   const cases = [
     [401, /could not authenticate/, 503],
     [403, /could not authenticate/, 503],
-    [400, /configured AI model or request/, 503],
-    [404, /configured AI model or request/, 503],
+    [400, /configured AI model or request/, 502],
+    [404, /configured AI model or request/, 502],
     [429, /rate limit/, 429],
     [408, /too long to respond/, 503],
     [500, /temporarily unavailable/, 503],

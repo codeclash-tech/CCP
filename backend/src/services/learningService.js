@@ -54,6 +54,29 @@ const LEARNING_EVALUATION_METHODS = new Set([
   "DEBUGGING",
   "PRACTICAL",
 ]);
+function normalizeEvaluationMethod(value) {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return LEARNING_EVALUATION_METHODS.has(normalized) ? normalized : null;
+}
+
+function truncateDiagnosticValue(value, limit = 120) {
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  if (text === undefined) return "undefined";
+  if (text === null) return "null";
+  return text.length > limit ? `${text.slice(0, limit)}…` : text;
+}
+
+function criterionDiagnostic(index, criterion, field, expected, actual) {
+  return `objective criterion ${index + 1}${
+    criterion?.key
+      ? ` (key "${String(criterion.key).trim().slice(0, 60)}")`
+      : ""
+  }: ${field} ${expected}, but received ${truncateDiagnosticValue(actual)}`;
+}
+
 function normalizeTutorLanguage() {
   return "en";
 }
@@ -121,9 +144,11 @@ function findObjectiveTask(topic, objectiveKey) {
     ...(topic.exercises || []),
     ...(topic.subtopics || []).flatMap((subtopic) => subtopic.exercises || []),
   ];
-  return exercises.find((exercise) =>
-    (exercise.objectiveKeys || []).map(String).includes(String(objectiveKey)),
-  ) || null;
+  return (
+    exercises.find((exercise) =>
+      (exercise.objectiveKeys || []).map(String).includes(String(objectiveKey)),
+    ) || null
+  );
 }
 
 function applyEvidenceDecision(progress, decision, topic) {
@@ -138,18 +163,27 @@ function applyEvidenceDecision(progress, decision, topic) {
       item.objectiveKey === decision.targetObjectiveKey &&
       Number(item.moduleVersion) === Number(progress.moduleVersion),
   );
-  const evaluationResults = decision.evidence.flatMap((item) => item.criteria || []);
+  const evaluationResults = decision.evidence.flatMap(
+    (item) => item.criteria || [],
+  );
   const evidenceSignals = evaluationResults.reduce(
     (signals, item) => ({
-      missingConcepts: [...signals.missingConcepts, ...(item.missingConcepts || [])],
-      misconceptions: [...signals.misconceptions, ...(item.misconceptions || [])],
+      missingConcepts: [
+        ...signals.missingConcepts,
+        ...(item.missingConcepts || []),
+      ],
+      misconceptions: [
+        ...signals.misconceptions,
+        ...(item.misconceptions || []),
+      ],
     }),
     { missingConcepts: [], misconceptions: [] },
   );
   const profileUpdate = {
     objectiveKey: decision.targetObjectiveKey,
     moduleVersion: progress.moduleVersion,
-    demonstratedCount: (profile?.demonstratedCount || 0) +
+    demonstratedCount:
+      (profile?.demonstratedCount || 0) +
       evaluationResults.filter((item) => item.demonstrated).length,
     missingConcepts: [...new Set(evidenceSignals.missingConcepts)].slice(-12),
     misconceptions: [...new Set(evidenceSignals.misconceptions)].slice(-12),
@@ -165,18 +199,23 @@ function applyEvidenceDecision(progress, decision, topic) {
   if (profile) Object.assign(profile, profileUpdate);
   else progress.objectiveProfiles.push(profileUpdate);
 
-  const completedKeys = new Set((progress.completedObjectiveKeys || []).map(String));
+  const completedKeys = new Set(
+    (progress.completedObjectiveKeys || []).map(String),
+  );
   for (const key of decision.masteredObjectiveKeys) {
     completedKeys.add(objectiveProgressKey(topic._id, key));
   }
   progress.completedObjectiveKeys = [...completedKeys];
   const statesAfterEvaluation = getObjectiveProgress(topic, progress);
-  const topicComplete = statesAfterEvaluation.length > 0 &&
+  const topicComplete =
+    statesAfterEvaluation.length > 0 &&
     statesAfterEvaluation.every((state) => state.state === "MASTERED");
   progress.completedTopicIds ||= [];
   if (
     topicComplete &&
-    !progress.completedTopicIds.some((currentId) => sameId(currentId, topic._id))
+    !progress.completedTopicIds.some((currentId) =>
+      sameId(currentId, topic._id),
+    )
   ) {
     progress.completedTopicIds.push(new mongoose.Types.ObjectId(topic._id));
   }
@@ -185,7 +224,9 @@ function applyEvidenceDecision(progress, decision, topic) {
 
 function validateTopicTasks(topic) {
   const objectives = topic.objectiveDefinitions || [];
-  const objectiveKeys = new Set(objectives.map((objective) => String(objective.key)));
+  const objectiveKeys = new Set(
+    objectives.map((objective) => String(objective.key)),
+  );
   const exercises = [
     ...(topic.exercises || []),
     ...(topic.subtopics || []).flatMap((subtopic) => subtopic.exercises || []),
@@ -197,27 +238,43 @@ function validateTopicTasks(topic) {
       new Set(linkedObjectives).size !== linkedObjectives.length ||
       linkedObjectives.some((key) => !objectiveKeys.has(key))
     ) {
-      throw requestError(`Task "${exercise.title}" must reference valid, unique objective keys.`);
+      throw requestError(
+        `Task "${exercise.title}" must reference valid, unique objective keys.`,
+      );
     }
     if (!objectives.length || !linkedObjectives.length) continue;
     const allowedCriteria = new Set(
       objectives
         .filter((objective) => linkedObjectives.includes(String(objective.key)))
-        .flatMap((objective) => (objective.masteryCriteria || []).map((criterion) => String(criterion.key))),
+        .flatMap((objective) =>
+          (objective.masteryCriteria || []).map((criterion) =>
+            String(criterion.key),
+          ),
+        ),
     );
     if (
       new Set(linkedCriteria).size !== linkedCriteria.length ||
       linkedCriteria.some((key) => !allowedCriteria.has(key))
     ) {
-      throw requestError(`Task "${exercise.title}" must reference mastery criteria from its linked objectives.`);
+      throw requestError(
+        `Task "${exercise.title}" must reference mastery criteria from its linked objectives.`,
+      );
     }
     if (exercise.type === "CODE") {
-      const codeCriteria = linkedObjectives.flatMap((key) =>
-        objectives.find((objective) => String(objective.key) === key)?.masteryCriteria || [],
-      ).filter((criterion) =>
-        (!linkedCriteria.length || linkedCriteria.includes(String(criterion.key))) &&
-        ["CODE", "DEBUGGING", "PRACTICAL"].includes(criterion.evaluationMethod),
-      );
+      const codeCriteria = linkedObjectives
+        .flatMap(
+          (key) =>
+            objectives.find((objective) => String(objective.key) === key)
+              ?.masteryCriteria || [],
+        )
+        .filter(
+          (criterion) =>
+            (!linkedCriteria.length ||
+              linkedCriteria.includes(String(criterion.key))) &&
+            ["CODE", "DEBUGGING", "PRACTICAL"].includes(
+              criterion.evaluationMethod,
+            ),
+        );
       if (
         String(exercise.language || "java").toLowerCase() !== "java" ||
         !Array.isArray(exercise.tests) ||
@@ -225,25 +282,43 @@ function validateTopicTasks(topic) {
         exercise.tests.length > 50 ||
         !codeCriteria.length
       ) {
-        throw requestError(`Java task "${exercise.title}" needs test cases and a linked CODE, DEBUGGING, or PRACTICAL criterion.`);
+        throw requestError(
+          `Java task "${exercise.title}" needs test cases and a linked CODE, DEBUGGING, or PRACTICAL criterion.`,
+        );
       }
     }
     if (exercise.type === "MATH") {
-      const calculationCriteria = linkedObjectives.flatMap((key) =>
-        objectives.find((objective) => String(objective.key) === key)?.masteryCriteria || [],
-      ).filter((criterion) =>
-        (!linkedCriteria.length || linkedCriteria.includes(String(criterion.key))) &&
-        criterion.evaluationMethod === "CALCULATION",
-      );
-      if (!String(exercise.expectedAnswer || "").trim() || !calculationCriteria.length) {
-        throw requestError(`Mathematics task "${exercise.title}" needs an expected answer and a linked CALCULATION criterion.`);
+      const calculationCriteria = linkedObjectives
+        .flatMap(
+          (key) =>
+            objectives.find((objective) => String(objective.key) === key)
+              ?.masteryCriteria || [],
+        )
+        .filter(
+          (criterion) =>
+            (!linkedCriteria.length ||
+              linkedCriteria.includes(String(criterion.key))) &&
+            criterion.evaluationMethod === "CALCULATION",
+        );
+      if (
+        !String(exercise.expectedAnswer || "").trim() ||
+        !calculationCriteria.length
+      ) {
+        throw requestError(
+          `Mathematics task "${exercise.title}" needs an expected answer and a linked CALCULATION criterion.`,
+        );
       }
       const validation = evaluateMathematicsTask(
-        { ...(exercise.toObject ? exercise.toObject() : exercise), requireReasoning: false },
+        {
+          ...(exercise.toObject ? exercise.toObject() : exercise),
+          requireReasoning: false,
+        },
         { answer: exercise.expectedAnswer },
       );
       if (validation.status !== "CORRECT") {
-        throw requestError(`Mathematics task "${exercise.title}" has an answer or unit that cannot be evaluated safely.`);
+        throw requestError(
+          `Mathematics task "${exercise.title}" has an answer or unit that cannot be evaluated safely.`,
+        );
       }
     }
   }
@@ -309,7 +384,9 @@ export function serializeStudentModule(module) {
         : getTopicObjectives(topic).map((objective) => objective.title),
     };
     if (topic.objectiveDefinitions?.length) {
-      summary.objectiveKeys = topic.objectiveDefinitions.map((objective) => objective.key);
+      summary.objectiveKeys = topic.objectiveDefinitions.map(
+        (objective) => objective.key,
+      );
     }
     if (topic.prerequisiteTopicIds?.length) {
       summary.prerequisiteTopicIds = topic.prerequisiteTopicIds;
@@ -321,16 +398,21 @@ export function serializeStudentModule(module) {
     return summary;
   });
   result.assessment ||= { questions: [] };
-  result.assessment.questions = (result.assessment?.questions || []).map(studentQuestion);
+  result.assessment.questions = (result.assessment?.questions || []).map(
+    studentQuestion,
+  );
   return result;
 }
 
 function approvedTopicContext(topic, activeObjectiveKey) {
   const plain = topic.toObject ? topic.toObject() : topic;
-  const objective = getTopicObjectives(plain)
-    .find((item) => item.key === activeObjectiveKey);
-  const knowledge = (plain.coreKnowledge || []).filter((item) =>
-    !item.objectiveKeys?.length || item.objectiveKeys.includes(activeObjectiveKey),
+  const objective = getTopicObjectives(plain).find(
+    (item) => item.key === activeObjectiveKey,
+  );
+  const knowledge = (plain.coreKnowledge || []).filter(
+    (item) =>
+      !item.objectiveKeys?.length ||
+      item.objectiveKeys.includes(activeObjectiveKey),
   );
   return JSON.stringify({
     title: plain.title,
@@ -351,40 +433,58 @@ function validateTopicKnowledgeSize(topicInput) {
   }
 }
 
-function objectiveEvaluationSummary(objective, decision, progress, topic, feedback) {
+function objectiveEvaluationSummary(
+  objective,
+  decision,
+  progress,
+  topic,
+  feedback,
+) {
   const states = getObjectiveProgress(topic, progress);
-  const activeState = states.find((state) => state.objectiveKey === objective.key);
-  const latestResults = decision.evidence.flatMap((item) => item.criteria || []);
-  const demonstratedKnowledge = [...new Set(
-    latestResults.flatMap((item) => item.demonstratedConcepts || []),
-  )].slice(0, 12);
-  const missingKnowledge = [...new Set(
-    latestResults.flatMap((item) => item.missingConcepts || []),
-  )].slice(0, 12);
-  const identifiedMisconceptions = [...new Set(
-    latestResults.flatMap((item) => item.misconceptions || []),
-  )].slice(0, 12);
-  const allCriteriaDemonstrated = Boolean(activeState?.criteria?.length) &&
-    activeState.criteria.every((criterion) =>
-      criterion.demonstratedCount >= criterion.requiredEvidenceCount,
+  const activeState = states.find(
+    (state) => state.objectiveKey === objective.key,
+  );
+  const latestResults = decision.evidence.flatMap(
+    (item) => item.criteria || [],
+  );
+  const demonstratedKnowledge = [
+    ...new Set(
+      latestResults.flatMap((item) => item.demonstratedConcepts || []),
+    ),
+  ].slice(0, 12);
+  const missingKnowledge = [
+    ...new Set(latestResults.flatMap((item) => item.missingConcepts || [])),
+  ].slice(0, 12);
+  const identifiedMisconceptions = [
+    ...new Set(latestResults.flatMap((item) => item.misconceptions || [])),
+  ].slice(0, 12);
+  const allCriteriaDemonstrated =
+    Boolean(activeState?.criteria?.length) &&
+    activeState.criteria.every(
+      (criterion) =>
+        criterion.demonstratedCount >= criterion.requiredEvidenceCount,
     );
-  const teachingEvidence = decision.evidence.some((item) => item.sourceType === "TUTOR");
-  const teachingCriteriaDemonstrated = teachingEvidence &&
+  const teachingEvidence = decision.evidence.some(
+    (item) => item.sourceType === "TUTOR",
+  );
+  const teachingCriteriaDemonstrated =
+    teachingEvidence &&
     objective.masteryCriteria.length > 0 &&
     objective.masteryCriteria.every((criterion) =>
       latestResults.some(
-        (result) => result.criterionKey === criterion.key && result.demonstrated,
+        (result) =>
+          result.criterionKey === criterion.key && result.demonstrated,
       ),
     );
   const correctness = allCriteriaDemonstrated
     ? "correct"
     : teachingCriteriaDemonstrated
       ? "correct"
-    : demonstratedKnowledge.length
-      ? "partially_correct"
-      : identifiedMisconceptions.length
-        ? "incorrect"
-        : "ambiguous";
+      : demonstratedKnowledge.length
+        ? "partially_correct"
+        : identifiedMisconceptions.length
+          ? "incorrect"
+          : "ambiguous";
   return {
     correctness,
     demonstratedKnowledge,
@@ -401,28 +501,39 @@ function objectiveEvaluationSummary(objective, decision, progress, topic, feedba
       ? Math.min(...latestResults.map((item) => Number(item.confidence) || 0))
       : 0,
     feedback: String(feedback || ""),
-    recommendedNextAction: activeState?.state === "MASTERED"
-      ? states.every((state) => state.state === "MASTERED")
-        ? "TOPIC_COMPLETE"
-        : "NEXT_OBJECTIVE"
-      : identifiedMisconceptions.length
-        ? "CORRECT_MISCONCEPTION"
-        : demonstratedKnowledge.length
-          ? "TARGETED_FOLLOW_UP"
-          : "CLARIFY",
+    recommendedNextAction:
+      activeState?.state === "MASTERED"
+        ? states.every((state) => state.state === "MASTERED")
+          ? "TOPIC_COMPLETE"
+          : "NEXT_OBJECTIVE"
+        : identifiedMisconceptions.length
+          ? "CORRECT_MISCONCEPTION"
+          : demonstratedKnowledge.length
+            ? "TARGETED_FOLLOW_UP"
+            : "CLARIFY",
   };
 }
 
 function validateModuleCompletionConfiguration(module) {
-  const topics = (module.topics || []).filter((topic) => String(topic.title || "").trim());
+  const topics = (module.topics || []).filter((topic) =>
+    String(topic.title || "").trim(),
+  );
   if (!topics.length) {
-    throw requestError(`Module "${module.title}" needs at least one topic before it can be published.`);
+    throw requestError(
+      `Module "${module.title}" needs at least one topic before it can be published.`,
+    );
   }
-  if (topics.some((topic) =>
-    !(topic.objectives || []).some((objective) => String(objective || "").trim()) &&
-    !(topic.objectiveDefinitions || []).length
-  )) {
-    throw requestError(`Every topic in "${module.title}" needs at least one learning objective before publishing.`);
+  if (
+    topics.some(
+      (topic) =>
+        !(topic.objectives || []).some((objective) =>
+          String(objective || "").trim(),
+        ) && !(topic.objectiveDefinitions || []).length,
+    )
+  ) {
+    throw requestError(
+      `Every topic in "${module.title}" needs at least one learning objective before publishing.`,
+    );
   }
   for (const topic of topics) {
     validateTopicTasks(topic);
@@ -430,7 +541,9 @@ function validateModuleCompletionConfiguration(module) {
       topics.slice(0, topics.indexOf(topic)).map((item) => id(item._id)),
     );
     if (
-      (topic.prerequisiteTopicIds || []).some((topicId) => !earlierTopicIds.has(id(topicId))) ||
+      (topic.prerequisiteTopicIds || []).some(
+        (topicId) => !earlierTopicIds.has(id(topicId)),
+      ) ||
       new Set((topic.prerequisiteTopicIds || []).map(id)).size !==
         (topic.prerequisiteTopicIds || []).length
     ) {
@@ -440,37 +553,46 @@ function validateModuleCompletionConfiguration(module) {
     }
     if (
       (topic.coreKnowledge || []).length > 100 ||
-      Buffer.byteLength(JSON.stringify(topic.coreKnowledge || []), "utf8") > 64000
+      Buffer.byteLength(JSON.stringify(topic.coreKnowledge || []), "utf8") >
+        64000
     ) {
-      throw requestError(`Core knowledge for "${module.title}" exceeds the supported structured content size.`);
+      throw requestError(
+        `Core knowledge for "${module.title}" exceeds the supported structured content size.`,
+      );
     }
     const objectives = topic.objectiveDefinitions || [];
     if (!objectives.length) continue;
-    const keys = objectives.map((objective) => String(objective.key || "").trim());
+    const keys = objectives.map((objective) =>
+      String(objective.key || "").trim(),
+    );
     if (
       objectives.length > 50 ||
       keys.some((key) => !key || key.length > 100) ||
       new Set(keys).size !== keys.length ||
-      objectives.some((objective, index) =>
-        !String(objective.title || "").trim() ||
-        !String(objective.description || "").trim() ||
-        !String(objective.expectedOutcome || "").trim() ||
-        !(objective.masteryCriteria || []).length ||
-        objective.masteryCriteria.length > 10 ||
-        (objective.requiredKnowledge || []).length > 20 ||
-        (objective.commonMisconceptions || []).length > 20 ||
-        (objective.masteryCriteria || []).some((criterion) =>
-          !String(criterion.key || "").trim() ||
-          String(criterion.key || "").length > 100 ||
-          !String(criterion.description || "").trim() ||
-          !LEARNING_EVALUATION_METHODS.has(String(criterion.evaluationMethod || "EXPLANATION")) ||
-          !Number.isInteger(Number(criterion.requiredEvidenceCount || 1)) ||
-          Number(criterion.requiredEvidenceCount || 1) < 1 ||
-          Number(criterion.requiredEvidenceCount || 1) > 5,
-        ) ||
-        (objective.prerequisites || []).some((key) =>
-          !keys.slice(0, index).includes(String(key)),
-        )
+      objectives.some(
+        (objective, index) =>
+          !String(objective.title || "").trim() ||
+          !String(objective.description || "").trim() ||
+          !String(objective.expectedOutcome || "").trim() ||
+          !(objective.masteryCriteria || []).length ||
+          objective.masteryCriteria.length > 10 ||
+          (objective.requiredKnowledge || []).length > 20 ||
+          (objective.commonMisconceptions || []).length > 20 ||
+          (objective.masteryCriteria || []).some(
+            (criterion) =>
+              !String(criterion.key || "").trim() ||
+              String(criterion.key || "").length > 100 ||
+              !String(criterion.description || "").trim() ||
+              !LEARNING_EVALUATION_METHODS.has(
+                String(criterion.evaluationMethod || "EXPLANATION"),
+              ) ||
+              !Number.isInteger(Number(criterion.requiredEvidenceCount || 1)) ||
+              Number(criterion.requiredEvidenceCount || 1) < 1 ||
+              Number(criterion.requiredEvidenceCount || 1) > 5,
+          ) ||
+          (objective.prerequisites || []).some(
+            (key) => !keys.slice(0, index).includes(String(key)),
+          ),
       )
     ) {
       throw requestError(
@@ -478,9 +600,13 @@ function validateModuleCompletionConfiguration(module) {
       );
     }
     for (const objective of objectives) {
-      const criterionKeys = objective.masteryCriteria.map((criterion) => String(criterion.key));
+      const criterionKeys = objective.masteryCriteria.map((criterion) =>
+        String(criterion.key),
+      );
       if (new Set(criterionKeys).size !== criterionKeys.length) {
-        throw requestError(`Mastery criteria in "${objective.title}" must have unique keys.`);
+        throw requestError(
+          `Mastery criteria in "${objective.title}" must have unique keys.`,
+        );
       }
     }
   }
@@ -497,45 +623,63 @@ function validateModuleCompletionConfiguration(module) {
     0,
   );
   if (Number(requirements.minCompletedTopics || 0) > module.topics.length) {
-    throw requestError(`Module "${module.title}" requires more completed topics than it contains.`);
+    throw requestError(
+      `Module "${module.title}" requires more completed topics than it contains.`,
+    );
   }
   if (Number(requirements.requiredExercises || 0) > exerciseCount) {
-    throw requestError(`Module "${module.title}" requires more exercises than it contains.`);
+    throw requestError(
+      `Module "${module.title}" requires more exercises than it contains.`,
+    );
   }
   if (requirements.requireAssessment && !module.assessment?.questions?.length) {
-    throw requestError(`Module "${module.title}" requires an assessment but has no assessment questions.`);
+    throw requestError(
+      `Module "${module.title}" requires an assessment but has no assessment questions.`,
+    );
   }
 }
 
 function requireTopicPrerequisites(topic, module, progress) {
-  const completed = new Set((progress.completedTopicIds || []).map((topicId) => String(topicId)));
-  const missing = (topic.prerequisiteTopicIds || []).filter(
-    (topicId) => {
-      const prerequisite = module.topics.id(topicId);
-      if (!prerequisite || !getTopicObjectives(prerequisite).length) {
-        return !completed.has(String(topicId));
-      }
-      const states = getObjectiveProgress(prerequisite, progress);
-      return !states.length || !states.every((state) => state.state === "MASTERED");
-    },
+  const completed = new Set(
+    (progress.completedTopicIds || []).map((topicId) => String(topicId)),
   );
+  const missing = (topic.prerequisiteTopicIds || []).filter((topicId) => {
+    const prerequisite = module.topics.id(topicId);
+    if (!prerequisite || !getTopicObjectives(prerequisite).length) {
+      return !completed.has(String(topicId));
+    }
+    const states = getObjectiveProgress(prerequisite, progress);
+    return (
+      !states.length || !states.every((state) => state.state === "MASTERED")
+    );
+  });
   if (missing.length) {
-    throw requestError("Complete the prerequisite topics before starting this topic.", 403);
+    throw requestError(
+      "Complete the prerequisite topics before starting this topic.",
+      403,
+    );
   }
 }
 
 async function reconcileCompletedTopics(module, progress) {
-  const completed = new Set((progress.completedTopicIds || []).map((topicId) => String(topicId)));
+  const completed = new Set(
+    (progress.completedTopicIds || []).map((topicId) => String(topicId)),
+  );
   const next = new Set(completed);
   for (const topic of module.topics || []) {
     const objectives = getTopicObjectives(topic);
     if (!objectives.length) continue;
-    const isMastered = getObjectiveProgress(topic, progress)
-      .every((state) => state.state === "MASTERED");
+    const isMastered = getObjectiveProgress(topic, progress).every(
+      (state) => state.state === "MASTERED",
+    );
     if (isMastered) next.add(String(topic._id));
     else next.delete(String(topic._id));
   }
-  if (next.size === completed.size && [...next].every((topicId) => completed.has(topicId))) return;
+  if (
+    next.size === completed.size &&
+    [...next].every((topicId) => completed.has(topicId))
+  )
+    return;
   progress.completedTopicIds = [...next];
   await progress.save();
 }
@@ -552,14 +696,19 @@ function validateAiConfiguration(value) {
     Array.isArray(value.advancedSettings) ||
     JSON.stringify(value.advancedSettings).length > 4000
   ) {
-    throw requestError("AI configuration must be a valid prompt and small advanced-settings object.");
+    throw requestError(
+      "AI configuration must be a valid prompt and small advanced-settings object.",
+    );
   }
 }
 
 async function loadProgress(userId, moduleId) {
-  const module = typeof moduleId === "object"
-    ? moduleId
-    : await LearningModule.findById(moduleId).select("currentPublishedVersion");
+  const module =
+    typeof moduleId === "object"
+      ? moduleId
+      : await LearningModule.findById(moduleId).select(
+          "currentPublishedVersion",
+        );
   if (!module) throw requestError("Learning module not found.", 404);
   const progress = await LearningProgress.findOneAndUpdate(
     { userId, moduleId: module._id },
@@ -573,7 +722,10 @@ async function loadProgress(userId, moduleId) {
     { new: true, upsert: true, setDefaultsOnInsert: true },
   );
   if (!progress.moduleVersion) {
-    progress.moduleVersion = Math.max(1, Number(module.currentPublishedVersion) || 1);
+    progress.moduleVersion = Math.max(
+      1,
+      Number(module.currentPublishedVersion) || 1,
+    );
     await progress.save();
   }
   return progress;
@@ -593,7 +745,8 @@ async function getModuleVersion(module, version) {
     versionedModule.$locals.versioned = true;
     return versionedModule;
   }
-  if (snapshot?.contentSnapshot) return LearningModule.hydrate(snapshot.contentSnapshot);
+  if (snapshot?.contentSnapshot)
+    return LearningModule.hydrate(snapshot.contentSnapshot);
   return LearningModule.findById(module._id);
 }
 
@@ -615,8 +768,7 @@ async function getEntitledModuleForStudent(userId, moduleId) {
     _id: moduleId,
     status: "PUBLISHED",
     deletedAt: null,
-  })
-    .select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
   await requireModulePurchase(userId, currentModule);
@@ -651,7 +803,8 @@ async function savePublishedModuleVersion(module) {
       total +
       (topic.exercises || []).length +
       (topic.subtopics || []).reduce(
-        (subtopicTotal, subtopic) => subtopicTotal + (subtopic.exercises || []).length,
+        (subtopicTotal, subtopic) =>
+          subtopicTotal + (subtopic.exercises || []).length,
         0,
       ),
     0,
@@ -673,7 +826,11 @@ async function savePublishedModuleVersion(module) {
     await LearningTopicVersion.bulkWrite(
       topics.map((topic) => ({
         updateOne: {
-          filter: { moduleId: module._id, moduleVersion: version, topicId: topic._id },
+          filter: {
+            moduleId: module._id,
+            moduleVersion: version,
+            topicId: topic._id,
+          },
           update: {
             $setOnInsert: {
               moduleId: module._id,
@@ -716,7 +873,8 @@ async function saveModuleEdit(module, revision) {
   if (module.status === "PUBLISHED") {
     validateModuleCompletionConfiguration(module);
   }
-  if (revision.wasPublished) module.currentPublishedVersion = revision.version + 1;
+  if (revision.wasPublished)
+    module.currentPublishedVersion = revision.version + 1;
   await module.save();
   if (revision.wasPublished) await savePublishedModuleVersion(module);
   return module;
@@ -749,7 +907,9 @@ const PREVIEW_SCENARIOS = new Set([
 
 function normalizePreviewHistory(value) {
   if (!Array.isArray(value) || value.length > 12) {
-    throw requestError("Preview history must contain no more than 12 messages.");
+    throw requestError(
+      "Preview history must contain no more than 12 messages.",
+    );
   }
   let total = 0;
   return value.map((item) => {
@@ -760,10 +920,13 @@ function normalizePreviewHistory(value) {
       !item.content.trim() ||
       item.content.length > 2000
     ) {
-      throw requestError("Preview messages must be user or tutor text within 2000 characters.");
+      throw requestError(
+        "Preview messages must be user or tutor text within 2000 characters.",
+      );
     }
     total += item.content.length;
-    if (total > 8000) throw requestError("Preview conversation context is too long.");
+    if (total > 8000)
+      throw requestError("Preview conversation context is too long.");
     return { role: item.role, content: item.content };
   });
 }
@@ -771,7 +934,9 @@ function normalizePreviewHistory(value) {
 function validatePreviewTopic(topic) {
   const objectives = getTopicObjectives(topic);
   if (!objectives.length || objectives.length > 50) {
-    throw requestError("The preview topic needs between 1 and 50 learning objectives.");
+    throw requestError(
+      "The preview topic needs between 1 and 50 learning objectives.",
+    );
   }
   const keys = objectives.map((objective) => objective.key);
   if (new Set(keys).size !== keys.length) {
@@ -787,20 +952,25 @@ function validatePreviewTopic(topic) {
       !criteria.length ||
       criteria.length > 10 ||
       new Set(criterionKeys).size !== criterionKeys.length ||
-      criteria.some((criterion) =>
-        !criterion.key.trim() ||
-        !criterion.description.trim() ||
-        !LEARNING_EVALUATION_METHODS.has(criterion.evaluationMethod) ||
-        !Number.isInteger(criterion.requiredEvidenceCount) ||
-        criterion.requiredEvidenceCount < 1 ||
-        criterion.requiredEvidenceCount > 5,
+      criteria.some(
+        (criterion) =>
+          !criterion.key.trim() ||
+          !criterion.description.trim() ||
+          !LEARNING_EVALUATION_METHODS.has(criterion.evaluationMethod) ||
+          !Number.isInteger(criterion.requiredEvidenceCount) ||
+          criterion.requiredEvidenceCount < 1 ||
+          criterion.requiredEvidenceCount > 5,
       ) ||
       objective.prerequisites.some((key) => !keys.slice(0, index).includes(key))
     ) {
-      throw requestError(`Objective "${objective.title}" needs valid criteria and only earlier prerequisites.`);
+      throw requestError(
+        `Objective "${objective.title}" needs valid criteria and only earlier prerequisites.`,
+      );
     }
   });
-  if (Buffer.byteLength(JSON.stringify(topic.coreKnowledge || []), "utf8") > 64000) {
+  if (
+    Buffer.byteLength(JSON.stringify(topic.coreKnowledge || []), "utf8") > 64000
+  ) {
     throw requestError("Approved topic knowledge is too large to preview.");
   }
   return objectives;
@@ -838,7 +1008,9 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
     message.length > (taskType === "ACTIVITY" ? 5000 : 2000) ||
     !PREVIEW_SCENARIOS.has(scenario)
   ) {
-    throw requestError("Provide a preview message and a supported starting-knowledge scenario.");
+    throw requestError(
+      "Provide a preview message and a supported starting-knowledge scenario.",
+    );
   }
   if (
     input.topicDraft &&
@@ -848,10 +1020,16 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
   ) {
     throw requestError("The topic draft preview is invalid or too large.");
   }
-  if (Array.isArray(input.previousEvidence) && input.previousEvidence.length > 20) {
+  if (
+    Array.isArray(input.previousEvidence) &&
+    input.previousEvidence.length > 20
+  ) {
     throw requestError("Preview evidence history is too large.");
   }
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
   const previewModule = new LearningModule(module.toObject());
   let topic = topicId ? previewModule.topics.id(topicId) : null;
@@ -860,28 +1038,36 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
     if (!topic) {
       previewModule.topics.push({
         title: String(input.topicDraft.title || "Preview topic").slice(0, 160),
-        description: String(input.topicDraft.description || "Tutor preview.").slice(0, 2000),
+        description: String(
+          input.topicDraft.description || "Tutor preview.",
+        ).slice(0, 2000),
       });
       topic = previewModule.topics[previewModule.topics.length - 1];
     }
     for (const field of editableTopicFields) {
-      if (input.topicDraft[field] !== undefined) topic[field] = input.topicDraft[field];
+      if (input.topicDraft[field] !== undefined)
+        topic[field] = input.topicDraft[field];
     }
   }
-  if (!topic) throw requestError("A topic draft is required for tutor preview.");
+  if (!topic)
+    throw requestError("A topic draft is required for tutor preview.");
   const objectives = validatePreviewTopic(topic);
-  const selectedObjective = objectives.find(
-    (objective) => objective.key === String(input.objectiveKey || ""),
-  ) || objectives[0];
-  if (!selectedObjective) throw requestError("The preview topic needs a learning objective.");
+  const selectedObjective =
+    objectives.find(
+      (objective) => objective.key === String(input.objectiveKey || ""),
+    ) || objectives[0];
+  if (!selectedObjective)
+    throw requestError("The preview topic needs a learning objective.");
   const previewTaskList = [
-        ...(topic.exercises || []),
-        ...(topic.subtopics || []).flatMap((subtopic) => subtopic.exercises || []),
-      ];
+    ...(topic.exercises || []),
+    ...(topic.subtopics || []).flatMap((subtopic) => subtopic.exercises || []),
+  ];
   const taskExercise = taskSimulation
-    ? previewTaskList.find((exercise) => id(exercise) === String(taskSimulation.exerciseId || "")) ||
+    ? previewTaskList.find(
+        (exercise) => id(exercise) === String(taskSimulation.exerciseId || ""),
+      ) ||
       (Number.isInteger(Number(taskSimulation.exerciseIndex)) &&
-        Number(taskSimulation.exerciseIndex) >= 0
+      Number(taskSimulation.exerciseIndex) >= 0
         ? previewTaskList[Number(taskSimulation.exerciseIndex)]
         : null)
     : null;
@@ -889,15 +1075,22 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
     throw requestError("Select a task included in this topic preview.", 404);
   }
   if (taskExercise && String(taskExercise.type || "CODE") !== taskType) {
-    throw requestError("The selected task type does not match the task definition.");
+    throw requestError(
+      "The selected task type does not match the task definition.",
+    );
   }
   if (
     taskExercise?.objectiveKeys?.length &&
     !taskExercise.objectiveKeys.map(String).includes(selectedObjective.key)
   ) {
-    throw requestError("The selected task is not linked to this objective.", 409);
+    throw requestError(
+      "The selected task is not linked to this objective.",
+      409,
+    );
   }
-  const objectiveIndex = objectives.findIndex((objective) => objective.key === selectedObjective.key);
+  const objectiveIndex = objectives.findIndex(
+    (objective) => objective.key === selectedObjective.key,
+  );
   const completedObjectiveKeys = objectives
     .slice(0, objectiveIndex)
     .map((objective) => objectiveProgressKey(topic._id, objective.key));
@@ -906,38 +1099,48 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
     .filter((item) => item.role === "user")
     .map((item) => item.content.toLocaleLowerCase().replace(/\s+/g, " ").trim())
     .join("\n");
-  const profile = scenario === "SOME_PRIOR_KNOWLEDGE"
-    ? {
-        demonstratedCount: 1,
-        missingConcepts: selectedObjective.requiredKnowledge.slice(0, 1),
-        misconceptions: [],
-        teachingSignals: ["TARGETED_EXPLANATION"],
-      }
-    : scenario === "MOST_OBJECTIVES_VERIFIED"
+  const profile =
+    scenario === "SOME_PRIOR_KNOWLEDGE"
       ? {
-          demonstratedCount: Math.max(0, selectedObjective.masteryCriteria.length - 1),
-          missingConcepts: [],
+          demonstratedCount: 1,
+          missingConcepts: selectedObjective.requiredKnowledge.slice(0, 1),
           misconceptions: [],
-          teachingSignals: ["BRIEF_VERIFICATION"],
+          teachingSignals: ["TARGETED_EXPLANATION"],
         }
-      : scenario === "MISCONCEPTION"
+      : scenario === "MOST_OBJECTIVES_VERIFIED"
         ? {
-            demonstratedCount: 0,
-            missingConcepts: selectedObjective.requiredKnowledge.slice(0, 1),
-            misconceptions: selectedObjective.commonMisconceptions.slice(0, 1),
-            teachingSignals: ["MISCONCEPTION_CORRECTION"],
+            demonstratedCount: Math.max(
+              0,
+              selectedObjective.masteryCriteria.length - 1,
+            ),
+            missingConcepts: [],
+            misconceptions: [],
+            teachingSignals: ["BRIEF_VERIFICATION"],
           }
-        : null;
+        : scenario === "MISCONCEPTION"
+          ? {
+              demonstratedCount: 0,
+              missingConcepts: selectedObjective.requiredKnowledge.slice(0, 1),
+              misconceptions: selectedObjective.commonMisconceptions.slice(
+                0,
+                1,
+              ),
+              teachingSignals: ["MISCONCEPTION_CORRECTION"],
+            }
+          : null;
   const priorUnderstanding = Array.isArray(input.previousEvidence)
     ? input.previousEvidence
-        .filter((item) =>
-          item &&
-          item.objectiveKey === selectedObjective.key &&
-          Array.isArray(item.criteria),
+        .filter(
+          (item) =>
+            item &&
+            item.objectiveKey === selectedObjective.key &&
+            Array.isArray(item.criteria),
         )
         .slice(-20)
         .flatMap((item, index) => {
-          const evidenceId = String(item.evidenceId || `preview-${index}`).slice(0, 100);
+          const evidenceId = String(
+            item.evidenceId || `preview-${index}`,
+          ).slice(0, 100);
           const acceptedKeys = new Set();
           const criteria = item.criteria.slice(0, 20).flatMap((criterion) => {
             const criterionKey = String(criterion?.criterionKey || "");
@@ -947,28 +1150,35 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
               .trim();
             if (
               criterion?.demonstrated !== true ||
-              !selectedObjective.masteryCriteria.some((approved) => approved.key === criterionKey) ||
+              !selectedObjective.masteryCriteria.some(
+                (approved) => approved.key === criterionKey,
+              ) ||
               acceptedKeys.has(criterionKey) ||
               Number(criterion.confidence) < 0.7 ||
               quote.length < 3 ||
               !priorStudentText.includes(quote)
-            ) return [];
+            )
+              return [];
             acceptedKeys.add(criterionKey);
-            return [{
-              criterionKey,
-              demonstrated: true,
-              evidenceQuote: quote,
-              confidence: Math.min(1, Number(criterion.confidence)),
-            }];
+            return [
+              {
+                criterionKey,
+                demonstrated: true,
+                evidenceQuote: quote,
+                confidence: Math.min(1, Number(criterion.confidence)),
+              },
+            ];
           });
           return criteria.length
-            ? [{
-                evidenceId,
-                topicId: topic._id,
-                moduleVersion: 1,
-                objectiveKey: selectedObjective.key,
-                criteria,
-              }]
+            ? [
+                {
+                  evidenceId,
+                  topicId: topic._id,
+                  moduleVersion: 1,
+                  objectiveKey: selectedObjective.key,
+                  criteria,
+                },
+              ]
             : [];
         })
     : [];
@@ -989,14 +1199,19 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
     });
   }
   const startedAt = Date.now();
-  const providerName = String(config.AI_PROVIDER || "ollama").trim().toLowerCase();
+  const providerName = String(config.AI_PROVIDER || "ollama")
+    .trim()
+    .toLowerCase();
   const model = String(config.AI_MODEL || "").trim();
   try {
     const previewTopic = { ...topic.toObject(), previewMode: true };
     const provider = createTutorProvider(config);
     const reply = await provider.generateReply({
       topic: previewTopic,
-      approvedContent: approvedTopicContext(previewTopic, selectedObjective.key),
+      approvedContent: approvedTopicContext(
+        previewTopic,
+        selectedObjective.key,
+      ),
       objectiveProgress: {
         currentObjective: {
           key: selectedObjective.key,
@@ -1008,18 +1223,28 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
         },
         states: objectives.map((objective, index) => ({
           objectiveKey: objective.key,
-          state: index < objectiveIndex
-            ? "MASTERED"
-            : index === objectiveIndex
-              ? "IN_PROGRESS"
-              : "NOT_STARTED",
+          state:
+            index < objectiveIndex
+              ? "MASTERED"
+              : index === objectiveIndex
+                ? "IN_PROGRESS"
+                : "NOT_STARTED",
         })),
       },
       evaluationTask: {
         type: taskType || undefined,
-        title: String(taskExercise?.title || input.task?.title || "").slice(0, 160),
-        instructions: String(taskExercise?.instructions || input.task?.instructions || "").slice(0, 2000),
-        evaluationMethod: String(taskExercise?.evaluationMethod || input.task?.evaluationMethod || "EXPLANATION").slice(0, 40),
+        title: String(taskExercise?.title || input.task?.title || "").slice(
+          0,
+          160,
+        ),
+        instructions: String(
+          taskExercise?.instructions || input.task?.instructions || "",
+        ).slice(0, 2000),
+        evaluationMethod: String(
+          taskExercise?.evaluationMethod ||
+            input.task?.evaluationMethod ||
+            "EXPLANATION",
+        ).slice(0, 40),
       },
       previewScenario: scenario,
       progressContext: { preview: true },
@@ -1036,7 +1261,9 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
       studentResponse: message,
       sourceType: taskType === "ACTIVITY" ? "THEORY_TASK" : "TUTOR",
       evidenceId: createHash("sha256")
-        .update(`${topic._id}:${selectedObjective.key}:${message.toLocaleLowerCase().replace(/\s+/g, " ")}`)
+        .update(
+          `${topic._id}:${selectedObjective.key}:${message.toLocaleLowerCase().replace(/\s+/g, " ")}`,
+        )
         .digest("hex")
         .slice(0, 40),
       sessionId: new mongoose.Types.ObjectId(),
@@ -1060,20 +1287,25 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
       topic,
       reply.content,
     );
-    const activeCriteria = selectedObjective.masteryCriteria.filter((criterion) =>
-      !(taskExercise?.criterionKeys || []).length ||
-      taskExercise.criterionKeys.map(String).includes(criterion.key),
+    const activeCriteria = selectedObjective.masteryCriteria.filter(
+      (criterion) =>
+        !(taskExercise?.criterionKeys || []).length ||
+        taskExercise.criterionKeys.map(String).includes(criterion.key),
     );
-    const taskState = getObjectiveProgress(topic, simulatedProgress)
-      .find((state) => state.objectiveKey === selectedObjective.key);
-    const taskAccepted = taskType === "ACTIVITY" &&
+    const taskState = getObjectiveProgress(topic, simulatedProgress).find(
+      (state) => state.objectiveKey === selectedObjective.key,
+    );
+    const taskAccepted =
+      taskType === "ACTIVITY" &&
       activeCriteria.length > 0 &&
       activeCriteria.every((criterion) =>
-        evidenceDecision.evidence.some((item) =>
-          item.sourceType === "THEORY_TASK" &&
-          item.criteria.some((result) =>
-            result.criterionKey === criterion.key && result.demonstrated,
-          ),
+        evidenceDecision.evidence.some(
+          (item) =>
+            item.sourceType === "THEORY_TASK" &&
+            item.criteria.some(
+              (result) =>
+                result.criterionKey === criterion.key && result.demonstrated,
+            ),
         ),
       );
     const nextObjective = objectives[objectiveIndex + 1];
@@ -1094,23 +1326,29 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
       taskResult: taskType
         ? {
             type: taskType,
-            status: taskAccepted ? "CORRECT" : evaluation.correctness.toUpperCase(),
+            status: taskAccepted
+              ? "CORRECT"
+              : evaluation.correctness.toUpperCase(),
             accepted: taskAccepted,
             feedback: reply.content,
           }
         : null,
       masteryDecision: {
-        mastered: evidenceDecision.masteredObjectiveKeys.includes(selectedObjective.key),
+        mastered: evidenceDecision.masteredObjectiveKeys.includes(
+          selectedObjective.key,
+        ),
         state: taskState?.state || "IN_PROGRESS",
       },
       task: taskExercise
         ? { id: id(taskExercise), title: taskExercise.title, type: taskType }
         : null,
-      missingCriteria: getObjectiveProgress(topic, simulatedProgress)
-        .find((state) => state.objectiveKey === selectedObjective.key)
-        ?.criteria.filter((criterion) =>
-          criterion.demonstratedCount < criterion.requiredEvidenceCount,
-        ) || [],
+      missingCriteria:
+        getObjectiveProgress(topic, simulatedProgress)
+          .find((state) => state.objectiveKey === selectedObjective.key)
+          ?.criteria.filter(
+            (criterion) =>
+              criterion.demonstratedCount < criterion.requiredEvidenceCount,
+          ) || [],
       reason: evidenceDecision.masteredObjectiveKeys.length
         ? nextObjective
           ? "Approved criteria have sufficient cited evidence; preview can advance to the next objective."
@@ -1118,8 +1356,9 @@ export async function previewLearningTutor(adminId, moduleId, topicId, input) {
         : "More valid evidence is needed for at least one approved criterion.",
       simulatedProgress: {
         completedObjectiveKeys: simulatedProgress.completedObjectiveKeys,
-        objectiveProgress: getObjectiveProgress(topic, simulatedProgress)
-          .map(({ objectiveKey, state }) => ({ objectiveKey, state })),
+        objectiveProgress: getObjectiveProgress(topic, simulatedProgress).map(
+          ({ objectiveKey, state }) => ({ objectiveKey, state }),
+        ),
       },
     };
   } catch (error) {
@@ -1149,18 +1388,24 @@ async function simulateLearningTaskPreview({
   completedObjectiveKeys,
   historyLength,
 }) {
-  const normalizedSubmission = normalizeTaskSubmission(taskType, taskSubmission);
+  const normalizedSubmission = normalizeTaskSubmission(
+    taskType,
+    taskSubmission,
+  );
   const responseText = taskResponseText(taskType, normalizedSubmission);
-  const activeCriteria = selectedObjective.masteryCriteria.filter((criterion) =>
-    !(taskExercise.criterionKeys || []).length ||
-    taskExercise.criterionKeys.map(String).includes(criterion.key),
+  const activeCriteria = selectedObjective.masteryCriteria.filter(
+    (criterion) =>
+      !(taskExercise.criterionKeys || []).length ||
+      taskExercise.criterionKeys.map(String).includes(criterion.key),
   );
   const mayRecordEvidence = (taskExercise.objectiveKeys || [])
     .map(String)
     .includes(selectedObjective.key);
   const sourceType = taskType === "CODE" ? "CODE_TASK" : "MATH_TASK";
   const startedAt = Date.now();
-  const providerName = String(config.AI_PROVIDER || "ollama").trim().toLowerCase();
+  const providerName = String(config.AI_PROVIDER || "ollama")
+    .trim()
+    .toLowerCase();
   const modelName = String(config.AI_MODEL || "").trim();
   let deterministicResult;
   let proposals = [];
@@ -1170,20 +1415,30 @@ async function simulateLearningTaskPreview({
 
   if (taskType === "CODE") {
     if (String(taskExercise.language || "java").toLowerCase() !== "java") {
-      throw requestError("The current secure execution engine supports Java exercises only.", 400);
+      throw requestError(
+        "The current secure execution engine supports Java exercises only.",
+        400,
+      );
     }
     if (!taskExercise.tests.length || taskExercise.tests.length > 50) {
       throw requestError("This exercise does not have a valid test set.", 409);
     }
     deterministicResult = await executionService.execute(
       normalizedSubmission,
-      taskExercise.tests.map(({ input, expectedOutput }) => ({ input, expectedOutput })),
+      taskExercise.tests.map(({ input, expectedOutput }) => ({
+        input,
+        expectedOutput,
+      })),
       "java",
       { timeLimit: 2000, memoryLimit: 65536 },
     );
     if (deterministicResult.accepted && mayRecordEvidence) {
       verifiedCriteria = activeCriteria
-        .filter((criterion) => ["CODE", "DEBUGGING", "PRACTICAL"].includes(criterion.evaluationMethod))
+        .filter((criterion) =>
+          ["CODE", "DEBUGGING", "PRACTICAL"].includes(
+            criterion.evaluationMethod,
+          ),
+        )
         .map((criterion) => ({
           criterionKey: criterion.key,
           sourceType,
@@ -1193,17 +1448,26 @@ async function simulateLearningTaskPreview({
     reply = taskEvaluationReply(taskType, deterministicResult);
     taskAccepted = deterministicResult.accepted === true;
   } else {
-    deterministicResult = evaluateMathematicsTask(taskExercise, normalizedSubmission);
-    if (deterministicResult.accepted && !taskExercise.requireReasoning && mayRecordEvidence) {
+    deterministicResult = evaluateMathematicsTask(
+      taskExercise,
+      normalizedSubmission,
+    );
+    if (
+      deterministicResult.accepted &&
+      !taskExercise.requireReasoning &&
+      mayRecordEvidence
+    ) {
       verifiedCriteria = activeCriteria
         .filter((criterion) => criterion.evaluationMethod === "CALCULATION")
         .map((criterion) => ({
           criterionKey: criterion.key,
           sourceType,
-          verificationReference: "Numerical expression validated by the deterministic evaluator.",
+          verificationReference:
+            "Numerical expression validated by the deterministic evaluator.",
         }));
     }
-    const shouldEvaluateReasoning = Boolean(taskExercise.requireReasoning) &&
+    const shouldEvaluateReasoning =
+      Boolean(taskExercise.requireReasoning) &&
       Boolean(normalizedSubmission.reasoning);
     if (shouldEvaluateReasoning && mayRecordEvidence) {
       try {
@@ -1265,9 +1529,10 @@ async function simulateLearningTaskPreview({
       proposals = proposals.map((proposal) => ({
         ...proposal,
         criteria: proposal.criteria.filter((criterion) =>
-          activeCriteria.some((approved) =>
-            approved.key === criterion.criterionKey &&
-            approved.evaluationMethod !== "CALCULATION",
+          activeCriteria.some(
+            (approved) =>
+              approved.key === criterion.criterionKey &&
+              approved.evaluationMethod !== "CALCULATION",
           ),
         ),
       }));
@@ -1287,7 +1552,9 @@ async function simulateLearningTaskPreview({
     taskId: taskExercise._id,
     taskAttemptKey: "admin-preview",
     evidenceId: createHash("sha256")
-      .update(`${topic._id}:${taskExercise._id}:${responseText.trim().toLocaleLowerCase().replace(/\s+/g, " ")}`)
+      .update(
+        `${topic._id}:${taskExercise._id}:${responseText.trim().toLocaleLowerCase().replace(/\s+/g, " ")}`,
+      )
       .digest("hex")
       .slice(0, 40),
     sessionId: new mongoose.Types.ObjectId(),
@@ -1304,20 +1571,26 @@ async function simulateLearningTaskPreview({
     ],
     objectiveEvidence: [...priorUnderstanding, ...evidenceDecision.evidence],
   };
-  const objectiveState = getObjectiveProgress(topic, simulatedProgress)
-    .find((state) => state.objectiveKey === selectedObjective.key);
+  const objectiveState = getObjectiveProgress(topic, simulatedProgress).find(
+    (state) => state.objectiveKey === selectedObjective.key,
+  );
   if (taskType === "MATH") {
     if (!taskExercise.requireReasoning) {
       taskAccepted = deterministicResult.accepted;
     } else {
-      const calculationCriteria = activeCriteria.filter((criterion) =>
-        criterion.evaluationMethod === "CALCULATION",
+      const calculationCriteria = activeCriteria.filter(
+        (criterion) => criterion.evaluationMethod === "CALCULATION",
       );
-      taskAccepted = deterministicResult.accepted &&
+      taskAccepted =
+        deterministicResult.accepted &&
         calculationCriteria.length > 0 &&
         calculationCriteria.every((criterion) => {
-          const state = objectiveState?.criteria.find((item) => item.criterionKey === criterion.key);
-          return state && state.demonstratedCount >= state.requiredEvidenceCount;
+          const state = objectiveState?.criteria.find(
+            (item) => item.criterionKey === criterion.key,
+          );
+          return (
+            state && state.demonstratedCount >= state.requiredEvidenceCount
+          );
         });
     }
   }
@@ -1329,42 +1602,49 @@ async function simulateLearningTaskPreview({
     reply,
   );
   const nextObjective = objectives[objectiveIndex + 1];
-  const visibleResults = taskType === "CODE"
-    ? deterministicResult.results
-        .filter((_result, index) => taskExercise.tests[index]?.visible)
-        .map(({ testCase, status, output, executionTime }) => ({
-          testCase,
-          status,
-          output,
-          executionTime,
-        }))
-    : [];
+  const visibleResults =
+    taskType === "CODE"
+      ? deterministicResult.results
+          .filter((_result, index) => taskExercise.tests[index]?.visible)
+          .map(({ testCase, status, output, executionTime }) => ({
+            testCase,
+            status,
+            output,
+            executionTime,
+          }))
+      : [];
   return {
     reply,
     objectiveKey: selectedObjective.key,
     task: { id: id(taskExercise), title: taskExercise.title, type: taskType },
     taskResult: {
       type: taskType,
-      status: taskType === "CODE"
-        ? deterministicResult.status
-        : taskAccepted
-          ? "CORRECT"
-          : taskExercise.requireReasoning && deterministicResult.accepted
-            ? "REASONING_REQUIRED"
-            : deterministicResult.status,
+      status:
+        taskType === "CODE"
+          ? deterministicResult.status
+          : taskAccepted
+            ? "CORRECT"
+            : taskExercise.requireReasoning && deterministicResult.accepted
+              ? "REASONING_REQUIRED"
+              : deterministicResult.status,
       accepted: taskAccepted,
       feedback: reply,
-      passed: taskType === "CODE" ? deterministicResult.passed : Number(taskAccepted),
+      passed:
+        taskType === "CODE" ? deterministicResult.passed : Number(taskAccepted),
       total: taskType === "CODE" ? deterministicResult.total : 1,
       visibleResults,
     },
     evaluation,
     evidence: evidenceDecision.evidence,
-    missingCriteria: objectiveState?.criteria.filter((criterion) =>
-      criterion.demonstratedCount < criterion.requiredEvidenceCount,
-    ) || [],
+    missingCriteria:
+      objectiveState?.criteria.filter(
+        (criterion) =>
+          criterion.demonstratedCount < criterion.requiredEvidenceCount,
+      ) || [],
     masteryDecision: {
-      mastered: evidenceDecision.masteredObjectiveKeys.includes(selectedObjective.key),
+      mastered: evidenceDecision.masteredObjectiveKeys.includes(
+        selectedObjective.key,
+      ),
       state: objectiveState?.state || "IN_PROGRESS",
     },
     reason: evidenceDecision.masteredObjectiveKeys.length
@@ -1375,8 +1655,9 @@ async function simulateLearningTaskPreview({
     nextAction: evaluation.recommendedNextAction,
     simulatedProgress: {
       completedObjectiveKeys: simulatedProgress.completedObjectiveKeys,
-      objectiveProgress: getObjectiveProgress(topic, simulatedProgress)
-        .map(({ objectiveKey, state }) => ({ objectiveKey, state })),
+      objectiveProgress: getObjectiveProgress(topic, simulatedProgress).map(
+        ({ objectiveKey, state }) => ({ objectiveKey, state }),
+      ),
     },
   };
 }
@@ -1386,7 +1667,10 @@ function validateTopicProposal(rawContent, request) {
   try {
     proposal = JSON.parse(rawContent);
   } catch {
-    throw requestError("The AI returned an invalid topic proposal. Please retry or author the topic manually.", 502);
+    throw requestError(
+      "The AI returned an invalid topic proposal. Please retry or author the topic manually.",
+      502,
+    );
   }
   if (!proposal || typeof proposal !== "object" || Array.isArray(proposal)) {
     throw requestError("The AI topic proposal must be a JSON object.", 502);
@@ -1396,22 +1680,32 @@ function validateTopicProposal(rawContent, request) {
     !Array.isArray(objectives) ||
     objectives.length < 1 ||
     objectives.length > 50 ||
-    objectives.some((objective) =>
-      !objective || typeof objective !== "object" || Array.isArray(objective),
+    objectives.some(
+      (objective) =>
+        !objective || typeof objective !== "object" || Array.isArray(objective),
     )
   ) {
-    throw requestError("The AI topic proposal must include between 1 and 50 learning objectives.", 502);
+    throw requestError(
+      "The AI topic proposal must include between 1 and 50 learning objectives.",
+      502,
+    );
   }
-  const keys = objectives.map((objective) => String(objective?.key || "").trim());
+  const keys = objectives.map((objective) =>
+    String(objective?.key || "").trim(),
+  );
   if (
     keys.some((key) => !key || key.length > 100) ||
     new Set(keys).size !== keys.length
   ) {
-    throw requestError("The AI topic proposal contains missing or duplicate objective keys.", 502);
+    throw requestError(
+      "The AI topic proposal contains missing or duplicate objective keys.",
+      502,
+    );
   }
   const objectiveDefinitions = objectives.map((objective, index) => {
     const masteryCriteria = objective.masteryCriteria;
-    const prerequisites = objective.prerequisites === undefined ? [] : objective.prerequisites;
+    const prerequisites =
+      objective.prerequisites === undefined ? [] : objective.prerequisites;
     if (
       !String(objective.title || "").trim() ||
       String(objective.title).length > 160 ||
@@ -1423,35 +1717,50 @@ function validateTopicProposal(rawContent, request) {
       !Array.isArray(masteryCriteria) ||
       masteryCriteria.length < 1 ||
       masteryCriteria.length > 10 ||
-      masteryCriteria.some((criterion) =>
-        !criterion || typeof criterion !== "object" || Array.isArray(criterion),
+      masteryCriteria.some(
+        (criterion) =>
+          !criterion ||
+          typeof criterion !== "object" ||
+          Array.isArray(criterion),
       )
     ) {
-      throw requestError(`The AI proposal has an incomplete objective at position ${index + 1}.`, 502);
+      throw requestError(
+        `The AI proposal has an incomplete objective at position ${index + 1}.`,
+        502,
+      );
     }
-    const criterionKeys = masteryCriteria.map((criterion) => String(criterion?.key || "").trim());
+    const criterionKeys = masteryCriteria.map((criterion) =>
+      String(criterion?.key || "").trim(),
+    );
     if (
       criterionKeys.some((key) => !key || key.length > 100) ||
       new Set(criterionKeys).size !== criterionKeys.length ||
-      masteryCriteria.some((criterion) =>
-        !String(criterion.description || "").trim() ||
-        String(criterion.description).length > 1000 ||
-        !LEARNING_EVALUATION_METHODS.has(String(criterion.evaluationMethod || "EXPLANATION")) ||
-        !Number.isInteger(Number(criterion.requiredEvidenceCount || 1)) ||
-        Number(criterion.requiredEvidenceCount || 1) < 1 ||
-        Number(criterion.requiredEvidenceCount || 1) > 5,
+      masteryCriteria.some(
+        (criterion) =>
+          !String(criterion.description || "").trim() ||
+          String(criterion.description).length > 1000 ||
+          !LEARNING_EVALUATION_METHODS.has(
+            String(criterion.evaluationMethod || "EXPLANATION"),
+          ) ||
+          !Number.isInteger(Number(criterion.requiredEvidenceCount || 1)) ||
+          Number(criterion.requiredEvidenceCount || 1) < 1 ||
+          Number(criterion.requiredEvidenceCount || 1) > 5,
       ) ||
-      prerequisites.some((key) =>
-        !keys.slice(0, index).includes(String(key)),
-      )
+      prerequisites.some((key) => !keys.slice(0, index).includes(String(key)))
     ) {
-      throw requestError(`The AI proposal has invalid mastery criteria or prerequisites for "${objective.title}".`, 502);
+      throw requestError(
+        `The AI proposal has invalid mastery criteria or prerequisites for "${objective.title}".`,
+        502,
+      );
     }
     return {
       key: keys[index],
       title: String(objective.title).trim(),
       description: String(objective.description || "").trim(),
-      requiredKnowledge: normalizeProposalStringList(objective.requiredKnowledge, "required knowledge"),
+      requiredKnowledge: normalizeProposalStringList(
+        objective.requiredKnowledge,
+        "required knowledge",
+      ),
       expectedOutcome: String(objective.expectedOutcome).trim(),
       masteryCriteria: masteryCriteria.map((criterion) => ({
         key: String(criterion.key).trim(),
@@ -1466,58 +1775,91 @@ function validateTopicProposal(rawContent, request) {
       prerequisites: prerequisites.map(String),
     };
   });
-  const coreKnowledge = Array.isArray(proposal.coreKnowledge) ? proposal.coreKnowledge : [];
+  const coreKnowledge = Array.isArray(proposal.coreKnowledge)
+    ? proposal.coreKnowledge
+    : [];
   const allowedKnowledgeTypes = new Set([
-    "CONCEPT", "DEFINITION", "EXPLANATION", "EXAMPLE", "ANALOGY", "PROCEDURE",
-    "STEPS", "FORMULA", "DERIVATION", "CASE_STUDY", "SCENARIO", "DIAGRAM",
-    "SIMULATION", "EXERCISE", "QUESTION", "COMPARISON", "REVISION_SUMMARY",
+    "CONCEPT",
+    "DEFINITION",
+    "EXPLANATION",
+    "EXAMPLE",
+    "ANALOGY",
+    "PROCEDURE",
+    "STEPS",
+    "FORMULA",
+    "DERIVATION",
+    "CASE_STUDY",
+    "SCENARIO",
+    "DIAGRAM",
+    "SIMULATION",
+    "EXERCISE",
+    "QUESTION",
+    "COMPARISON",
+    "REVISION_SUMMARY",
   ]);
   if (
     coreKnowledge.length < 1 ||
     coreKnowledge.length > 100 ||
-    coreKnowledge.some((item) =>
-      !item ||
-      !String(item.key || "").trim() ||
-      String(item.key).length > 100 ||
-      !allowedKnowledgeTypes.has(String(item.type || "")) ||
-      Number(item.schemaVersion) !== 1 ||
-      (item.title && String(item.title).length > 160) ||
-      !Array.isArray(item.objectiveKeys) ||
-      !item.objectiveKeys.length ||
-      item.objectiveKeys.some((key) => !keys.includes(String(key))) ||
-      !Number.isInteger(Number(item.order)) ||
-      item.order < 0 ||
-      !item.content ||
-      (item.metadata !== undefined &&
-        (!item.metadata || typeof item.metadata !== "object" || Array.isArray(item.metadata))) ||
-      typeof item.content === "function",
+    coreKnowledge.some(
+      (item) =>
+        !item ||
+        !String(item.key || "").trim() ||
+        String(item.key).length > 100 ||
+        !allowedKnowledgeTypes.has(String(item.type || "")) ||
+        Number(item.schemaVersion) !== 1 ||
+        (item.title && String(item.title).length > 160) ||
+        !Array.isArray(item.objectiveKeys) ||
+        !item.objectiveKeys.length ||
+        item.objectiveKeys.some((key) => !keys.includes(String(key))) ||
+        !Number.isInteger(Number(item.order)) ||
+        item.order < 0 ||
+        !item.content ||
+        (item.metadata !== undefined &&
+          (!item.metadata ||
+            typeof item.metadata !== "object" ||
+            Array.isArray(item.metadata))) ||
+        typeof item.content === "function",
     ) ||
     Buffer.byteLength(JSON.stringify(coreKnowledge), "utf8") > 64000
   ) {
-    throw requestError("The AI topic proposal contains invalid or oversized core knowledge.", 502);
+    throw requestError(
+      "The AI topic proposal contains invalid or oversized core knowledge.",
+      502,
+    );
   }
   const knowledgeKeys = coreKnowledge.map((item) => String(item.key));
   if (new Set(knowledgeKeys).size !== knowledgeKeys.length) {
-    throw requestError("The AI topic proposal contains duplicate core knowledge keys.", 502);
+    throw requestError(
+      "The AI topic proposal contains duplicate core knowledge keys.",
+      502,
+    );
   }
-  const practiceTasks = Array.isArray(proposal.practiceTasks) ? proposal.practiceTasks : [];
+  const practiceTasks = Array.isArray(proposal.practiceTasks)
+    ? proposal.practiceTasks
+    : [];
   if (
     practiceTasks.length > 10 ||
-    practiceTasks.some((task) =>
-      !task ||
-      !String(task.title || "").trim() ||
-      String(task.title).length > 160 ||
-      !String(task.instructions || "").trim() ||
-      String(task.instructions).length > 5000 ||
-      !Array.isArray(task.objectiveKeys) ||
-      !task.objectiveKeys.length ||
-      task.objectiveKeys.some((key) => !keys.includes(String(key))),
+    practiceTasks.some(
+      (task) =>
+        !task ||
+        !String(task.title || "").trim() ||
+        String(task.title).length > 160 ||
+        !String(task.instructions || "").trim() ||
+        String(task.instructions).length > 5000 ||
+        !Array.isArray(task.objectiveKeys) ||
+        !task.objectiveKeys.length ||
+        task.objectiveKeys.some((key) => !keys.includes(String(key))),
     )
   ) {
-    throw requestError("The AI topic proposal contains invalid practice tasks.", 502);
+    throw requestError(
+      "The AI topic proposal contains invalid practice tasks.",
+      502,
+    );
   }
   const estimatedDurationMinutes = Number(proposal.estimatedDurationMinutes);
-  const proposalDescription = String(proposal.description || request.description).trim();
+  const proposalDescription = String(
+    proposal.description || request.description,
+  ).trim();
   if (
     !proposalDescription ||
     proposalDescription.length > 2000 ||
@@ -1525,7 +1867,10 @@ function validateTopicProposal(rawContent, request) {
     estimatedDurationMinutes < 1 ||
     estimatedDurationMinutes > 100000
   ) {
-    throw requestError("The AI topic proposal must include a valid estimated duration.", 502);
+    throw requestError(
+      "The AI topic proposal must include a valid estimated duration.",
+      502,
+    );
   }
   return {
     title: request.title,
@@ -1542,31 +1887,143 @@ function validateTopicProposal(rawContent, request) {
   };
 }
 
+function findInvalidPracticeTask(
+  practiceTasks,
+  objectiveKeys,
+  objectiveDefinitions,
+) {
+  for (let index = 0; index < practiceTasks.length; index += 1) {
+    const task = practiceTasks[index];
+    const label = task?.title
+      ? `task ${index + 1} ("${String(task.title).trim().slice(0, 80)}")`
+      : `task ${index + 1}`;
+    if (!task || typeof task !== "object" || Array.isArray(task)) {
+      return `The curriculum preview contains an invalid practice task: ${label} must be an object (received ${truncateDiagnosticValue(task)}).`;
+    }
+    const type = String(task.type || "ACTIVITY").toUpperCase();
+    if (!["ACTIVITY", "MATH", "CODE"].includes(type)) {
+      return `The curriculum preview contains an invalid practice task: ${label} has type ${truncateDiagnosticValue(task.type)}, which must be ACTIVITY, MATH, or CODE.`;
+    }
+    if (!String(task.title || "").trim() || String(task.title).length > 160) {
+      return `The curriculum preview contains an invalid practice task: ${label} needs a non-empty title of at most 160 characters.`;
+    }
+    if (
+      !String(task.instructions || "").trim() ||
+      String(task.instructions).length > 5000
+    ) {
+      return `The curriculum preview contains an invalid practice task: ${label} needs non-empty instructions of at most 5000 characters.`;
+    }
+    if (
+      !Array.isArray(task.objectiveKeys) ||
+      !task.objectiveKeys.length ||
+      task.objectiveKeys.some((key) => !objectiveKeys.includes(String(key)))
+    ) {
+      return `The curriculum preview contains an invalid practice task: ${label} must link objectiveKeys to supplied objective keys (received ${truncateDiagnosticValue(task.objectiveKeys)}).`;
+    }
+    if (
+      task.criterionKeys !== undefined &&
+      (!Array.isArray(task.criterionKeys) ||
+        task.criterionKeys.some(
+          (key) =>
+            !task.objectiveKeys.some((objectiveKey) =>
+              objectiveDefinitions
+                .find((objective) => objective.key === String(objectiveKey))
+                ?.masteryCriteria.some(
+                  (criterion) => criterion.key === String(key),
+                ),
+            ),
+        ))
+    ) {
+      return `The curriculum preview contains an invalid practice task: ${label} references criterionKeys that do not belong to its linked objectives (received ${truncateDiagnosticValue(task.criterionKeys)}).`;
+    }
+    if (
+      type === "MATH" &&
+      (typeof task.expectedAnswer !== "string" ||
+        !task.expectedAnswer.trim() ||
+        task.expectedAnswer.length > 3000)
+    ) {
+      return `The curriculum preview contains an invalid practice task: ${label} is a MATH task and needs a non-empty expectedAnswer of at most 3000 characters (received ${truncateDiagnosticValue(task.expectedAnswer)}).`;
+    }
+    if (type === "CODE") {
+      if (String(task.language || "").toLowerCase() !== "java") {
+        return `The curriculum preview contains an invalid practice task: ${label} is a CODE task and the secure runner supports language "java" only (received ${truncateDiagnosticValue(task.language)}).`;
+      }
+      if (
+        typeof task.starterCode !== "string" ||
+        task.starterCode.length > 20000
+      ) {
+        return `The curriculum preview contains an invalid practice task: ${label} is a CODE task and needs starterCode text of at most 20000 characters.`;
+      }
+      if (
+        !Array.isArray(task.tests) ||
+        task.tests.length < 1 ||
+        task.tests.length > 50 ||
+        task.tests.some(
+          (testCase) =>
+            !testCase ||
+            typeof testCase.expectedOutput !== "string" ||
+            testCase.expectedOutput.length > 4000 ||
+            typeof testCase.input !== "string" ||
+            testCase.input.length > 4000 ||
+            (testCase.visible !== undefined &&
+              typeof testCase.visible !== "boolean"),
+        )
+      ) {
+        return `The curriculum preview contains an invalid practice task: ${label} is a CODE task and needs between 1 and 50 test cases, each with string input and expectedOutput of at most 4000 characters.`;
+      }
+    }
+  }
+  return null;
+}
+
 function validateSuppliedObjectivesProposal(rawContent, request) {
   let proposal;
   try {
     proposal = JSON.parse(rawContent);
   } catch {
-    throw requestError("The AI returned an invalid curriculum preview. Please retry.", 502);
+    throw requestError(
+      "The AI returned an invalid curriculum preview. Please retry.",
+      502,
+    );
   }
   const sourceObjectives = request.suppliedObjectives;
   const definitions = proposal?.objectiveDefinitions;
   if (
     !Array.isArray(definitions) ||
     definitions.length !== sourceObjectives.length ||
-    definitions.some((objective) => !objective || typeof objective !== "object" || Array.isArray(objective))
+    definitions.some(
+      (objective) =>
+        !objective || typeof objective !== "object" || Array.isArray(objective),
+    )
   ) {
-    throw requestError("The curriculum preview must preserve every supplied objective.", 502);
+    throw requestError(
+      "The curriculum preview must preserve every supplied objective.",
+      502,
+    );
   }
-  const keys = definitions.map((objective) => String(objective.key || "").trim());
-  if (keys.some((key) => !key || key.length > 100) || new Set(keys).size !== keys.length) {
-    throw requestError("The curriculum preview contains missing or duplicate objective keys.", 502);
+  const keys = definitions.map((objective) =>
+    String(objective.key || "").trim(),
+  );
+  if (
+    keys.some((key) => !key || key.length > 100) ||
+    new Set(keys).size !== keys.length
+  ) {
+    throw requestError(
+      "The curriculum preview contains missing or duplicate objective keys.",
+      502,
+    );
   }
   const objectiveDefinitions = definitions.map((objective, index) => {
     const criteria = objective.masteryCriteria;
-    const prerequisites = objective.prerequisites === undefined ? [] : objective.prerequisites;
+    const prerequisites =
+      objective.prerequisites === undefined ? [] : objective.prerequisites;
+    if (String(objective.title || "").trim() !== sourceObjectives[index]) {
+      throw requestError(
+        `The curriculum preview must preserve the supplied objective at position ${index + 1} exactly; expected "${sourceObjectives[index]}", received ${truncateDiagnosticValue(objective.title)}.`,
+        502,
+      );
+    }
     if (
-      String(objective.title || "").trim() !== sourceObjectives[index] ||
       typeof objective.description !== "string" ||
       !objective.description.trim() ||
       objective.description.length > 2000 ||
@@ -1579,33 +2036,137 @@ function validateSuppliedObjectivesProposal(rawContent, request) {
       !Array.isArray(prerequisites) ||
       prerequisites.some((key) => !keys.slice(0, index).includes(String(key)))
     ) {
-      throw requestError(`The curriculum preview has an invalid structure for objective ${index + 1}.`, 502);
+      let detail;
+      if (
+        typeof objective.description !== "string" ||
+        !objective.description.trim()
+      ) {
+        detail = "description must be a non-empty string";
+      } else if (objective.description.length > 2000) {
+        detail = `description must be at most 2000 characters (received ${objective.description.length})`;
+      } else if (
+        typeof objective.expectedOutcome !== "string" ||
+        !objective.expectedOutcome.trim()
+      ) {
+        detail = "expectedOutcome must be a non-empty string";
+      } else if (objective.expectedOutcome.length > 2000) {
+        detail = `expectedOutcome must be at most 2000 characters (received ${objective.expectedOutcome.length})`;
+      } else if (!Array.isArray(criteria)) {
+        detail = `masteryCriteria must be an array (received ${truncateDiagnosticValue(criteria)})`;
+      } else if (criteria.length < 1 || criteria.length > 10) {
+        detail = `masteryCriteria must contain between 1 and 10 criteria (received ${criteria.length})`;
+      } else {
+        detail = "prerequisites may only reference keys of earlier objectives";
+      }
+      throw requestError(
+        `The curriculum preview has an invalid structure for objective ${index + 1} ("${sourceObjectives[index]}"): ${detail}.`,
+        502,
+      );
     }
-    const criterionKeys = criteria.map((criterion) => String(criterion?.key || "").trim());
+    const criterionKeys = criteria.map((criterion) =>
+      String(criterion?.key || "").trim(),
+    );
     if (
       criterionKeys.some((key) => !key || key.length > 100) ||
-      new Set(criterionKeys).size !== criterionKeys.length ||
-      criteria.some((criterion) =>
-        !String(criterion.description || "").trim() ||
-        !LEARNING_EVALUATION_METHODS.has(String(criterion.evaluationMethod || "EXPLANATION")) ||
-        !Number.isInteger(Number(criterion.requiredEvidenceCount || 1)) ||
-        Number(criterion.requiredEvidenceCount || 1) < 1 ||
-        Number(criterion.requiredEvidenceCount || 1) > 5,
-      )
+      new Set(criterionKeys).size !== criterionKeys.length
     ) {
-      throw requestError(`The curriculum preview has invalid verification criteria for "${sourceObjectives[index]}".`, 502);
+      throw requestError(
+        `The curriculum preview has invalid verification criteria for "${sourceObjectives[index]}": criterion keys must be unique, non-empty, and at most 100 characters.`,
+        502,
+      );
+    }
+    const invalidCriterionIndex = criteria.findIndex((criterion) => {
+      if (
+        !criterion ||
+        typeof criterion !== "object" ||
+        Array.isArray(criterion)
+      )
+        return true;
+      if (
+        !String(criterion.description || "").trim() ||
+        String(criterion.description).length > 1000
+      )
+        return true;
+      if (normalizeEvaluationMethod(criterion.evaluationMethod) === null)
+        return true;
+      const evidenceCount = Number(criterion.requiredEvidenceCount ?? 1);
+      return (
+        !Number.isInteger(evidenceCount) ||
+        evidenceCount < 1 ||
+        evidenceCount > 5
+      );
+    });
+    if (invalidCriterionIndex !== -1) {
+      const criterion = criteria[invalidCriterionIndex];
+      let detail;
+      if (
+        !criterion ||
+        typeof criterion !== "object" ||
+        Array.isArray(criterion)
+      ) {
+        detail = criterionDiagnostic(
+          invalidCriterionIndex,
+          criterion,
+          "criterion",
+          "to be an object",
+          criterion,
+        );
+      } else if (!String(criterion.description || "").trim()) {
+        detail = criterionDiagnostic(
+          invalidCriterionIndex,
+          criterion,
+          "description",
+          "to be a non-empty string",
+          criterion.description,
+        );
+      } else if (String(criterion.description || "").length > 1000) {
+        detail = criterionDiagnostic(
+          invalidCriterionIndex,
+          criterion,
+          "description",
+          "to be at most 1000 characters",
+          `length ${String(criterion.description).length}`,
+        );
+      } else if (
+        normalizeEvaluationMethod(criterion.evaluationMethod) === null
+      ) {
+        detail = criterionDiagnostic(
+          invalidCriterionIndex,
+          criterion,
+          "evaluationMethod",
+          `to be one of ${[...LEARNING_EVALUATION_METHODS].join(", ")} (case and spacing are normalized automatically)`,
+          criterion.evaluationMethod === undefined
+            ? "missing"
+            : criterion.evaluationMethod,
+        );
+      } else {
+        detail = criterionDiagnostic(
+          invalidCriterionIndex,
+          criterion,
+          "requiredEvidenceCount",
+          "to be an integer between 1 and 5",
+          criterion.requiredEvidenceCount,
+        );
+      }
+      throw requestError(
+        `The curriculum preview has invalid verification criteria for "${sourceObjectives[index]}": ${detail}.`,
+        502,
+      );
     }
     return {
       key: keys[index],
       title: sourceObjectives[index],
       description: String(objective.description).trim(),
-      requiredKnowledge: normalizeProposalStringList(objective.requiredKnowledge, "required knowledge"),
+      requiredKnowledge: normalizeProposalStringList(
+        objective.requiredKnowledge,
+        "required knowledge",
+      ),
       expectedOutcome: String(objective.expectedOutcome).trim(),
       masteryCriteria: criteria.map((criterion) => ({
         key: String(criterion.key).trim(),
         description: String(criterion.description).trim(),
-        evaluationMethod: String(criterion.evaluationMethod || "EXPLANATION"),
-        requiredEvidenceCount: Number(criterion.requiredEvidenceCount || 1),
+        evaluationMethod: normalizeEvaluationMethod(criterion.evaluationMethod),
+        requiredEvidenceCount: Number(criterion.requiredEvidenceCount ?? 1),
       })),
       commonMisconceptions: normalizeProposalStringList(
         objective.commonMisconceptions,
@@ -1615,78 +2176,96 @@ function validateSuppliedObjectivesProposal(rawContent, request) {
     };
   });
   const coverage = proposal.coverageReport;
-  if (!Array.isArray(coverage) || coverage.length !== objectiveDefinitions.length) {
-    throw requestError("The curriculum preview must report source coverage for every objective.", 502);
+  if (
+    !Array.isArray(coverage) ||
+    coverage.length !== objectiveDefinitions.length
+  ) {
+    throw requestError(
+      "The curriculum preview must report source coverage for every objective.",
+      502,
+    );
   }
-  const normalizedSource = request.referenceContent.toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  const normalizedSource = request.referenceContent
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
   const coverageByKey = new Map();
   for (const item of coverage) {
     const objectiveKey = String(item?.objectiveKey || "");
     const status = String(item?.status || "").toUpperCase();
     const sourceExcerpt = String(item?.sourceExcerpt || "").trim();
-    const excerptInSource = sourceExcerpt.length >= 8 &&
-      normalizedSource.includes(sourceExcerpt.toLocaleLowerCase().replace(/\s+/g, " ").trim());
+    const excerptInSource =
+      sourceExcerpt.length >= 8 &&
+      normalizedSource.includes(
+        sourceExcerpt.toLocaleLowerCase().replace(/\s+/g, " ").trim(),
+      );
     if (
       !keys.includes(objectiveKey) ||
       coverageByKey.has(objectiveKey) ||
-      !["COVERED", "PARTIAL", "UNSUPPORTED"].includes(status) ||
-      ((status === "COVERED" || status === "PARTIAL") && !excerptInSource)
+      !["COVERED", "PARTIAL", "UNSUPPORTED"].includes(status)
     ) {
-      throw requestError("The curriculum preview contains unsupported or invalid source-coverage evidence.", 502);
+      throw requestError(
+        `The curriculum preview contains invalid source-coverage evidence${
+          objectiveKey ? ` for objective key "${objectiveKey}"` : ""
+        }: objectiveKey must match a supplied objective exactly once, and status must be COVERED, PARTIAL, or UNSUPPORTED (received ${truncateDiagnosticValue(item?.status)}).`,
+        502,
+      );
+    }
+    if ((status === "COVERED" || status === "PARTIAL") && !excerptInSource) {
+      throw requestError(
+        `The curriculum preview claims objective key "${objectiveKey}" is ${status} but its sourceExcerpt does not appear in the supplied reference content. The excerpt must quote the supplied content exactly (received ${
+          truncateDiagnosticValue(sourceExcerpt, 80) || "an empty excerpt"
+        }). Mark the objective PARTIAL or UNSUPPORTED with notes instead of inventing evidence.`,
+        502,
+      );
     }
     coverageByKey.set(objectiveKey, {
       objectiveKey,
       status,
       sourceExcerpt: excerptInSource ? sourceExcerpt : "",
-      notes: String(item.notes || "").trim().slice(0, 1000),
+      notes: String(item.notes || "")
+        .trim()
+        .slice(0, 1000),
     });
   }
   const practiceTasks = proposal.practiceTasks;
   if (
     !Array.isArray(practiceTasks) ||
     !practiceTasks.length ||
-    practiceTasks.length > 50 ||
-    practiceTasks.some((task) =>
-      !task ||
-      !["ACTIVITY", "MATH", "CODE"].includes(String(task.type || "ACTIVITY").toUpperCase()) ||
-      !String(task.title || "").trim() ||
-      String(task.title).length > 160 ||
-      !String(task.instructions || "").trim() ||
-      String(task.instructions).length > 5000 ||
-      !Array.isArray(task.objectiveKeys) ||
-      !task.objectiveKeys.length ||
-      task.objectiveKeys.some((key) => !keys.includes(String(key))) ||
-      (task.criterionKeys !== undefined &&
-        (!Array.isArray(task.criterionKeys) ||
-          task.criterionKeys.some((key) =>
-            !task.objectiveKeys.some((objectiveKey) =>
-              objectiveDefinitions.find((objective) => objective.key === String(objectiveKey))
-                ?.masteryCriteria.some((criterion) => criterion.key === String(key)),
-            ),
-          ))) ||
-      (String(task.type || "ACTIVITY").toUpperCase() === "MATH" &&
-        (typeof task.expectedAnswer !== "string" ||
-          !task.expectedAnswer.trim() ||
-          task.expectedAnswer.length > 3000)) ||
-      (String(task.type || "ACTIVITY").toUpperCase() === "CODE" &&
-        (String(task.language || "").toLowerCase() !== "java" ||
-          typeof task.starterCode !== "string" ||
-          task.starterCode.length > 20000 ||
-          !Array.isArray(task.tests) ||
-          task.tests.length < 1 ||
-          task.tests.length > 50 ||
-          task.tests.some((testCase) =>
-            !testCase ||
-            typeof testCase.expectedOutput !== "string" ||
-            testCase.expectedOutput.length > 4000 ||
-            typeof testCase.input !== "string" ||
-            testCase.input.length > 4000 ||
-            (testCase.visible !== undefined && typeof testCase.visible !== "boolean"),
-          ))),
-    ) ||
-    keys.some((key) => !practiceTasks.some((task) => task.objectiveKeys.map(String).includes(key)))
+    practiceTasks.length > 50
   ) {
-    throw requestError("The curriculum preview must include a focused verification task for each objective.", 502);
+    throw requestError(
+      `The curriculum preview must include between 1 and 50 practice tasks (received ${
+        Array.isArray(practiceTasks)
+          ? practiceTasks.length
+          : truncateDiagnosticValue(practiceTasks)
+      }).`,
+      502,
+    );
+  }
+  const taskDiagnostic = findInvalidPracticeTask(
+    practiceTasks,
+    keys,
+    objectiveDefinitions,
+  );
+  if (taskDiagnostic) {
+    throw requestError(taskDiagnostic, 502);
+  }
+  const unlinkedObjectiveKey = keys.find(
+    (key) =>
+      !practiceTasks.some((task) =>
+        task.objectiveKeys.map(String).includes(key),
+      ),
+  );
+  if (unlinkedObjectiveKey) {
+    const objectiveTitle =
+      objectiveDefinitions.find(
+        (objective) => objective.key === unlinkedObjectiveKey,
+      )?.title || unlinkedObjectiveKey;
+    throw requestError(
+      `The curriculum preview must include at least one practice task linked to objective "${objectiveTitle}" (key "${unlinkedObjectiveKey}").`,
+      502,
+    );
   }
   return {
     title: request.title,
@@ -1695,26 +2274,36 @@ function validateSuppliedObjectivesProposal(rawContent, request) {
     estimatedDurationMinutes: 30,
     objectives: sourceObjectives,
     objectiveDefinitions,
-    coverageReport: objectiveDefinitions.map((objective) => coverageByKey.get(objective.key)),
+    coverageReport: objectiveDefinitions.map((objective) =>
+      coverageByKey.get(objective.key),
+    ),
     coverageIssues: objectiveDefinitions.flatMap((objective) => {
       const item = coverageByKey.get(objective.key);
-      return item.status === "COVERED" ? [] : [{
-        objectiveKey: objective.key,
-        objective: objective.title,
-        status: item.status,
-        details: item.notes || "The supplied content needs review for this objective.",
-      }];
+      return item.status === "COVERED"
+        ? []
+        : [
+            {
+              objectiveKey: objective.key,
+              objective: objective.title,
+              status: item.status,
+              details:
+                item.notes ||
+                "The supplied content needs review for this objective.",
+            },
+          ];
     }),
-    coreKnowledge: [{
-      key: "administrator-source-content",
-      type: "EXPLANATION",
-      schemaVersion: 1,
-      title: "Administrator-provided source content",
-      content: request.referenceContent,
-      objectiveKeys: keys,
-      order: 0,
-      metadata: { authoritativeSource: true },
-    }],
+    coreKnowledge: [
+      {
+        key: "administrator-source-content",
+        type: "EXPLANATION",
+        schemaVersion: 1,
+        title: "Administrator-provided source content",
+        content: request.referenceContent,
+        objectiveKeys: keys,
+        order: 0,
+        metadata: { authoritativeSource: true },
+      },
+    ],
     practiceTasks: practiceTasks.map((task) => ({
       type: String(task.type || "ACTIVITY").toUpperCase(),
       title: String(task.title).trim(),
@@ -1723,21 +2312,33 @@ function validateSuppliedObjectivesProposal(rawContent, request) {
       ...(Array.isArray(task.criterionKeys)
         ? { criterionKeys: task.criterionKeys.map(String) }
         : {}),
-      ...(LEARNING_EVALUATION_METHODS.has(String(task.evaluationMethod || "").toUpperCase())
+      ...(LEARNING_EVALUATION_METHODS.has(
+        String(task.evaluationMethod || "").toUpperCase(),
+      )
         ? { evaluationMethod: String(task.evaluationMethod).toUpperCase() }
         : {}),
       ...(String(task.type || "ACTIVITY").toUpperCase() === "MATH"
         ? {
             expectedAnswer: task.expectedAnswer.trim(),
             acceptedAnswers: Array.isArray(task.acceptedAnswers)
-              ? task.acceptedAnswers.filter((answer) => typeof answer === "string").slice(0, 20)
+              ? task.acceptedAnswers
+                  .filter((answer) => typeof answer === "string")
+                  .slice(0, 20)
               : [],
-            variables: task.variables && typeof task.variables === "object" && !Array.isArray(task.variables)
-              ? task.variables
-              : {},
-            unit: String(task.unit || "").trim().slice(0, 40),
+            variables:
+              task.variables &&
+              typeof task.variables === "object" &&
+              !Array.isArray(task.variables)
+                ? task.variables
+                : {},
+            unit: String(task.unit || "")
+              .trim()
+              .slice(0, 40),
             numericTolerance: Number.isFinite(Number(task.numericTolerance))
-              ? Math.max(0, Math.min(1000000000000, Number(task.numericTolerance)))
+              ? Math.max(
+                  0,
+                  Math.min(1000000000000, Number(task.numericTolerance)),
+                )
               : 0.000001,
             requireReasoning: task.requireReasoning === true,
             requireUnit: task.requireUnit === true,
@@ -1765,7 +2366,10 @@ function normalizeProposalStringList(value, label) {
     value.length > 20 ||
     value.some((item) => typeof item !== "string" || !item.trim())
   ) {
-    throw requestError(`AI proposal ${label} must be a list of at most 20 non-empty strings.`, 502);
+    throw requestError(
+      `AI proposal ${label} must be a list of at most 20 non-empty strings.`,
+      502,
+    );
   }
   return value.map((item) => item.trim());
 }
@@ -1790,7 +2394,10 @@ function parseSuppliedObjectives(value) {
   }
   const paragraphs = String(value || "").split(/\r?\n\s*\r?\n+/);
   return paragraphs.flatMap((paragraph) =>
-    paragraph.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    paragraph
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
   );
 }
 
@@ -1798,8 +2405,10 @@ export async function generateLearningTopicProposal(adminId, moduleId, input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw requestError("A topic proposal request is required.");
   }
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null })
-    .select("title");
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  }).select("title");
   if (!module) throw requestError("Learning module not found.", 404);
   const title = String(input.title || "").trim();
   const subject = String(input.subject || "").trim();
@@ -1811,37 +2420,53 @@ export async function generateLearningTopicProposal(adminId, moduleId, input) {
     (typeof input.objectivesText !== "string" ||
       Buffer.byteLength(input.objectivesText, "utf8") > 12000)
   ) {
-    throw requestError("Learning objectives must be text no larger than 12 KB.");
+    throw requestError(
+      "Learning objectives must be text no larger than 12 KB.",
+    );
   }
-  if (!title || title.length > 160 || subject.length > 100 || description.length > 2000 ||
-      referenceContent.length > 64000 || (!description && !referenceContent) ||
-      (input.objectivesText !== undefined &&
-        (!suppliedObjectives.length || suppliedObjectives.length > 50 ||
-          suppliedObjectives.some((objective) => objective.length > 2000)))) {
-    throw requestError("Provide a topic title, description, learning objectives, and source content within the supported limits.");
+  if (
+    !title ||
+    title.length > 160 ||
+    subject.length > 100 ||
+    description.length > 2000 ||
+    referenceContent.length > 64000 ||
+    (!description && !referenceContent) ||
+    (input.objectivesText !== undefined &&
+      (!suppliedObjectives.length ||
+        suppliedObjectives.length > 50 ||
+        suppliedObjectives.some((objective) => objective.length > 2000)))
+  ) {
+    throw requestError(
+      "Provide a topic title, description, learning objectives, and source content within the supported limits.",
+    );
   }
   const startedAt = Date.now();
-  const providerName = String(config.AI_PROVIDER || "ollama").trim().toLowerCase();
+  const providerName = String(config.AI_PROVIDER || "ollama")
+    .trim()
+    .toLowerCase();
   const model = String(config.AI_MODEL || "").trim();
-  let reply;
-  try {
-    const provider = createTutorProvider(config);
-    reply = await provider.generateReply({
+  const provider = createTutorProvider(config);
+  const authoringRequestContent = JSON.stringify({
+    moduleTitle: module.title,
+    title,
+    subject,
+    description,
+    ...(input.objectivesText === undefined ? {} : { suppliedObjectives }),
+    referenceContent,
+  });
+  const baseAuthoringCall = () =>
+    provider.generateReply({
       topic: { title, authoringProposal: true },
-      approvedContent: JSON.stringify({
-        moduleTitle: module.title,
-        title,
-        subject,
-        description,
-        ...(input.objectivesText === undefined ? {} : { suppliedObjectives }),
-        referenceContent,
-      }),
+      approvedContent: authoringRequestContent,
       progressContext: {},
       objectiveProgress: {},
       history: [],
       language: "en",
       advancedSettings: {},
     });
+  let reply;
+  try {
+    reply = await baseAuthoringCall();
   } catch (error) {
     await LearningAiUsage.create({
       userId: adminId,
@@ -1853,28 +2478,70 @@ export async function generateLearningTopicProposal(adminId, moduleId, input) {
     });
     throw error;
   }
+  const proposalRequest = {
+    title,
+    subject,
+    description,
+    suppliedObjectives:
+      input.objectivesText === undefined ? null : suppliedObjectives,
+    referenceContent,
+  };
+  const validateProposal = (content) =>
+    proposalRequest.suppliedObjectives
+      ? validateSuppliedObjectivesProposal(content, proposalRequest)
+      : validateTopicProposal(content, proposalRequest);
   let proposal;
   try {
-    const request = {
-      title,
-      subject,
-      description,
-      suppliedObjectives: input.objectivesText === undefined ? null : suppliedObjectives,
-      referenceContent,
-    };
-    proposal = request.suppliedObjectives
-      ? validateSuppliedObjectivesProposal(reply.content, request)
-      : validateTopicProposal(reply.content, request);
-  } catch (error) {
-    await LearningAiUsage.create({
-      userId: adminId,
+    proposal = validateProposal(reply.content);
+  } catch (validationError) {
+    // One limited repair attempt: give the model its previous output plus the
+    // exact validation error, and ask it to fix only the invalid fields.
+    console.error("[Learning] Curriculum proposal rejected by validation:", {
       operation: "TOPIC_PROPOSAL",
-      provider: reply.provider,
-      model: reply.model,
-      responseTimeMs: Date.now() - startedAt,
-      succeeded: false,
+      error: validationError.message,
     });
-    throw error;
+    try {
+      const repairReply = await provider.generateReply({
+        topic: { title, authoringProposal: true },
+        approvedContent: JSON.stringify({
+          originalRequest: authoringRequestContent,
+          previousResponse: reply.content.slice(0, 32000),
+          validationError: validationError.message,
+          repairInstructions:
+            "Your previous curriculum response above was rejected by server-side validation with the error shown. Return a corrected complete JSON object in the same schema. Preserve every supplied objective exactly, keep all previously valid fields unchanged, fix only the invalid or missing fields, and never invent source excerpts that are not present verbatim in the original reference content.",
+        }),
+        progressContext: {},
+        objectiveProgress: {},
+        history: [],
+        language: "en",
+        advancedSettings: {},
+      });
+      await LearningAiUsage.create({
+        userId: adminId,
+        operation: "TOPIC_PROPOSAL_REPAIR",
+        provider: repairReply.provider,
+        model: repairReply.model,
+        ...aiUsageFields(repairReply),
+        responseTimeMs: Date.now() - startedAt,
+        succeeded: true,
+      });
+      proposal = validateProposal(repairReply.content);
+      reply = repairReply;
+    } catch (repairError) {
+      await LearningAiUsage.create({
+        userId: adminId,
+        operation: "TOPIC_PROPOSAL",
+        provider: reply.provider || providerName || "unknown",
+        model: reply.model || model || "unconfigured",
+        responseTimeMs: Date.now() - startedAt,
+        succeeded: false,
+      });
+      if (repairError instanceof AiProviderError) throw repairError;
+      throw requestError(
+        `The generated curriculum could not be validated after a repair attempt. ${validationError.message} Your entered content is preserved; please retry or author the topic manually.`,
+        502,
+      );
+    }
   }
   await LearningAiUsage.create({
     userId: adminId,
@@ -1889,7 +2556,10 @@ export async function generateLearningTopicProposal(adminId, moduleId, input) {
 }
 
 export async function createLearningTopic(moduleId, input) {
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw requestError("A topic object is required.");
@@ -1911,14 +2581,20 @@ export async function createLearningTopic(moduleId, input) {
 }
 
 export async function updateLearningTopic(moduleId, topicId, input) {
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
   const topic = module.topics.id(topicId);
   if (!topic) throw requestError("Learning topic not found.", 404);
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw requestError("A topic object is required.");
   }
-  if (input.title !== undefined && (typeof input.title !== "string" || !input.title.trim())) {
+  if (
+    input.title !== undefined &&
+    (typeof input.title !== "string" || !input.title.trim())
+  ) {
     throw requestError("Topic title cannot be empty.");
   }
   const revision = await preparePublishedModuleEdit(module);
@@ -1931,9 +2607,13 @@ export async function updateLearningTopic(moduleId, topicId, input) {
 }
 
 export async function deleteLearningTopic(moduleId, topicId) {
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
-  if (!module.topics.id(topicId)) throw requestError("Learning topic not found.", 404);
+  if (!module.topics.id(topicId))
+    throw requestError("Learning topic not found.", 404);
   const revision = await preparePublishedModuleEdit(module);
   module.topics.pull(topicId);
   await saveModuleEdit(module, revision);
@@ -1941,7 +2621,10 @@ export async function deleteLearningTopic(moduleId, topicId) {
 }
 
 export async function reorderLearningTopics(moduleId, orderedTopicIds) {
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
   if (
     !Array.isArray(orderedTopicIds) ||
@@ -1952,7 +2635,9 @@ export async function reorderLearningTopics(moduleId, orderedTopicIds) {
     throw requestError("The order must include every topic exactly once.");
   }
   const revision = await preparePublishedModuleEdit(module);
-  const byId = new Map(module.topics.map((topic) => [id(topic), topic.toObject()]));
+  const byId = new Map(
+    module.topics.map((topic) => [id(topic), topic.toObject()]),
+  );
   module.topics = orderedTopicIds.map((topicId) => byId.get(id(topicId)));
   await saveModuleEdit(module, revision);
   return module.topics;
@@ -1972,7 +2657,8 @@ async function createCertificateIfComplete(module, progress) {
         userId: progress.userId,
         programId: module.programId,
         moduleId: module._id,
-        moduleVersion: progress.moduleVersion || module.currentPublishedVersion || 1,
+        moduleVersion:
+          progress.moduleVersion || module.currentPublishedVersion || 1,
         earnedAt: progress.completedAt,
       },
     },
@@ -1985,7 +2671,10 @@ async function activateModulePurchase(purchase) {
     const startedAt = new Date();
     purchase.accessStartedAt = startedAt;
     purchase.accessExpiresAt = Number.isInteger(purchase.accessDurationDays)
-      ? new Date(startedAt.getTime() + purchase.accessDurationDays * 24 * 60 * 60 * 1000)
+      ? new Date(
+          startedAt.getTime() +
+            purchase.accessDurationDays * 24 * 60 * 60 * 1000,
+        )
       : null;
   }
   purchase.status = "ACTIVE";
@@ -2002,7 +2691,11 @@ async function activateModulePurchase(purchase) {
     { upsert: true },
   );
   await LearningProgress.updateOne(
-    { userId: purchase.userId, moduleId: purchase.moduleId, moduleVersion: null },
+    {
+      userId: purchase.userId,
+      moduleId: purchase.moduleId,
+      moduleVersion: null,
+    },
     { $set: { moduleVersion: purchase.moduleVersion || 1 } },
   );
   return purchase;
@@ -2018,7 +2711,10 @@ async function requireModulePurchase(userId, module) {
   if (purchase.accessExpiresAt && purchase.accessExpiresAt <= new Date()) {
     purchase.status = "EXPIRED";
     await purchase.save();
-    throw requestError("Your access to this module has expired. Purchase it again to continue.", 403);
+    throw requestError(
+      "Your access to this module has expired. Purchase it again to continue.",
+      403,
+    );
   }
 }
 
@@ -2040,8 +2736,15 @@ async function requireModulePrerequisites(userId, module) {
       completedAt: { $ne: null },
     }).select("moduleId");
     const completedIds = new Set(completed.map((entry) => id(entry.moduleId)));
-    if (prerequisites.some((prerequisiteId) => !completedIds.has(id(prerequisiteId)))) {
-      throw requestError("Complete the module prerequisites before opening this module.", 403);
+    if (
+      prerequisites.some(
+        (prerequisiteId) => !completedIds.has(id(prerequisiteId)),
+      )
+    ) {
+      throw requestError(
+        "Complete the module prerequisites before opening this module.",
+        403,
+      );
     }
   }
 }
@@ -2053,7 +2756,8 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
     deletedAt: null,
     $or: [{ status: "PUBLISHED" }, { status: { $exists: false } }],
   });
-  if (!publishedModuleProgramIds.length) return { programs: [], page, limit, total: 0 };
+  if (!publishedModuleProgramIds.length)
+    return { programs: [], page, limit, total: 0 };
   const filter = {
     status: "PUBLISHED",
     deletedAt: null,
@@ -2075,7 +2779,9 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
     deletedAt: null,
     $or: [{ status: "PUBLISHED" }, { status: { $exists: false } }],
   })
-    .select("programId title description price currency difficulty sequence estimatedDurationMinutes accessDurationDays prerequisites status")
+    .select(
+      "programId title description price currency difficulty sequence estimatedDurationMinutes accessDurationDays prerequisites status",
+    )
     .sort({ programId: 1, sequence: 1 })
     .lean();
   const moduleIds = modules.map((module) => module._id);
@@ -2084,29 +2790,49 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
       userId,
       status: { $in: ["PENDING", "ACTIVE", "EXPIRED"] },
       moduleId: { $in: moduleIds },
-    }).select("programId moduleId status accessExpiresAt").lean(),
+    })
+      .select("programId moduleId status accessExpiresAt")
+      .lean(),
     LearningProgress.find({ userId, moduleId: { $in: moduleIds } })
-      .select("moduleId completedTopicIds completedObjectiveKeys completedAt assessmentPassed progressPercentage")
+      .select(
+        "moduleId completedTopicIds completedObjectiveKeys completedAt assessmentPassed progressPercentage",
+      )
       .lean(),
     LearningCertificate.find({ userId, moduleId: { $in: moduleIds } })
       .select("_id code moduleId")
       .lean(),
   ]);
   const purchaseFor = (module) => {
-    const matches = purchases.filter((purchase) =>
-      sameId(purchase.programId, module.programId) ||
-      sameId(purchase.moduleId, module._id),
+    const matches = purchases.filter(
+      (purchase) =>
+        sameId(purchase.programId, module.programId) ||
+        sameId(purchase.moduleId, module._id),
     );
-    return matches.find((purchase) =>
-      purchase.status === "ACTIVE" &&
-      (!purchase.accessExpiresAt || new Date(purchase.accessExpiresAt) > new Date()),
-    ) ||
+    return (
+      matches.find(
+        (purchase) =>
+          purchase.status === "ACTIVE" &&
+          (!purchase.accessExpiresAt ||
+            new Date(purchase.accessExpiresAt) > new Date()),
+      ) ||
       matches.find((purchase) => purchase.status === "PENDING") ||
-      matches.find((purchase) => purchase.status === "EXPIRED" || purchase.status === "ACTIVE");
+      matches.find(
+        (purchase) =>
+          purchase.status === "EXPIRED" || purchase.status === "ACTIVE",
+      )
+    );
   };
-  const progressByModule = new Map(progress.map((entry) => [id(entry.moduleId), entry]));
-  const certificateByModule = new Map(certificates.map((entry) => [id(entry.moduleId), entry]));
-  const activeCompleted = new Set(progress.filter((entry) => entry.completedAt).map((entry) => id(entry.moduleId)));
+  const progressByModule = new Map(
+    progress.map((entry) => [id(entry.moduleId), entry]),
+  );
+  const certificateByModule = new Map(
+    certificates.map((entry) => [id(entry.moduleId), entry]),
+  );
+  const activeCompleted = new Set(
+    progress
+      .filter((entry) => entry.completedAt)
+      .map((entry) => id(entry.moduleId)),
+  );
 
   return {
     programs: programs.map((program) => ({
@@ -2116,28 +2842,41 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
         .map((module) => {
           const purchase = purchaseFor(module);
           const moduleProgress = progressByModule.get(id(module._id));
-          const accessExpired = purchase?.status === "EXPIRED" ||
+          const accessExpired =
+            purchase?.status === "EXPIRED" ||
             (purchase?.status === "ACTIVE" &&
               purchase.accessExpiresAt &&
               new Date(purchase.accessExpiresAt) <= new Date());
-          const prerequisitesMet = (module.prerequisites || []).every((prerequisite) =>
-            activeCompleted.has(id(prerequisite)),
+          const prerequisitesMet = (module.prerequisites || []).every(
+            (prerequisite) => activeCompleted.has(id(prerequisite)),
           );
           return {
             ...module,
-            hasAccess: purchase?.status === "ACTIVE" && !accessExpired && prerequisitesMet,
-            purchaseStatus: accessExpired ? "EXPIRED" : purchase?.status || null,
+            hasAccess:
+              purchase?.status === "ACTIVE" &&
+              !accessExpired &&
+              prerequisitesMet,
+            purchaseStatus: accessExpired
+              ? "EXPIRED"
+              : purchase?.status || null,
             accessExpiresAt: purchase?.accessExpiresAt || null,
             certificate: certificateByModule.get(id(module._id)) || null,
             progress: moduleProgress
               ? {
                   completedTopics: moduleProgress.completedTopicIds.length,
-                  completedObjectives: moduleProgress.completedObjectiveKeys?.length || 0,
+                  completedObjectives:
+                    moduleProgress.completedObjectiveKeys?.length || 0,
                   completed: Boolean(moduleProgress.completedAt),
                   assessmentPassed: moduleProgress.assessmentPassed,
                   progressPercentage: moduleProgress.progressPercentage || 0,
                 }
-              : { completedTopics: 0, completedObjectives: 0, completed: false, assessmentPassed: false, progressPercentage: 0 },
+              : {
+                  completedTopics: 0,
+                  completedObjectives: 0,
+                  completed: false,
+                  assessmentPassed: false,
+                  progressPercentage: 0,
+                },
           };
         }),
     })),
@@ -2159,15 +2898,22 @@ export async function listAdminLearningPrograms(pageInput, limitInput) {
     LearningProgram.countDocuments({ deletedAt: null }),
   ]);
   const modules = programs.length
-    ? await LearningModule.find({ programId: { $in: programs.map((program) => program._id) }, deletedAt: null })
-        .select("programId title description price currency difficulty sequence estimatedDurationMinutes accessDurationDays status")
+    ? await LearningModule.find({
+        programId: { $in: programs.map((program) => program._id) },
+        deletedAt: null,
+      })
+        .select(
+          "programId title description price currency difficulty sequence estimatedDurationMinutes accessDurationDays status",
+        )
         .sort({ programId: 1, sequence: 1 })
         .lean()
     : [];
   return {
     programs: programs.map((program) => ({
       ...program,
-      modules: modules.filter((module) => sameId(module.programId, program._id)),
+      modules: modules.filter((module) =>
+        sameId(module.programId, program._id),
+      ),
     })),
     page,
     limit,
@@ -2192,7 +2938,9 @@ export async function createLearningProgram(userId, input) {
     input.difficulty !== undefined &&
     !["BEGINNER", "INTERMEDIATE", "ADVANCED"].includes(input.difficulty)
   ) {
-    throw requestError("Course difficulty must be beginner, intermediate, or advanced.");
+    throw requestError(
+      "Course difficulty must be beginner, intermediate, or advanced.",
+    );
   }
   const thumbnailUrl = String(input.thumbnailUrl || "").trim();
   if (thumbnailUrl) {
@@ -2228,7 +2976,8 @@ export async function createLearningProgram(userId, input) {
 
 export async function updateLearningProgram(userId, programId, input) {
   const program = await LearningProgram.findById(programId);
-  if (!program || program.deletedAt) throw requestError("Learning course not found.", 404);
+  if (!program || program.deletedAt)
+    throw requestError("Learning course not found.", 404);
   for (const field of [
     "title",
     "description",
@@ -2251,7 +3000,11 @@ export async function updateLearningProgram(userId, programId, input) {
         } catch {
           throw requestError("Course thumbnail URL must be a valid HTTPS URL.");
         }
-        if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+        if (
+          parsed.protocol !== "https:" ||
+          parsed.username ||
+          parsed.password
+        ) {
           throw requestError("Course thumbnail URL must be a valid HTTPS URL.");
         }
       }
@@ -2268,11 +3021,14 @@ export async function updateLearningProgram(userId, programId, input) {
         deletedAt: null,
       });
       if (!modules.length) {
-        throw requestError("Add at least one module before publishing this course.");
+        throw requestError(
+          "Add at least one module before publishing this course.",
+        );
       }
       modules.forEach(validateModuleCompletionConfiguration);
       for (const module of modules) {
-        if (module.status === "PUBLISHED" && module.currentPublishedVersion) continue;
+        if (module.status === "PUBLISHED" && module.currentPublishedVersion)
+          continue;
         module.status = "PUBLISHED";
         module.currentPublishedVersion = Math.max(
           1,
@@ -2300,9 +3056,15 @@ export async function archiveLearningProgram(programId) {
   return program;
 }
 
-async function validatePrerequisites(programId, prerequisites, excludedModuleId = null) {
-  if (!Array.isArray(prerequisites)) throw requestError("Prerequisites must be an array.");
-  if (prerequisites.length > 20) throw requestError("A module can have at most 20 prerequisites.");
+async function validatePrerequisites(
+  programId,
+  prerequisites,
+  excludedModuleId = null,
+) {
+  if (!Array.isArray(prerequisites))
+    throw requestError("Prerequisites must be an array.");
+  if (prerequisites.length > 20)
+    throw requestError("A module can have at most 20 prerequisites.");
   const uniqueIds = [...new Set(prerequisites.map(id))];
   if (excludedModuleId && uniqueIds.includes(id(excludedModuleId))) {
     throw requestError("A module cannot be its own prerequisite.");
@@ -2311,10 +3073,14 @@ async function validatePrerequisites(programId, prerequisites, excludedModuleId 
     const found = await LearningModule.find({
       _id: { $in: uniqueIds },
       programId,
-      ...(excludedModuleId ? { _id: { $in: uniqueIds, $ne: excludedModuleId } } : {}),
+      ...(excludedModuleId
+        ? { _id: { $in: uniqueIds, $ne: excludedModuleId } }
+        : {}),
     }).select("_id");
     if (found.length !== uniqueIds.length) {
-      throw requestError("Every prerequisite must be another module in the same program.");
+      throw requestError(
+        "Every prerequisite must be another module in the same program.",
+      );
     }
   }
   return uniqueIds;
@@ -2324,7 +3090,9 @@ function normalizeAccessDurationDays(value) {
   if (value === undefined || value === null || value === "") return null;
   const days = Number(value);
   if (!Number.isInteger(days) || days < 1 || days > 36500) {
-    throw requestError("Module access duration must be a whole number of days between 1 and 36500.");
+    throw requestError(
+      "Module access duration must be a whole number of days between 1 and 36500.",
+    );
   }
   return days;
 }
@@ -2341,28 +3109,43 @@ export async function createLearningModule(programId, input) {
       throw requestError(`${label} must be ${maxLength} characters or fewer.`);
     }
   }
-  const program = await LearningProgram.findOne({ _id: programId, deletedAt: null });
+  const program = await LearningProgram.findOne({
+    _id: programId,
+    deletedAt: null,
+  });
   if (!program) throw requestError("Learning course not found.", 404);
-  const prerequisites = await validatePrerequisites(programId, input.prerequisites || []);
+  const prerequisites = await validatePrerequisites(
+    programId,
+    input.prerequisites || [],
+  );
   validateAiConfiguration(input.aiConfiguration);
-  const accessDurationDays = normalizeAccessDurationDays(input.accessDurationDays);
-  const lastModule = await LearningModule.findOne({ programId, deletedAt: null })
+  const accessDurationDays = normalizeAccessDurationDays(
+    input.accessDurationDays,
+  );
+  const lastModule = await LearningModule.findOne({
+    programId,
+    deletedAt: null,
+  })
     .sort({ sequence: -1 })
     .select("sequence")
     .lean();
   const requestedSequence = Number(input.sequence);
   const module = new LearningModule({
     title: input.title,
-    shortDescription: String(input.shortDescription || input.description).slice(0, 300),
+    shortDescription: String(input.shortDescription || input.description).slice(
+      0,
+      300,
+    ),
     description: input.description,
     objectives: input.objectives,
     price: input.price,
     currency: input.currency,
     accessDurationDays,
     difficulty: input.difficulty,
-    sequence: Number.isInteger(requestedSequence) && requestedSequence > 0
-      ? requestedSequence
-      : (Number(lastModule?.sequence) || 0) + 1,
+    sequence:
+      Number.isInteger(requestedSequence) && requestedSequence > 0
+        ? requestedSequence
+        : (Number(lastModule?.sequence) || 0) + 1,
     estimatedDurationMinutes: Number(input.estimatedDurationMinutes) || 60,
     topics: [],
     assessment: input.assessment,
@@ -2383,13 +3166,19 @@ export async function createLearningModule(programId, input) {
 }
 
 export async function getAdminLearningModule(moduleId) {
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
   return module;
 }
 
 export async function updateLearningModule(moduleId, input) {
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
   const revision = await preparePublishedModuleEdit(module);
   const fields = [
@@ -2409,9 +3198,10 @@ export async function updateLearningModule(moduleId, input) {
   ];
   for (const field of fields) {
     if (input[field] !== undefined) {
-      module[field] = field === "accessDurationDays"
-        ? normalizeAccessDurationDays(input[field])
-        : input[field];
+      module[field] =
+        field === "accessDurationDays"
+          ? normalizeAccessDurationDays(input[field])
+          : input[field];
     }
   }
   if (input.prerequisites !== undefined) {
@@ -2427,7 +3217,8 @@ export async function updateLearningModule(moduleId, input) {
     validateAiConfiguration(next);
     if (
       previous.behaviorPrompt !== next.behaviorPrompt ||
-      JSON.stringify(previous.advancedSettings || {}) !== JSON.stringify(next.advancedSettings || {})
+      JSON.stringify(previous.advancedSettings || {}) !==
+        JSON.stringify(next.advancedSettings || {})
     ) {
       const version = Number(previous.version) || 1;
       module.aiConfiguration = {
@@ -2452,9 +3243,16 @@ export async function setLearningModuleStatus(moduleId, status) {
   if (!["DRAFT", "PUBLISHED"].includes(status)) {
     throw requestError("Module status must be DRAFT or PUBLISHED.");
   }
-  const module = await LearningModule.findOne({ _id: moduleId, deletedAt: null });
+  const module = await LearningModule.findOne({
+    _id: moduleId,
+    deletedAt: null,
+  });
   if (!module) throw requestError("Learning module not found.", 404);
-  if (status === "PUBLISHED" && module.status === "PUBLISHED" && !module.currentPublishedVersion) {
+  if (
+    status === "PUBLISHED" &&
+    module.status === "PUBLISHED" &&
+    !module.currentPublishedVersion
+  ) {
     validateModuleCompletionConfiguration(module);
     module.currentPublishedVersion = 1;
     await module.save();
@@ -2464,7 +3262,10 @@ export async function setLearningModuleStatus(moduleId, status) {
   if (module.status !== status) {
     if (status === "PUBLISHED") {
       validateModuleCompletionConfiguration(module);
-      module.currentPublishedVersion = Math.max(1, Number(module.currentPublishedVersion) + 1 || 1);
+      module.currentPublishedVersion = Math.max(
+        1,
+        Number(module.currentPublishedVersion) + 1 || 1,
+      );
     }
     module.status = status;
     await module.save();
@@ -2487,16 +3288,29 @@ export async function reorderLearningModules(programId, orderedModuleIds) {
   if (!Array.isArray(orderedModuleIds) || !orderedModuleIds.length) {
     throw requestError("Provide the ordered module IDs.");
   }
-  const modules = await LearningModule.find({ programId, deletedAt: null }).select("_id sequence");
+  const modules = await LearningModule.find({
+    programId,
+    deletedAt: null,
+  }).select("_id sequence");
   if (
     modules.length !== orderedModuleIds.length ||
     new Set(orderedModuleIds.map(id)).size !== modules.length ||
-    orderedModuleIds.some((moduleId) => !modules.some((module) => sameId(module._id, moduleId)))
+    orderedModuleIds.some(
+      (moduleId) => !modules.some((module) => sameId(module._id, moduleId)),
+    )
   ) {
-    throw requestError("The order must include every active module exactly once.");
+    throw requestError(
+      "The order must include every active module exactly once.",
+    );
   }
-  const offset = Math.max(...modules.map((module) => module.sequence), modules.length) + modules.length + 1;
-  await LearningModule.updateMany({ programId, deletedAt: null }, { $inc: { sequence: offset } });
+  const offset =
+    Math.max(...modules.map((module) => module.sequence), modules.length) +
+    modules.length +
+    1;
+  await LearningModule.updateMany(
+    { programId, deletedAt: null },
+    { $inc: { sequence: offset } },
+  );
   await Promise.all(
     orderedModuleIds.map((moduleId, index) =>
       LearningModule.updateOne(
@@ -2520,7 +3334,9 @@ export async function createLearningPurchase(userId, input) {
     _id: moduleId,
     status: "PUBLISHED",
     deletedAt: null,
-  }).select("programId title price currency currentPublishedVersion accessDurationDays");
+  }).select(
+    "programId title price currency currentPublishedVersion accessDurationDays",
+  );
   if (!module) throw requestError("Published module not found.", 404);
   const program = await LearningProgram.findOne({
     _id: module.programId,
@@ -2533,25 +3349,29 @@ export async function createLearningPurchase(userId, input) {
     moduleId: module._id,
     status: { $in: ["PENDING", "ACTIVE"] },
   }).sort({ createdAt: -1 });
-  if (existing?.status === "ACTIVE" && existing.accessExpiresAt && existing.accessExpiresAt <= new Date()) {
+  if (
+    existing?.status === "ACTIVE" &&
+    existing.accessExpiresAt &&
+    existing.accessExpiresAt <= new Date()
+  ) {
     existing.status = "EXPIRED";
     await existing.save();
     existing = null;
   }
   if (
     existing?.status === "PENDING" &&
-    (
-      existing.amount !== module.price ||
+    (existing.amount !== module.price ||
       existing.currency !== (module.currency || "INR") ||
-      (existing.accessDurationDays ?? null) !== (module.accessDurationDays ?? null)
-    )
+      (existing.accessDurationDays ?? null) !==
+        (module.accessDurationDays ?? null))
   ) {
     existing.status = "FAILED";
     existing.paymentStatus = "FAILED";
     await existing.save();
     existing = null;
   }
-  if (existing?.status === "ACTIVE") return { purchase: existing, checkout: null };
+  if (existing?.status === "ACTIVE")
+    return { purchase: existing, checkout: null };
   if (existing?.paymentOrderId && existing.status === "PENDING") {
     return {
       purchase: existing,
@@ -2564,17 +3384,22 @@ export async function createLearningPurchase(userId, input) {
       },
     };
   }
-  const purchase = existing || new LearningPurchase({
-    userId,
-    moduleId: module._id,
-    programId: module.programId,
-    moduleVersion: Math.max(1, Number(module.currentPublishedVersion) || 1),
-    amount: module.price,
-    currency: module.currency || "INR",
-    accessDurationDays: module.accessDurationDays ?? null,
-  });
+  const purchase =
+    existing ||
+    new LearningPurchase({
+      userId,
+      moduleId: module._id,
+      programId: module.programId,
+      moduleVersion: Math.max(1, Number(module.currentPublishedVersion) || 1),
+      amount: module.price,
+      currency: module.currency || "INR",
+      accessDurationDays: module.accessDurationDays ?? null,
+    });
   if (!purchase.moduleVersion) {
-    purchase.moduleVersion = Math.max(1, Number(module.currentPublishedVersion) || 1);
+    purchase.moduleVersion = Math.max(
+      1,
+      Number(module.currentPublishedVersion) || 1,
+    );
   }
   if (purchase.amount === 0) {
     purchase.paymentProvider = "FREE";
@@ -2583,7 +3408,10 @@ export async function createLearningPurchase(userId, input) {
     return { purchase, checkout: null };
   }
   if (!getRazorpayKeyId()) {
-    throw requestError("Razorpay is not configured. Contact the learning administrator.", 503);
+    throw requestError(
+      "Razorpay is not configured. Contact the learning administrator.",
+      503,
+    );
   }
   if (!purchase.isNew) {
     purchase.status = "PENDING";
@@ -2613,7 +3441,11 @@ export async function createLearningPurchase(userId, input) {
           },
         };
       }
-      if (duplicate) throw requestError("A purchase is already being prepared. Retry shortly.", 409);
+      if (duplicate)
+        throw requestError(
+          "A purchase is already being prepared. Retry shortly.",
+          409,
+        );
       throw error;
     }
   }
@@ -2628,7 +3460,10 @@ export async function createLearningPurchase(userId, input) {
     order.amount !== amount ||
     order.currency !== purchase.currency
   ) {
-    throw requestError("The payment service returned an unexpected order.", 502);
+    throw requestError(
+      "The payment service returned an unexpected order.",
+      502,
+    );
   }
   purchase.paymentOrderId = order.id;
   await purchase.save();
@@ -2647,7 +3482,8 @@ export async function createLearningPurchase(userId, input) {
 export async function verifyLearningPurchase(userId, purchaseId, input) {
   const purchase = await LearningPurchase.findOne({ _id: purchaseId, userId });
   if (!purchase) throw requestError("Purchase not found.", 404);
-  if (purchase.status === "ACTIVE" && purchase.paymentId === input.paymentId) return purchase;
+  if (purchase.status === "ACTIVE" && purchase.paymentId === input.paymentId)
+    return purchase;
   if (
     purchase.status !== "PENDING" ||
     purchase.paymentOrderId !== input.orderId ||
@@ -2669,7 +3505,12 @@ export async function verifyLearningPurchase(userId, purchaseId, input) {
   return activateModulePurchase(purchase);
 }
 
-export async function processLearningPaymentWebhook(rawBody, signature, eventId, payload) {
+export async function processLearningPaymentWebhook(
+  rawBody,
+  signature,
+  eventId,
+  payload,
+) {
   if (!verifyRazorpayWebhookSignature(rawBody, signature)) {
     throw requestError("Invalid payment webhook signature.", 400);
   }
@@ -2688,7 +3529,12 @@ export async function processLearningPaymentWebhook(rawBody, signature, eventId,
     if (error?.code !== 11000) throw error;
     event = await LearningPaymentEvent.findOneAndUpdate(
       { provider: "RAZORPAY", eventId, processingStatus: "RECEIVED" },
-      { $set: { processingStatus: "PROCESSING", eventType: String(payload?.event || "unknown") } },
+      {
+        $set: {
+          processingStatus: "PROCESSING",
+          eventType: String(payload?.event || "unknown"),
+        },
+      },
       { new: true },
     );
     if (!event) return { duplicate: true };
@@ -2699,24 +3545,33 @@ export async function processLearningPaymentWebhook(rawBody, signature, eventId,
     const refundEntity = payload?.payload?.refund?.entity;
     const orderId = paymentEntity?.order_id || refundEntity?.order_id;
     const paymentId = paymentEntity?.id || refundEntity?.payment_id;
-    const purchase = orderId || paymentId
-      ? await LearningPurchase.findOne({
-          $or: [
-            ...(orderId ? [{ paymentOrderId: orderId }] : []),
-            ...(paymentId ? [{ paymentId }] : []),
-          ],
-        })
-      : null;
+    const purchase =
+      orderId || paymentId
+        ? await LearningPurchase.findOne({
+            $or: [
+              ...(orderId ? [{ paymentOrderId: orderId }] : []),
+              ...(paymentId ? [{ paymentId }] : []),
+            ],
+          })
+        : null;
     let processed = false;
-    if (purchase && ["PENDING", "ACTIVE"].includes(purchase.status) &&
-        payload.event === "payment.captured" &&
-        paymentEntity?.currency === purchase.currency &&
-        paymentEntity?.amount === toMinorUnitAmount(purchase.amount, purchase.currency)) {
+    if (
+      purchase &&
+      ["PENDING", "ACTIVE"].includes(purchase.status) &&
+      payload.event === "payment.captured" &&
+      paymentEntity?.currency === purchase.currency &&
+      paymentEntity?.amount ===
+        toMinorUnitAmount(purchase.amount, purchase.currency)
+    ) {
       purchase.paymentId = paymentId;
       purchase.paymentStatus = "CAPTURED";
       await activateModulePurchase(purchase);
       processed = true;
-    } else if (purchase && purchase.status === "PENDING" && payload.event === "payment.failed") {
+    } else if (
+      purchase &&
+      purchase.status === "PENDING" &&
+      payload.event === "payment.failed"
+    ) {
       purchase.paymentId = paymentId;
       purchase.paymentStatus = "FAILED";
       purchase.status = "FAILED";
@@ -2726,7 +3581,8 @@ export async function processLearningPaymentWebhook(rawBody, signature, eventId,
       purchase &&
       purchase.status === "ACTIVE" &&
       payload.event === "refund.processed" &&
-      Number(refundEntity?.amount) >= toMinorUnitAmount(purchase.amount, purchase.currency)
+      Number(refundEntity?.amount) >=
+        toMinorUnitAmount(purchase.amount, purchase.currency)
     ) {
       purchase.paymentStatus = "REFUNDED";
       purchase.status = "REFUNDED";
@@ -2765,7 +3621,9 @@ export async function listAdminLearningPurchases(pageInput, limitInput) {
 
 export async function reviewLearningPurchase(adminId, purchaseId, status) {
   if (!["REJECTED", "REVOKED"].includes(status)) {
-    throw requestError("Administrators may reject or revoke access; only verified payment can activate it.");
+    throw requestError(
+      "Administrators may reject or revoke access; only verified payment can activate it.",
+    );
   }
   const purchase = await LearningPurchase.findByIdAndUpdate(
     purchaseId,
@@ -2782,8 +3640,7 @@ export async function getStudentModule(userId, programId, moduleId) {
     programId,
     status: "PUBLISHED",
     deletedAt: null,
-  })
-    .select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
   await requireModulePurchase(userId, currentModule);
@@ -2799,8 +3656,12 @@ export async function getStudentModule(userId, programId, moduleId) {
     status: "PUBLISHED",
     deletedAt: null,
   }).select("title");
-  if (!program) throw requestError("The course for this module is unavailable.", 404);
-  const certificate = await LearningCertificate.findOne({ userId, moduleId }).select("code earnedAt");
+  if (!program)
+    throw requestError("The course for this module is unavailable.", 404);
+  const certificate = await LearningCertificate.findOne({
+    userId,
+    moduleId,
+  }).select("code earnedAt");
   return {
     program: { title: program.title },
     module: serializeStudentModule(module),
@@ -2815,8 +3676,7 @@ export async function getStudentTopic(userId, programId, moduleId, topicId) {
     programId,
     status: "PUBLISHED",
     deletedAt: null,
-  })
-    .select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
   await requireModulePurchase(userId, currentModule);
@@ -2830,17 +3690,27 @@ export async function getStudentTopic(userId, programId, moduleId, topicId) {
   const topic = await getVersionedTopic(module, topicId);
   if (!topic) throw requestError("Topic not found in this module.", 404);
   requireTopicPrerequisites(topic, module, progress);
-  const topicProgress = await LearningProgress.findOne({ userId, moduleId: module._id })
-    .select("moduleVersion completedObjectiveKeys objectiveEvidence objectiveProfiles taskAttempts")
+  const topicProgress = await LearningProgress.findOne({
+    userId,
+    moduleId: module._id,
+  })
+    .select(
+      "moduleVersion completedObjectiveKeys objectiveEvidence objectiveProfiles taskAttempts",
+    )
     .lean();
   const objectives = getTopicObjectives(topic);
   const firstAvailable = objectives.find((objective) =>
-    getObjectiveProgress(topic, topicProgress).find((state) =>
-      state.objectiveKey === objective.key && state.state !== "MASTERED",
+    getObjectiveProgress(topic, topicProgress).find(
+      (state) =>
+        state.objectiveKey === objective.key && state.state !== "MASTERED",
     ),
   );
-  const activeObjective = firstAvailable && getObjectiveProgress(topic, topicProgress)
-    .find((state) => state.objectiveKey === firstAvailable.key && state.prerequisitesMet);
+  const activeObjective =
+    firstAvailable &&
+    getObjectiveProgress(topic, topicProgress).find(
+      (state) =>
+        state.objectiveKey === firstAvailable.key && state.prerequisitesMet,
+    );
   return {
     topic: studentTopic(topic),
     objectiveProgress: getObjectiveProgress(
@@ -2849,9 +3719,11 @@ export async function getStudentTopic(userId, programId, moduleId, topicId) {
       activeObjective?.objectiveKey || "",
     ).map(({ objectiveKey, state }) => ({ objectiveKey, state })),
     taskResults: (topicProgress?.taskAttempts || [])
-      .filter((attempt) =>
-        sameId(attempt.topicId, topic._id) &&
-        Number(attempt.moduleVersion) === Number(topicProgress?.moduleVersion),
+      .filter(
+        (attempt) =>
+          sameId(attempt.topicId, topic._id) &&
+          Number(attempt.moduleVersion) ===
+            Number(topicProgress?.moduleVersion),
       )
       .map((attempt) => ({
         taskId: attempt.taskId,
@@ -2863,36 +3735,52 @@ export async function getStudentTopic(userId, programId, moduleId, topicId) {
   };
 }
 
-export async function requestLearningSession(userId, moduleId, topicId, language) {
+export async function requestLearningSession(
+  userId,
+  moduleId,
+  topicId,
+  language,
+) {
   language = normalizeTutorLanguage(language);
-  const { module, progress } = await getEntitledModuleForStudent(userId, moduleId);
+  const { module, progress } = await getEntitledModuleForStudent(
+    userId,
+    moduleId,
+  );
   const topic = getTopic(module, topicId);
   if (!topic) throw requestError("Topic not found in this module.", 404);
   requireTopicPrerequisites(topic, module, progress);
   const topicStates = getObjectiveProgress(topic, progress);
-  if (topicStates.length && topicStates.every((state) => state.state === "MASTERED")) {
-    throw requestError("All required objectives for this topic are already mastered.", 409);
+  if (
+    topicStates.length &&
+    topicStates.every((state) => state.state === "MASTERED")
+  ) {
+    throw requestError(
+      "All required objectives for this topic are already mastered.",
+      409,
+    );
   }
   let session = await LearningSession.findOne({
     userId,
     moduleId,
     topicId,
-    moduleVersion: progress.moduleVersion || module.currentPublishedVersion || 1,
-  })
-    .sort({ updatedAt: -1 });
+    moduleVersion:
+      progress.moduleVersion || module.currentPublishedVersion || 1,
+  }).sort({ updatedAt: -1 });
   if (!session) {
     session = new LearningSession({
       userId,
       moduleId,
       topicId,
-      moduleVersion: progress.moduleVersion || module.currentPublishedVersion || 1,
+      moduleVersion:
+        progress.moduleVersion || module.currentPublishedVersion || 1,
       language,
     });
   } else {
     session.language = language;
   }
   if (!session.currentObjectiveKey) {
-    session.currentObjectiveKey = objectivesForSession(topic, progress)[0]?.key || "";
+    session.currentObjectiveKey =
+      objectivesForSession(topic, progress)[0]?.key || "";
     if (session.messages.length) session.awaitingTeachingIntroduction = false;
   }
   await session.save();
@@ -2902,10 +3790,11 @@ export async function requestLearningSession(userId, moduleId, topicId, language
 function objectivesForSession(topic, progress) {
   const states = getObjectiveProgress(topic, progress);
   return getTopicObjectives(topic).filter((objective) =>
-    states.some((state) =>
-      state.objectiveKey === objective.key &&
-      state.state !== "MASTERED" &&
-      state.prerequisitesMet,
+    states.some(
+      (state) =>
+        state.objectiveKey === objective.key &&
+        state.state !== "MASTERED" &&
+        state.prerequisitesMet,
     ),
   );
 }
@@ -2917,15 +3806,18 @@ export async function getLearningSession(userId, sessionId) {
     _id: session.moduleId,
     status: "PUBLISHED",
     deletedAt: null,
-  })
-    .select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
   await requireModulePurchase(userId, currentModule);
   const module = await getModuleVersion(currentModule, session.moduleVersion);
   await requireModulePrerequisites(userId, module);
   const topic = await getVersionedTopic(module, session.topicId);
-  if (!topic) throw requestError("The topic for this learning session is no longer available.", 404);
+  if (!topic)
+    throw requestError(
+      "The topic for this learning session is no longer available.",
+      404,
+    );
   const progress = await loadProgress(userId, module._id);
   await reconcileCompletedTopics(module, progress);
   requireTopicPrerequisites(topic, module, progress);
@@ -2943,21 +3835,35 @@ export async function askLearningTutor(
 ) {
   const prompt = String(message || "").trim();
   if ((!prompt && !beginLesson) || prompt.length > 2000) {
-    throw requestError("Your message must contain between 1 and 2000 characters.");
+    throw requestError(
+      "Your message must contain between 1 and 2000 characters.",
+    );
   }
   language = normalizeTutorLanguage(language);
-  const displayName = String(studentName || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 40);
-  const { session, module, topic } = await getLearningSession(userId, sessionId);
-  const progress = await LearningProgress.findOne({ userId, moduleId: module._id })
-    .select("moduleVersion completedTopicIds completedObjectiveKeys completedExerciseIds assessmentPassed objectiveEvidence objectiveProfiles")
+  const displayName = String(studentName || "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, 40);
+  const { session, module, topic } = await getLearningSession(
+    userId,
+    sessionId,
+  );
+  const progress = await LearningProgress.findOne({
+    userId,
+    moduleId: module._id,
+  })
+    .select(
+      "moduleVersion completedTopicIds completedObjectiveKeys completedExerciseIds assessmentPassed objectiveEvidence objectiveProfiles",
+    )
     .lean();
   const objectives = getTopicObjectives(topic);
   const topicStates = getObjectiveProgress(topic, progress);
   const activeObjective = objectives.find((objective) =>
-    topicStates.some((state) =>
-      state.objectiveKey === objective.key &&
-      state.state !== "MASTERED" &&
-      state.prerequisitesMet,
+    topicStates.some(
+      (state) =>
+        state.objectiveKey === objective.key &&
+        state.state !== "MASTERED" &&
+        state.prerequisitesMet,
     ),
   );
   const activeProfile = progress?.objectiveProfiles?.find(
@@ -2966,7 +3872,10 @@ export async function askLearningTutor(
       Number(profile.moduleVersion) === Number(progress.moduleVersion),
   );
   if (!activeObjective) {
-    throw requestError("All required objectives for this topic are already mastered.", 409);
+    throw requestError(
+      "All required objectives for this topic are already mastered.",
+      409,
+    );
   }
   if (beginLesson && session.awaitingTeachingIntroduction !== true) {
     return {
@@ -2975,10 +3884,12 @@ export async function askLearningTutor(
       replyLanguage: "en",
       evaluation: {
         correctness: "ambiguous",
-        feedback: "Objective mastery is checked through the independent verification task.",
-        recommendedNextAction: session.learningStage === "OBJECTIVE_VERIFICATION"
-          ? "VERIFY_OBJECTIVE"
-          : "CONTINUE",
+        feedback:
+          "Objective mastery is checked through the independent verification task.",
+        recommendedNextAction:
+          session.learningStage === "OBJECTIVE_VERIFICATION"
+            ? "VERIFY_OBJECTIVE"
+            : "CONTINUE",
       },
       objectiveProgress: getObjectiveProgress(
         topic,
@@ -2989,24 +3900,31 @@ export async function askLearningTutor(
     };
   }
   if (beginLesson && session.learningStage !== "TEACHING") {
-    throw requestError("This learning session is not in the teaching stage.", 409);
+    throw requestError(
+      "This learning session is not in the teaching stage.",
+      409,
+    );
   }
   const learningStage = session.learningStage || "TEACHING";
   session.currentObjectiveKey = activeObjective.key;
-  const activeTask = learningStage === "OBJECTIVE_VERIFICATION" ||
+  const activeTask =
+    learningStage === "OBJECTIVE_VERIFICATION" ||
     learningStage === "VERIFICATION_HINT"
-    ? findObjectiveTask(topic, activeObjective.key)
-    : null;
+      ? findObjectiveTask(topic, activeObjective.key)
+      : null;
   const attemptsForTask = activeTask
-    ? (progress?.taskAttempts || []).filter((attempt) =>
-        sameId(attempt.taskId, activeTask._id) &&
-        sameId(attempt.topicId, topic._id) &&
-        Number(attempt.moduleVersion) === Number(session.moduleVersion),
+    ? (progress?.taskAttempts || []).filter(
+        (attempt) =>
+          sameId(attempt.taskId, activeTask._id) &&
+          sameId(attempt.topicId, topic._id) &&
+          Number(attempt.moduleVersion) === Number(session.moduleVersion),
       ).length
     : 0;
   const priorMessages = session.messages.slice(-MAX_SESSION_MESSAGES);
   const startedAt = Date.now();
-  const providerName = String(config.AI_PROVIDER || "ollama").trim().toLowerCase();
+  const providerName = String(config.AI_PROVIDER || "ollama")
+    .trim()
+    .toLowerCase();
   const model = String(config.AI_MODEL || "").trim();
   try {
     const provider = createTutorProvider(config);
@@ -3039,7 +3957,10 @@ export async function askLearningTutor(
                 : null,
             }
           : null,
-        states: topicStates.map(({ objectiveKey, state }) => ({ objectiveKey, state })),
+        states: topicStates.map(({ objectiveKey, state }) => ({
+          objectiveKey,
+          state,
+        })),
       },
       learningStage,
       hintLevel: Math.min(3, attemptsForTask + 1),
@@ -3063,7 +3984,11 @@ export async function askLearningTutor(
     session.language = language;
     if (prompt) session.messages.push({ role: "user", content: prompt });
     session.messages.push({ role: "assistant", content: reply.content });
-    if (!beginLesson && learningStage === "TEACHING" && reply.teachingComplete === true) {
+    if (
+      !beginLesson &&
+      learningStage === "TEACHING" &&
+      reply.teachingComplete === true
+    ) {
       session.learningStage = "OBJECTIVE_VERIFICATION";
     } else if (
       learningStage === "OBJECTIVE_VERIFICATION" ||
@@ -3074,7 +3999,8 @@ export async function askLearningTutor(
     session.awaitingTeachingIntroduction = false;
     session.messages = session.messages.slice(-MAX_SESSION_MESSAGES);
     await session.save();
-    const objectiveProgress = progress || await loadProgress(userId, module._id);
+    const objectiveProgress =
+      progress || (await loadProgress(userId, module._id));
     await LearningAiUsage.create({
       userId,
       sessionId: session._id,
@@ -3090,17 +4016,18 @@ export async function askLearningTutor(
       replyLanguage: "en",
       evaluation: {
         correctness: "ambiguous",
-        feedback: "Objective mastery is checked through the independent verification task.",
-        recommendedNextAction: session.learningStage === "OBJECTIVE_VERIFICATION"
-          ? "VERIFY_OBJECTIVE"
-          : "CONTINUE",
+        feedback:
+          "Objective mastery is checked through the independent verification task.",
+        recommendedNextAction:
+          session.learningStage === "OBJECTIVE_VERIFICATION"
+            ? "VERIFY_OBJECTIVE"
+            : "CONTINUE",
       },
       objectiveProgress: getObjectiveProgress(
         topic,
         objectiveProgress,
         activeObjective.key,
-      )
-        .map(({ objectiveKey, state }) => ({ objectiveKey, state })),
+      ).map(({ objectiveKey, state }) => ({ objectiveKey, state })),
       progress: null,
     };
   } catch (error) {
@@ -3117,25 +4044,40 @@ export async function askLearningTutor(
 }
 
 async function updateProgressAndCertificate(userId, module, progress) {
-  const exerciseCount = module.$locals.topicExerciseCount ?? module.topics.reduce(
-    (total, topic) => total + topic.exercises.length +
-      topic.subtopics.reduce((subtopicTotal, subtopic) => subtopicTotal + subtopic.exercises.length, 0),
-    0,
+  const exerciseCount =
+    module.$locals.topicExerciseCount ??
+    module.topics.reduce(
+      (total, topic) =>
+        total +
+        topic.exercises.length +
+        topic.subtopics.reduce(
+          (subtopicTotal, subtopic) =>
+            subtopicTotal + subtopic.exercises.length,
+          0,
+        ),
+      0,
+    );
+  const objectiveKeys = new Set(
+    (progress.completedObjectiveKeys || []).map(String),
   );
-  const objectiveKeys = new Set((progress.completedObjectiveKeys || []).map(String));
   const completedObjectives = module.topics.reduce(
     (total, topic) =>
       total +
-      getObjectiveProgress(topic, progress)
-        .filter((objective) => objective.state === "MASTERED").length,
+      getObjectiveProgress(topic, progress).filter(
+        (objective) => objective.state === "MASTERED",
+      ).length,
     0,
   );
   const objectiveCount = module.topics.reduce(
     (total, topic) => total + getTopicObjectives(topic).length,
     0,
   );
-  const totalItems = objectiveCount + exerciseCount + (module.assessment?.questions?.length ? 1 : 0);
-  const completedItems = completedObjectives +
+  const totalItems =
+    objectiveCount +
+    exerciseCount +
+    (module.assessment?.questions?.length ? 1 : 0);
+  const completedItems =
+    completedObjectives +
     progress.completedExerciseIds.length +
     (module.assessment?.questions?.length && progress.assessmentPassed ? 1 : 0);
   progress.progressPercentage = totalItems
@@ -3150,7 +4092,10 @@ async function updateProgressAndCertificate(userId, module, progress) {
 }
 
 export async function completeLearningTopic(userId, moduleId, topicId) {
-  const { module, progress } = await getEntitledModuleForStudent(userId, moduleId);
+  const { module, progress } = await getEntitledModuleForStudent(
+    userId,
+    moduleId,
+  );
   const topic = await getVersionedTopic(module, topicId);
   if (!topic) throw requestError("Topic not found in this module.", 404);
   const objectives = getTopicObjectives(topic);
@@ -3158,13 +4103,19 @@ export async function completeLearningTopic(userId, moduleId, topicId) {
   const results = objectives.map((objective) => ({
     objective: objective.title,
     completed: objectiveStates.some(
-      (state) => state.objectiveKey === objective.key && state.state === "MASTERED",
+      (state) =>
+        state.objectiveKey === objective.key && state.state === "MASTERED",
     ),
   }));
   const validation = {
-    passed: objectives.length > 0 && results.every((result) => result.completed),
-    scorePercent:     objectives.length
-      ? Math.round((results.filter((result) => result.completed).length / objectives.length) * 100)
+    passed:
+      objectives.length > 0 && results.every((result) => result.completed),
+    scorePercent: objectives.length
+      ? Math.round(
+          (results.filter((result) => result.completed).length /
+            objectives.length) *
+            100,
+        )
       : 0,
     results,
   };
@@ -3177,10 +4128,16 @@ export async function completeLearningTopic(userId, moduleId, topicId) {
       results: validation.results,
     };
   }
-  if (!progress.completedTopicIds.some((currentId) => sameId(currentId, topicId))) {
+  if (
+    !progress.completedTopicIds.some((currentId) => sameId(currentId, topicId))
+  ) {
     progress.completedTopicIds.push(new mongoose.Types.ObjectId(topicId));
   }
-  const completion = await updateProgressAndCertificate(userId, module, progress);
+  const completion = await updateProgressAndCertificate(
+    userId,
+    module,
+    progress,
+  );
   return {
     ...completion,
     progress: studentProgressSummary(completion.progress),
@@ -3191,25 +4148,34 @@ export async function completeLearningTopic(userId, moduleId, topicId) {
 }
 
 export async function submitLearningAssessment(userId, moduleId, answers) {
-  const { module, progress } = await getEntitledModuleForStudent(userId, moduleId);
+  const { module, progress } = await getEntitledModuleForStudent(
+    userId,
+    moduleId,
+  );
   const assessment = module.assessment || {};
   const result = evaluateLearningAssessment(
     assessment.questions,
     answers,
     assessment.passingScorePercent,
   );
-  const attemptNumber = await LearningAssessmentAttempt.countDocuments({ userId, moduleId }) + 1;
-  const savedAnswers = answers && typeof answers === "object" && !Array.isArray(answers)
-    ? Object.fromEntries(
-        Object.entries(answers)
-          .slice(0, 100)
-          .map(([questionId, answer]) => [questionId, String(answer || "").slice(0, 5000)]),
-      )
-    : {};
+  const attemptNumber =
+    (await LearningAssessmentAttempt.countDocuments({ userId, moduleId })) + 1;
+  const savedAnswers =
+    answers && typeof answers === "object" && !Array.isArray(answers)
+      ? Object.fromEntries(
+          Object.entries(answers)
+            .slice(0, 100)
+            .map(([questionId, answer]) => [
+              questionId,
+              String(answer || "").slice(0, 5000),
+            ]),
+        )
+      : {};
   await LearningAssessmentAttempt.create({
     userId,
     moduleId,
-    moduleVersion: progress.moduleVersion || module.currentPublishedVersion || 1,
+    moduleVersion:
+      progress.moduleVersion || module.currentPublishedVersion || 1,
     assessmentId: `${moduleId}:${progress.moduleVersion || module.currentPublishedVersion || 1}`,
     attemptNumber,
     answers: savedAnswers,
@@ -3221,7 +4187,11 @@ export async function submitLearningAssessment(userId, moduleId, answers) {
     progress.assessmentScorePercent || 0,
     result.scorePercent,
   );
-  const completion = await updateProgressAndCertificate(userId, module, progress);
+  const completion = await updateProgressAndCertificate(
+    userId,
+    module,
+    progress,
+  );
   return {
     ...completion,
     progress: studentProgressSummary(completion.progress),
@@ -3241,7 +4211,8 @@ function normalizeTaskSubmission(type, submission) {
     return code;
   }
   if (type === "MATH") {
-    const result = typeof submission === "string" ? { answer: submission } : submission;
+    const result =
+      typeof submission === "string" ? { answer: submission } : submission;
     if (
       !result ||
       typeof result !== "object" ||
@@ -3250,13 +4221,25 @@ function normalizeTaskSubmission(type, submission) {
       typeof (result.reasoning || "") !== "string" ||
       String(result.reasoning || "").length > 5000
     ) {
-      throw requestError("Provide a mathematical answer and, when requested, calculation steps.");
+      throw requestError(
+        "Provide a mathematical answer and, when requested, calculation steps.",
+      );
     }
-    return { answer: result.answer.trim(), reasoning: String(result.reasoning || "").trim() };
+    return {
+      answer: result.answer.trim(),
+      reasoning: String(result.reasoning || "").trim(),
+    };
   }
-  const response = typeof submission === "string" ? submission : submission?.response;
-  if (typeof response !== "string" || !response.trim() || response.length > 5000) {
-    throw requestError("Provide a written response of no more than 5000 characters.");
+  const response =
+    typeof submission === "string" ? submission : submission?.response;
+  if (
+    typeof response !== "string" ||
+    !response.trim() ||
+    response.length > 5000
+  ) {
+    throw requestError(
+      "Provide a written response of no more than 5000 characters.",
+    );
   }
   return response.trim();
 }
@@ -3271,17 +4254,31 @@ function taskResponseText(type, submission) {
 function taskEvaluationReply(type, result) {
   if (type === "CODE") {
     if (result.status === "ACCEPTED") return "All available tests passed.";
-    if (result.status === "COMPILATION_ERROR") return "The code did not compile. Review its syntax and types, then try again.";
-    if (result.status === "RUNTIME_ERROR") return "The program stopped with a runtime error. Check how it handles this input.";
-    if (result.status === "TIME_LIMIT_EXCEEDED") return "The program took too long. Review its control flow and efficiency.";
-    if (result.status === "MEMORY_LIMIT_EXCEEDED") return "The program exceeded the memory limit. Review its data usage.";
-    if (result.status === "SYSTEM_ERROR") return "The secure code runner is temporarily unavailable. Your progress was not changed.";
+    if (result.status === "COMPILATION_ERROR")
+      return "The code did not compile. Review its syntax and types, then try again.";
+    if (result.status === "RUNTIME_ERROR")
+      return "The program stopped with a runtime error. Check how it handles this input.";
+    if (result.status === "TIME_LIMIT_EXCEEDED")
+      return "The program took too long. Review its control flow and efficiency.";
+    if (result.status === "MEMORY_LIMIT_EXCEEDED")
+      return "The program exceeded the memory limit. Review its data usage.";
+    if (result.status === "SYSTEM_ERROR")
+      return "The secure code runner is temporarily unavailable. Your progress was not changed.";
     return "Some tests did not pass. Use the visible examples to find the issue.";
   }
   return result.feedback;
 }
 
-function safeTaskEvaluation(decision, topic, objective, progress, feedback, taskCriteria, type, deterministicResult) {
+function safeTaskEvaluation(
+  decision,
+  topic,
+  objective,
+  progress,
+  feedback,
+  taskCriteria,
+  type,
+  deterministicResult,
+) {
   const summary = objective
     ? objectiveEvaluationSummary(objective, decision, progress, topic, feedback)
     : {
@@ -3296,7 +4293,8 @@ function safeTaskEvaluation(decision, topic, objective, progress, feedback, task
         recommendedNextAction: "CONTINUE",
       };
   const latest = new Map(
-    decision.evidence.flatMap((item) => item.criteria || [])
+    decision.evidence
+      .flatMap((item) => item.criteria || [])
       .map((item) => [item.criterionKey, item]),
   );
   const criteriaDemonstrated = taskCriteria
@@ -3308,7 +4306,10 @@ function safeTaskEvaluation(decision, topic, objective, progress, feedback, task
   let correctness = summary.correctness;
   if (type === "CODE") {
     correctness = deterministicResult?.accepted ? "correct" : "incorrect";
-  } else if (type === "MATH" && deterministicResult?.correctness !== "correct") {
+  } else if (
+    type === "MATH" &&
+    deterministicResult?.correctness !== "correct"
+  ) {
     correctness = deterministicResult?.correctness || "incorrect";
   }
   return {
@@ -3320,18 +4321,30 @@ function safeTaskEvaluation(decision, topic, objective, progress, feedback, task
   };
 }
 
-function taskSubmissionResponse(attempt, progress, module, topic, session = null) {
+function taskSubmissionResponse(
+  attempt,
+  progress,
+  module,
+  topic,
+  session = null,
+) {
   const topicProgress = getObjectiveProgress(topic, progress);
   return {
     accepted: attempt.accepted,
     status: attempt.status,
     feedback: attempt.feedback,
     evaluation: {
-      correctness: attempt.evaluation?.correctness || (attempt.accepted ? "correct" : "incorrect"),
+      correctness:
+        attempt.evaluation?.correctness ||
+        (attempt.accepted ? "correct" : "incorrect"),
       feedback: attempt.feedback,
-      recommendedNextAction: attempt.evaluation?.recommendedNextAction || "CONTINUE",
+      recommendedNextAction:
+        attempt.evaluation?.recommendedNextAction || "CONTINUE",
     },
-    objectiveProgress: topicProgress.map(({ objectiveKey, state }) => ({ objectiveKey, state })),
+    objectiveProgress: topicProgress.map(({ objectiveKey, state }) => ({
+      objectiveKey,
+      state,
+    })),
     progress: {
       progressPercentage: progress.progressPercentage,
       completedTopicIds: progress.completedTopicIds || [],
@@ -3372,7 +4385,10 @@ export async function submitLearningExercise(
   const inFlightSubmission = taskSubmissionsInFlight.get(inFlightKey);
   if (inFlightSubmission) {
     if (inFlightSubmission.requestFingerprint !== requestFingerprint) {
-      throw requestError("This task submission key was already used for a different response.", 409);
+      throw requestError(
+        "This task submission key was already used for a different response.",
+        409,
+      );
     }
     inFlightSubmission.duplicateCount += 1;
     return inFlightSubmission.promise;
@@ -3407,10 +4423,12 @@ export async function submitLearningExercise(
   } finally {
     try {
       const attempt = inFlightSubmissionState.progress?.taskAttempts?.find(
-        (item) => item.idempotencyKey === inFlightSubmissionState.idempotencyKey,
+        (item) =>
+          item.idempotencyKey === inFlightSubmissionState.idempotencyKey,
       );
       if (attempt && inFlightSubmissionState.duplicateCount) {
-        attempt.duplicateCount = (Number(attempt.duplicateCount) || 0) +
+        attempt.duplicateCount =
+          (Number(attempt.duplicateCount) || 0) +
           inFlightSubmissionState.duplicateCount;
         await inFlightSubmissionState.progress.save();
       }
@@ -3429,12 +4447,16 @@ async function submitLearningExerciseOnce(
   subtopicId,
   { sessionId = "", requestedKey = "", registerSubmission = () => {} } = {},
 ) {
-  const { module, progress } = await getEntitledModuleForStudent(userId, moduleId);
+  const { module, progress } = await getEntitledModuleForStudent(
+    userId,
+    moduleId,
+  );
   const topic = await getVersionedTopic(module, topicId);
   if (!topic) throw requestError("Topic not found in this module.", 404);
   requireTopicPrerequisites(topic, module, progress);
   const subtopic = subtopicId ? topic.subtopics.id(subtopicId) : null;
-  if (subtopicId && !subtopic) throw requestError("Subtopic not found in this topic.", 404);
+  if (subtopicId && !subtopic)
+    throw requestError("Subtopic not found in this topic.", 404);
   const exercise = subtopic
     ? subtopic.exercises.id(exerciseId)
     : topic.exercises.id(exerciseId);
@@ -3446,9 +4468,9 @@ async function submitLearningExerciseOnce(
   const normalizedSubmission = normalizeTaskSubmission(type, rawSubmission);
   const responseText = taskResponseText(type, normalizedSubmission);
   const responseHash = createHash("sha256").update(responseText).digest("hex");
-  const idempotencyKey = requestedKey || createHash("sha256")
-    .update(`${exerciseId}:${responseHash}`)
-    .digest("hex");
+  const idempotencyKey =
+    requestedKey ||
+    createHash("sha256").update(`${exerciseId}:${responseHash}`).digest("hex");
   if (!/^[\w.:-]{1,100}$/.test(idempotencyKey)) {
     throw requestError("The task submission key is invalid.");
   }
@@ -3461,58 +4483,93 @@ async function submitLearningExerciseOnce(
       String(previousAttempt.taskId) !== String(exerciseId) ||
       previousAttempt.responseHash !== responseHash
     ) {
-      throw requestError("This task submission key was already used for a different response.", 409);
+      throw requestError(
+        "This task submission key was already used for a different response.",
+        409,
+      );
     }
-    previousAttempt.duplicateCount = (Number(previousAttempt.duplicateCount) || 0) + 1;
+    previousAttempt.duplicateCount =
+      (Number(previousAttempt.duplicateCount) || 0) + 1;
     await progress.save();
     const previousSession = await LearningSession.findOne({
       _id: previousAttempt.sessionId,
       userId,
     });
-    return taskSubmissionResponse(previousAttempt, progress, module, topic, previousSession);
+    return taskSubmissionResponse(
+      previousAttempt,
+      progress,
+      module,
+      topic,
+      previousSession,
+    );
   }
   const sessionResult = sessionId
     ? await getLearningSession(userId, sessionId)
-    : { session: await requestLearningSession(userId, moduleId, topicId, "en") };
+    : {
+        session: await requestLearningSession(userId, moduleId, topicId, "en"),
+      };
   const session = sessionResult.session;
   if (
     String(session.moduleId) !== String(moduleId) ||
     String(session.topicId) !== String(topicId) ||
     Number(session.moduleVersion) !== Number(progress.moduleVersion)
   ) {
-    throw requestError("The learning session does not match this topic version.", 403);
+    throw requestError(
+      "The learning session does not match this topic version.",
+      403,
+    );
   }
-  if (!["OBJECTIVE_VERIFICATION", "VERIFICATION_HINT"].includes(session.learningStage)) {
-    throw requestError("Finish the teaching conversation before submitting a verification task.", 409);
+  if (
+    !["OBJECTIVE_VERIFICATION", "VERIFICATION_HINT"].includes(
+      session.learningStage,
+    )
+  ) {
+    throw requestError(
+      "Finish the teaching conversation before submitting a verification task.",
+      409,
+    );
   }
   const objectives = getTopicObjectives(topic);
   const states = getObjectiveProgress(topic, progress);
   const activeObjective = objectives.find((objective) =>
-    states.some((state) =>
-      state.objectiveKey === objective.key &&
-      state.state !== "MASTERED" &&
-      state.prerequisitesMet,
+    states.some(
+      (state) =>
+        state.objectiveKey === objective.key &&
+        state.state !== "MASTERED" &&
+        state.prerequisitesMet,
     ),
   );
-  if (!activeObjective) throw requestError("All required objectives for this topic are already mastered.", 409);
+  if (!activeObjective)
+    throw requestError(
+      "All required objectives for this topic are already mastered.",
+      409,
+    );
   if (
     exercise.objectiveKeys?.length &&
     !exercise.objectiveKeys.map(String).includes(activeObjective.key)
   ) {
-    throw requestError("This task is not available for the current learning objective.", 409);
+    throw requestError(
+      "This task is not available for the current learning objective.",
+      409,
+    );
   }
-  const explicitlyLinked = (exercise.objectiveKeys || []).map(String).includes(activeObjective.key);
-  const mayRecordEvidence = explicitlyLinked ||
+  const explicitlyLinked = (exercise.objectiveKeys || [])
+    .map(String)
+    .includes(activeObjective.key);
+  const mayRecordEvidence =
+    explicitlyLinked ||
     (type === "ACTIVITY" && !(exercise.objectiveKeys || []).length);
-  const activeCriteria = activeObjective.masteryCriteria.filter((criterion) =>
-    !(exercise.criterionKeys || []).length ||
-    exercise.criterionKeys.map(String).includes(criterion.key),
+  const activeCriteria = activeObjective.masteryCriteria.filter(
+    (criterion) =>
+      !(exercise.criterionKeys || []).length ||
+      exercise.criterionKeys.map(String).includes(criterion.key),
   );
-  const sourceType = type === "CODE"
-    ? "CODE_TASK"
-    : type === "MATH"
-      ? "MATH_TASK"
-      : "THEORY_TASK";
+  const sourceType =
+    type === "CODE"
+      ? "CODE_TASK"
+      : type === "MATH"
+        ? "MATH_TASK"
+        : "THEORY_TASK";
   let execution = null;
   let mathResult = null;
   let reply = null;
@@ -3524,29 +4581,41 @@ async function submitLearningExerciseOnce(
   let providerSucceeded = false;
   let hintGenerated = false;
   const startedAt = Date.now();
-  const providerName = String(config.AI_PROVIDER || "ollama").trim().toLowerCase();
+  const providerName = String(config.AI_PROVIDER || "ollama")
+    .trim()
+    .toLowerCase();
   const modelName = String(config.AI_MODEL || "").trim();
-  const taskAttemptCount = (progress.taskAttempts || []).filter((attempt) =>
-    sameId(attempt.taskId, exerciseId) &&
-    sameId(attempt.topicId, topic._id) &&
-    Number(attempt.moduleVersion) === Number(progress.moduleVersion),
+  const taskAttemptCount = (progress.taskAttempts || []).filter(
+    (attempt) =>
+      sameId(attempt.taskId, exerciseId) &&
+      sameId(attempt.topicId, topic._id) &&
+      Number(attempt.moduleVersion) === Number(progress.moduleVersion),
   ).length;
 
   if (type === "CODE") {
     if (String(exercise.language || "java").toLowerCase() !== "java") {
-      throw requestError("The current secure execution engine supports Java exercises only.", 400);
+      throw requestError(
+        "The current secure execution engine supports Java exercises only.",
+        400,
+      );
     }
     if (!exercise.tests.length || exercise.tests.length > 50) {
       throw requestError("This exercise does not have a valid test set.", 409);
     }
     execution = await executionService.execute(
       normalizedSubmission,
-      exercise.tests.map(({ input, expectedOutput }) => ({ input, expectedOutput })),
+      exercise.tests.map(({ input, expectedOutput }) => ({
+        input,
+        expectedOutput,
+      })),
       "java",
       { timeLimit: 2000, memoryLimit: 65536 },
     );
     if (execution.status === "SYSTEM_ERROR") {
-      throw requestError("The secure code execution service is temporarily unavailable. Your progress was not changed.", 503);
+      throw requestError(
+        "The secure code execution service is temporarily unavailable. Your progress was not changed.",
+        503,
+      );
     }
     taskAccepted = execution.accepted;
     taskStatus = execution.status;
@@ -3556,8 +4625,11 @@ async function submitLearningExerciseOnce(
       mathResult = evaluateMathematicsTask(exercise, normalizedSubmission);
       taskStatus = mathResult.status;
     }
-    const shouldEvaluateReasoning = type === "ACTIVITY" ||
-      (type === "MATH" && Boolean(exercise.requireReasoning) && Boolean(normalizedSubmission.reasoning));
+    const shouldEvaluateReasoning =
+      type === "ACTIVITY" ||
+      (type === "MATH" &&
+        Boolean(exercise.requireReasoning) &&
+        Boolean(normalizedSubmission.reasoning));
     if (shouldEvaluateReasoning) {
       const currentProfile = (progress.objectiveProfiles || []).find(
         (profile) =>
@@ -3578,7 +4650,10 @@ async function submitLearningExerciseOnce(
               commonMisconceptions: activeObjective.commonMisconceptions,
               priorUnderstanding: currentProfile || null,
             },
-            states: states.map(({ objectiveKey, state }) => ({ objectiveKey, state })),
+            states: states.map(({ objectiveKey, state }) => ({
+              objectiveKey,
+              state,
+            })),
           },
           evaluationTask: {
             type,
@@ -3586,7 +4661,8 @@ async function submitLearningExerciseOnce(
             instructions: exercise.instructions,
             evaluationMethod: exercise.evaluationMethod,
             unit: type === "MATH" ? exercise.unit : undefined,
-            requireReasoning: type === "MATH" ? exercise.requireReasoning : undefined,
+            requireReasoning:
+              type === "MATH" ? exercise.requireReasoning : undefined,
           },
           learningStage: "OBJECTIVE_VERIFICATION",
           hintLevel: Math.min(3, taskAttemptCount + 1),
@@ -3617,28 +4693,25 @@ async function submitLearningExerciseOnce(
         throw error;
       }
     }
-    verifiedCriteria = type === "MATH" &&
-      mathResult.accepted &&
-      !exercise.requireReasoning
-      ? activeCriteria
-          .filter((criterion) => criterion.evaluationMethod === "CALCULATION")
-          .map((criterion) => ({
-            criterionKey: criterion.key,
-            sourceType,
-            verificationReference: "Numerical expression validated by the deterministic evaluator.",
-          }))
-      : [];
-    if (
-      type === "MATH" &&
-      !mathResult.accepted &&
-      proposals.length
-    ) {
+    verifiedCriteria =
+      type === "MATH" && mathResult.accepted && !exercise.requireReasoning
+        ? activeCriteria
+            .filter((criterion) => criterion.evaluationMethod === "CALCULATION")
+            .map((criterion) => ({
+              criterionKey: criterion.key,
+              sourceType,
+              verificationReference:
+                "Numerical expression validated by the deterministic evaluator.",
+            }))
+        : [];
+    if (type === "MATH" && !mathResult.accepted && proposals.length) {
       proposals = proposals.map((proposal) => ({
         ...proposal,
         criteria: proposal.criteria.filter((criterion) =>
-          activeCriteria.some((approved) =>
-            approved.key === criterion.criterionKey &&
-            approved.evaluationMethod !== "CALCULATION",
+          activeCriteria.some(
+            (approved) =>
+              approved.key === criterion.criterionKey &&
+              approved.evaluationMethod !== "CALCULATION",
           ),
         ),
       }));
@@ -3652,21 +4725,30 @@ async function submitLearningExerciseOnce(
     completedObjectiveKeys: progress.completedObjectiveKeys || [],
     existingEvidence: progress.objectiveEvidence || [],
     proposals,
-    verifiedCriteria: type === "CODE" && execution.accepted && mayRecordEvidence
-      ? activeCriteria
-          .filter((criterion) => ["CODE", "DEBUGGING", "PRACTICAL"].includes(criterion.evaluationMethod))
-          .map((criterion) => ({
-            criterionKey: criterion.key,
-            sourceType,
-            verificationReference: `Secure Java runner accepted ${execution.passed} of ${execution.total} test cases.`,
-          }))
-      : mayRecordEvidence ? verifiedCriteria : [],
+    verifiedCriteria:
+      type === "CODE" && execution.accepted && mayRecordEvidence
+        ? activeCriteria
+            .filter((criterion) =>
+              ["CODE", "DEBUGGING", "PRACTICAL"].includes(
+                criterion.evaluationMethod,
+              ),
+            )
+            .map((criterion) => ({
+              criterionKey: criterion.key,
+              sourceType,
+              verificationReference: `Secure Java runner accepted ${execution.passed} of ${execution.total} test cases.`,
+            }))
+        : mayRecordEvidence
+          ? verifiedCriteria
+          : [],
     studentResponse: responseText,
     sourceType,
     taskId: exerciseId,
     taskAttemptKey: attemptKey,
     evidenceId: createHash("sha256")
-      .update(`${session._id}:${progress.moduleVersion}:${exerciseId}:${responseText.trim().toLocaleLowerCase().replace(/\s+/g, " ")}`)
+      .update(
+        `${session._id}:${progress.moduleVersion}:${exerciseId}:${responseText.trim().toLocaleLowerCase().replace(/\s+/g, " ")}`,
+      )
       .digest("hex")
       .slice(0, 40),
     sessionId: session._id,
@@ -3675,32 +4757,42 @@ async function submitLearningExerciseOnce(
   });
   const matchingTaskCriteria = activeCriteria.map((criterion) => criterion.key);
   const validTaskCriteria = new Set(
-    evidenceDecision.evidence.flatMap((item) => item.criteria || [])
+    evidenceDecision.evidence
+      .flatMap((item) => item.criteria || [])
       .filter((result) => result.demonstrated === true)
       .map((result) => result.criterionKey),
   );
   if (type === "ACTIVITY") {
-    taskAccepted = matchingTaskCriteria.length > 0 &&
+    taskAccepted =
+      matchingTaskCriteria.length > 0 &&
       matchingTaskCriteria.every((key) => validTaskCriteria.has(key));
     taskStatus = taskAccepted
       ? "CORRECT"
       : validTaskCriteria.size
         ? "PARTIALLY_CORRECT"
         : proposals.some((proposal) =>
-            proposal.criteria.some((criterion) => criterion.misconceptions?.length),
-          )
+              proposal.criteria.some(
+                (criterion) => criterion.misconceptions?.length,
+              ),
+            )
           ? "MISCONCEPTION_DETECTED"
           : "NEEDS_CLARIFICATION";
-    feedback = reply?.content || "Please add one specific detail so I can check your understanding.";
+    feedback =
+      reply?.content ||
+      "Please add one specific detail so I can check your understanding.";
   } else if (type === "MATH") {
-    taskAccepted = mathResult.accepted && (
-      !exercise.requireReasoning ||
-      matchingTaskCriteria
-        .filter((key) => activeCriteria.some((criterion) =>
-          criterion.key === key && criterion.evaluationMethod === "CALCULATION",
-        ))
-        .every((key) => validTaskCriteria.has(key))
-    );
+    taskAccepted =
+      mathResult.accepted &&
+      (!exercise.requireReasoning ||
+        matchingTaskCriteria
+          .filter((key) =>
+            activeCriteria.some(
+              (criterion) =>
+                criterion.key === key &&
+                criterion.evaluationMethod === "CALCULATION",
+            ),
+          )
+          .every((key) => validTaskCriteria.has(key)));
     taskStatus = taskAccepted
       ? "CORRECT"
       : mathResult.status === "CORRECT"
@@ -3709,7 +4801,8 @@ async function submitLearningExerciseOnce(
     feedback = taskAccepted
       ? reply?.content || mathResult.feedback
       : mathResult.status === "CORRECT"
-        ? reply?.content || "Add the calculation reasoning before submitting again."
+        ? reply?.content ||
+          "Add the calculation reasoning before submitting again."
         : mathResult.feedback;
   }
   const visibleResults = execution
@@ -3723,16 +4816,20 @@ async function submitLearningExerciseOnce(
         }))
     : [];
   applyEvidenceDecision(progress, evidenceDecision, topic);
-  const updatedObjectiveProgress = getObjectiveProgress(topic, progress)
-    .find((state) => state.objectiveKey === activeObjective.key);
+  const updatedObjectiveProgress = getObjectiveProgress(topic, progress).find(
+    (state) => state.objectiveKey === activeObjective.key,
+  );
   if (type === "ACTIVITY") {
-    taskAccepted = matchingTaskCriteria.length > 0 &&
+    taskAccepted =
+      matchingTaskCriteria.length > 0 &&
       matchingTaskCriteria.every((key) => {
         const criterion = updatedObjectiveProgress?.criteria.find(
           (item) => item.criterionKey === key,
         );
-        return criterion &&
-          criterion.demonstratedCount >= criterion.requiredEvidenceCount;
+        return (
+          criterion &&
+          criterion.demonstratedCount >= criterion.requiredEvidenceCount
+        );
       });
     if (taskAccepted) taskStatus = "CORRECT";
   }
@@ -3740,97 +4837,107 @@ async function submitLearningExerciseOnce(
     const calculationKeys = activeCriteria
       .filter((criterion) => criterion.evaluationMethod === "CALCULATION")
       .map((criterion) => criterion.key);
-    taskAccepted = calculationKeys.length > 0 &&
+    taskAccepted =
+      calculationKeys.length > 0 &&
       calculationKeys.every((key) => {
         const criterion = updatedObjectiveProgress?.criteria.find(
           (item) => item.criterionKey === key,
         );
-        return criterion &&
-          criterion.demonstratedCount >= criterion.requiredEvidenceCount;
+        return (
+          criterion &&
+          criterion.demonstratedCount >= criterion.requiredEvidenceCount
+        );
       });
-    if (!taskAccepted && taskStatus === "CORRECT") taskStatus = "REASONING_REQUIRED";
+    if (!taskAccepted && taskStatus === "CORRECT")
+      taskStatus = "REASONING_REQUIRED";
   }
   if (!taskAccepted && (type === "CODE" || type === "MATH") && !reply) {
-      try {
-        const provider = createTutorProvider(config);
-        reply = await provider.generateReply({
-          topic,
-          approvedContent: approvedTopicContext(topic, activeObjective.key),
-          objectiveProgress: {
-            currentObjective: {
-              key: activeObjective.key,
-              title: activeObjective.title,
-              expectedOutcome: activeObjective.expectedOutcome,
-              masteryCriteria: activeCriteria,
-              commonMisconceptions: activeObjective.commonMisconceptions,
-            },
-            states: getObjectiveProgress(topic, progress).map(({ objectiveKey, state }) => ({
+    try {
+      const provider = createTutorProvider(config);
+      reply = await provider.generateReply({
+        topic,
+        approvedContent: approvedTopicContext(topic, activeObjective.key),
+        objectiveProgress: {
+          currentObjective: {
+            key: activeObjective.key,
+            title: activeObjective.title,
+            expectedOutcome: activeObjective.expectedOutcome,
+            masteryCriteria: activeCriteria,
+            commonMisconceptions: activeObjective.commonMisconceptions,
+          },
+          states: getObjectiveProgress(topic, progress).map(
+            ({ objectiveKey, state }) => ({
               objectiveKey,
               state,
-            })),
-          },
-          learningStage: "OBJECTIVE_VERIFICATION",
-          hintLevel: Math.min(3, taskAttemptCount + 1),
-          evaluationTask: {
-            type,
-            title: exercise.title,
-            instructions: exercise.instructions,
-            attemptCount: taskAttemptCount + 1,
-            result: { status: taskStatus, feedback },
-          },
-          progressContext: { verificationHint: true },
-          history: [
-            ...session.messages.slice(-MAX_SESSION_MESSAGES),
-            { role: "user", content: responseText },
-            { role: "assistant", content: feedback },
-          ].map(({ role, content }) => ({ role, content })),
-          advancedSettings: module.aiConfiguration?.advancedSettings || {},
-          language: session.language || "en",
-        });
-        feedback = `${feedback}\n\n${reply.content}`;
-        providerSucceeded = true;
-        hintGenerated = true;
-      } catch (error) {
-        if (!(error instanceof AiProviderError)) throw error;
-        await LearningAiUsage.create({
-          userId,
-          sessionId: session._id,
-          operation: "TASK_HINT",
-          provider: providerName || "unknown",
-          model: modelName || "unconfigured",
-          responseTimeMs: Date.now() - startedAt,
-          succeeded: false,
-        });
-        feedback = `${feedback}\n\nA hint could not be generated right now: ${error.message}`;
-      }
+            }),
+          ),
+        },
+        learningStage: "OBJECTIVE_VERIFICATION",
+        hintLevel: Math.min(3, taskAttemptCount + 1),
+        evaluationTask: {
+          type,
+          title: exercise.title,
+          instructions: exercise.instructions,
+          attemptCount: taskAttemptCount + 1,
+          result: { status: taskStatus, feedback },
+        },
+        progressContext: { verificationHint: true },
+        history: [
+          ...session.messages.slice(-MAX_SESSION_MESSAGES),
+          { role: "user", content: responseText },
+          { role: "assistant", content: feedback },
+        ].map(({ role, content }) => ({ role, content })),
+        advancedSettings: module.aiConfiguration?.advancedSettings || {},
+        language: session.language || "en",
+      });
+      feedback = `${feedback}\n\n${reply.content}`;
+      providerSucceeded = true;
+      hintGenerated = true;
+    } catch (error) {
+      if (!(error instanceof AiProviderError)) throw error;
+      await LearningAiUsage.create({
+        userId,
+        sessionId: session._id,
+        operation: "TASK_HINT",
+        provider: providerName || "unknown",
+        model: modelName || "unconfigured",
+        responseTimeMs: Date.now() - startedAt,
+        succeeded: false,
+      });
+      feedback = `${feedback}\n\nA hint could not be generated right now: ${error.message}`;
+    }
   }
   const fullEvaluation = safeTaskEvaluation(
-      evidenceDecision,
-      topic,
-      activeObjective,
-      progress,
-      feedback,
-      activeCriteria,
-      type,
-      execution || mathResult,
+    evidenceDecision,
+    topic,
+    activeObjective,
+    progress,
+    feedback,
+    activeCriteria,
+    type,
+    execution || mathResult,
   );
   if (execution?.accepted) taskAccepted = true;
   if (
     taskAccepted &&
-    !progress.completedExerciseIds.some((currentId) => sameId(currentId, exerciseId))
+    !progress.completedExerciseIds.some((currentId) =>
+      sameId(currentId, exerciseId),
+    )
   ) {
     progress.completedExerciseIds.push(new mongoose.Types.ObjectId(exerciseId));
   }
   const objectiveStatesAfterTask = getObjectiveProgress(topic, progress);
-  const masteredAfterTask = objectiveStatesAfterTask.find(
-    (state) => state.objectiveKey === activeObjective.key,
-  )?.state === "MASTERED";
+  const masteredAfterTask =
+    objectiveStatesAfterTask.find(
+      (state) => state.objectiveKey === activeObjective.key,
+    )?.state === "MASTERED";
   if (masteredAfterTask) {
     const nextObjective = objectives.find((objective) =>
-      objectiveStatesAfterTask.some((state) =>
-        state.objectiveKey === objective.key &&
-        state.state !== "MASTERED" &&
-        state.prerequisitesMet,
+      objectiveStatesAfterTask.some(
+        (state) =>
+          state.objectiveKey === objective.key &&
+          state.state !== "MASTERED" &&
+          state.prerequisitesMet,
       ),
     );
     session.currentObjectiveKey = nextObjective?.key || activeObjective.key;
@@ -3876,7 +4983,10 @@ async function submitLearningExerciseOnce(
     completion = await updateProgressAndCertificate(userId, module, progress);
   } catch (error) {
     if (error?.name !== "VersionError") throw error;
-    const latestProgress = await LearningProgress.findOne({ userId, moduleId: module._id });
+    const latestProgress = await LearningProgress.findOne({
+      userId,
+      moduleId: module._id,
+    });
     const concurrentAttempt = latestProgress?.taskAttempts?.find(
       (item) => item.idempotencyKey === idempotencyKey,
     );
@@ -3885,9 +4995,17 @@ async function submitLearningExerciseOnce(
       concurrentAttempt.responseHash === responseHash &&
       String(concurrentAttempt.taskId) === String(exerciseId)
     ) {
-      return taskSubmissionResponse(concurrentAttempt, latestProgress, module, topic);
+      return taskSubmissionResponse(
+        concurrentAttempt,
+        latestProgress,
+        module,
+        topic,
+      );
     }
-    throw requestError("Learning progress changed while this response was being evaluated. Retry the submission.", 409);
+    throw requestError(
+      "Learning progress changed while this response was being evaluated. Retry the submission.",
+      409,
+    );
   }
   if (providerSucceeded) {
     await LearningAiUsage.create({
@@ -3902,7 +5020,13 @@ async function submitLearningExerciseOnce(
     });
   }
   return {
-    ...taskSubmissionResponse(attempt, completion.progress, module, topic, session),
+    ...taskSubmissionResponse(
+      attempt,
+      completion.progress,
+      module,
+      topic,
+      session,
+    ),
     certificate: completion.certificate,
     certificateEmailSent: completion.certificateEmailSent,
   };
@@ -3912,39 +5036,51 @@ export async function getLearningDashboard(userId, pageInput, limitInput) {
   const page = normalizePage(pageInput, 1);
   const limit = Math.min(MAX_PAGE_SIZE, normalizePage(limitInput, 20));
   const skip = (page - 1) * limit;
-  const [progress, purchases, certificates, progressCount, completedModules, purchaseCount, certificateCount] =
-    await Promise.all([
-      LearningProgress.find({ userId })
-        .populate("moduleId", "title programId sequence")
-        .sort({ updatedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      LearningPurchase.find({ userId })
-        .populate("programId", "title")
-        .populate("moduleId", "title sequence")
-        .sort({ requestedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      LearningCertificate.find({ userId })
-        .populate("programId", "title")
-        .populate("moduleId", "title sequence")
-        .sort({ earnedAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      LearningProgress.countDocuments({ userId }),
-      LearningProgress.countDocuments({ userId, completedAt: { $ne: null } }),
-      LearningPurchase.countDocuments({ userId }),
-      LearningCertificate.countDocuments({ userId }),
-    ]);
+  const [
+    progress,
+    purchases,
+    certificates,
+    progressCount,
+    completedModules,
+    purchaseCount,
+    certificateCount,
+  ] = await Promise.all([
+    LearningProgress.find({ userId })
+      .populate("moduleId", "title programId sequence")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    LearningPurchase.find({ userId })
+      .populate("programId", "title")
+      .populate("moduleId", "title sequence")
+      .sort({ requestedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    LearningCertificate.find({ userId })
+      .populate("programId", "title")
+      .populate("moduleId", "title sequence")
+      .sort({ earnedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    LearningProgress.countDocuments({ userId }),
+    LearningProgress.countDocuments({ userId, completedAt: { $ne: null } }),
+    LearningPurchase.countDocuments({ userId }),
+    LearningCertificate.countDocuments({ userId }),
+  ]);
   return {
     progress: progress.map(studentProgressSummary),
     purchases,
     certificates,
     page,
     limit,
-    totals: { progress: progressCount, completedModules, purchases: purchaseCount, certificates: certificateCount },
+    totals: {
+      progress: progressCount,
+      completedModules,
+      purchases: purchaseCount,
+      certificates: certificateCount,
+    },
   };
 }

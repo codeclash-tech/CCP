@@ -133,6 +133,8 @@ test("malformed AI curriculum is rejected and recorded as a failed proposal", as
       masteryCriteria: [],
     }],
   };
+  // Every provider attempt (initial + repair) returns the same malformed body,
+  // so the pipeline must exhaust its single repair attempt and fail cleanly.
   await withStubs(JSON.stringify(incomplete), async (usage) => {
     await assert.rejects(
       generateLearningTopicProposal(
@@ -140,11 +142,83 @@ test("malformed AI curriculum is rejected and recorded as a failed proposal", as
         "507f1f77bcf86cd799439002",
         { title: "Topic", subject: "Theory", referenceContent: "Notes." },
       ),
-      (error) => error.statusCode === 502 && /incomplete objective/.test(error.message),
+      (error) => error.statusCode === 502 && /could not be validated/i.test(error.message),
     );
-    assert.equal(usage.length, 1);
-    assert.equal(usage[0].succeeded, false);
+    assert.equal(usage.length, 2);
+    assert.equal(usage[usage.length - 1].succeeded, false);
   });
+});
+
+test("a repair attempt can rescue a first invalid curriculum response", async () => {
+  const incomplete = {
+    objectiveDefinitions: [{
+      key: "objective-one",
+      title: "Incomplete objective",
+      description: "Needs criteria.",
+      expectedOutcome: "Demonstrate the objective.",
+      requiredKnowledge: [],
+      commonMisconceptions: [],
+      prerequisites: [],
+      masteryCriteria: [],
+    }],
+    practiceTasks: [{
+      title: "Check understanding",
+      instructions: "Explain the concept.",
+      objectiveKeys: ["objective-one"],
+    }],
+    estimatedDurationMinutes: 20,
+  };
+  const originalFetch = globalThis.fetch;
+  const originalModuleFindOne = LearningModule.findOne;
+  const originalUsageCreate = LearningAiUsage.create;
+  const originalConfig = {
+    AI_PROVIDER: config.AI_PROVIDER,
+    AI_MODEL: config.AI_MODEL,
+    AI_BASE_URL: config.AI_BASE_URL,
+    AI_API_KEY: config.AI_API_KEY,
+    AI_TIMEOUT_MS: config.AI_TIMEOUT_MS,
+  };
+  const usage = [];
+  let calls = 0;
+  LearningModule.findOne = () => ({ select: async () => ({ title: "M" }) });
+  LearningAiUsage.create = async (entry) => {
+    usage.push(entry);
+    return entry;
+  };
+  config.AI_PROVIDER = "groq";
+  config.AI_MODEL = "openai/gpt-oss-20b";
+  config.AI_BASE_URL = "https://api.groq.com/openai/v1";
+  config.AI_API_KEY = "test-key";
+  config.AI_TIMEOUT_MS = "1000";
+  globalThis.fetch = async (_url, options) => {
+    calls += 1;
+    const body = JSON.parse(options.body);
+    const isFirstCall = !JSON.stringify(body.messages).includes("repairInstructions");
+    const content = isFirstCall
+      ? JSON.stringify(incomplete)
+      : JSON.stringify(proposal);
+    return {
+      ok: true,
+      json: async () => ({ choices: [{ message: { content } }] }),
+    };
+  };
+  try {
+    const response = await generateLearningTopicProposal(
+      "507f1f77bcf86cd799439001",
+      "507f1f77bcf86cd799439002",
+      { title: "Topic", subject: "Theory", referenceContent: "Notes." },
+    );
+    assert.equal(response.proposal.objectiveDefinitions.length, 2);
+    assert.equal(calls, 2);
+    assert.equal(usage.length, 2);
+    assert.equal(usage[usage.length - 1].operation, "TOPIC_PROPOSAL");
+    assert.equal(usage[usage.length - 1].succeeded, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+    LearningModule.findOne = originalModuleFindOne;
+    LearningAiUsage.create = originalUsageCreate;
+    Object.assign(config, originalConfig);
+  }
 });
 
 test("source-based curriculum previews preserve pasted objectives and flag partial coverage", async () => {
