@@ -207,8 +207,10 @@ test("Groq tutor sends configured model, bearer key, approved prompt, and conver
       max_completion_tokens: body.max_completion_tokens,
       top_k: body.top_k,
     },
-    { temperature: 0.4, top_p: 0.9, max_completion_tokens: 300, top_k: undefined },
+    { temperature: 0.4, top_p: 0.9, max_completion_tokens: 2048, top_k: undefined },
   );
+  assert.equal(body.reasoning_effort, "low");
+  assert.equal(body.include_reasoning, false);
   assert.match(body.messages[0].content, /Explain that a variable stores a value/);
   assert.match(body.messages[0].content, /Use only the active objective and its approved knowledge/);
   assert.match(body.messages[0].content, /When the answer is incorrect or incomplete/);
@@ -224,6 +226,60 @@ test("Groq tutor sends configured model, bearer key, approved prompt, and conver
       totalTokens: null,
     },
   });
+});
+
+test("reasoning-model responses with empty content use the reasoning text instead of failing", async () => {
+  const groq = createTutorProvider(
+    {
+      AI_PROVIDER: "groq",
+      AI_MODEL: "openai/gpt-oss-20b",
+      AI_BASE_URL: "https://api.groq.com/openai/v1",
+      AI_API_KEY: "test-key",
+    },
+    {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          choices: [{
+            message: {
+              content: "",
+              reasoning: JSON.stringify({
+                reply: "A variable stores a value under a name.",
+                objectiveEvidence: [],
+              }),
+            },
+          }],
+        }),
+      }),
+    },
+  );
+  const reply = await groq.generateReply({
+    topic: { title: "Test" },
+    approvedContent: "",
+    history: [],
+  });
+  assert.equal(reply.content, "A variable stores a value under a name.");
+});
+
+test("truly empty Groq responses fail with an actionable message", async () => {
+  const groq = createTutorProvider(
+    {
+      AI_PROVIDER: "groq",
+      AI_MODEL: "openai/gpt-oss-20b",
+      AI_BASE_URL: "https://api.groq.com/openai/v1",
+      AI_API_KEY: "test-key",
+    },
+    {
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({ choices: [{ message: { content: "", reasoning: "" } }] }),
+      }),
+    },
+  );
+  await assert.rejects(
+    groq.generateReply({ topic: { title: "Test" }, approvedContent: "", history: [] }),
+    (error) => error instanceof AiProviderError && /num_predict|reasoning/i.test(error.message),
+  );
 });
 
 test("AI providers expose token usage only when the provider reports it", async () => {

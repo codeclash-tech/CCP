@@ -232,7 +232,14 @@ function allowedGroqOptions(settings = {}) {
   ) {
     options.max_completion_tokens = maxCompletionTokens;
   }
+  if (options.max_completion_tokens && options.max_completion_tokens < 2048) {
+    options.max_completion_tokens = 2048;
+  }
   return options;
+}
+
+function groqModelNeedsLowReasoning(model = "") {
+  return /gpt-oss/i.test(String(model));
 }
 
 function tutorMessages({
@@ -464,6 +471,9 @@ class GroqTutorProvider {
           messages,
           stream: false,
           ...allowedGroqOptions(advancedSettings),
+          ...(groqModelNeedsLowReasoning(this.model)
+            ? { reasoning_effort: "low", include_reasoning: false }
+            : {}),
         }),
         signal: controller.signal,
       });
