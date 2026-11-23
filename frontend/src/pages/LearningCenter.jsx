@@ -2523,14 +2523,14 @@ function AdminLearning() {
                   <h3>Curriculum preview</h3>
                   {topicDraft.curriculumProposal.coverageReport?.map((item) => {
                     const objective = topicDraft.objectiveDefinitions.find(
-                      (candidate) => candidate.key === item.objectiveKey,
+                      (candidate) => candidate.key === item?.objectiveKey,
                     );
                     return (
-                      <article className="learning-topic-editor-card" key={item.objectiveKey}>
-                        <strong>{objective?.title || item.objectiveKey}</strong>
-                        <p>Source coverage: {item.status.toLowerCase()}</p>
-                        {item.sourceExcerpt && <blockquote>{item.sourceExcerpt}</blockquote>}
-                        {item.notes && <small>{item.notes}</small>}
+                      <article className="learning-topic-editor-card" key={item?.objectiveKey || objective?.key}>
+                        <strong>{objective?.title || item?.objectiveKey || "Objective"}</strong>
+                        <p>Source coverage: {String(item?.status || "REVIEW").toLowerCase()}</p>
+                        {item?.sourceExcerpt && <blockquote>{item.sourceExcerpt}</blockquote>}
+                        {item?.notes && <small>{item.notes}</small>}
                       </article>
                     );
                   })}
@@ -2542,9 +2542,9 @@ function AdminLearning() {
                   <div className="learning-topic-editor-card">
                     <strong>Generated verification tasks</strong>
                     <ul>
-                      {topicDraft.curriculumProposal.practiceTasks?.map((task) => (
-                        <li key={`${task.title}-${task.objectiveKeys.join("-")}`}>
-                          {task.title}: {task.instructions}
+                      {topicDraft.curriculumProposal.practiceTasks?.map((task, taskIndex) => (
+                        <li key={`${task?.title || "task"}-${taskIndex}`}>
+                          {task?.title || "Untitled task"}: {task?.instructions || ""}
                         </li>
                       ))}
                     </ul>
