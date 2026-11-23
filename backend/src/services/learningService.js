@@ -2211,21 +2211,30 @@ function validateSuppliedObjectivesProposal(rawContent, request) {
         502,
       );
     }
-    if ((status === "COVERED" || status === "PARTIAL") && !excerptInSource) {
-      throw requestError(
-        `The curriculum preview claims objective key "${objectiveKey}" is ${status} but its sourceExcerpt does not appear in the supplied reference content. The excerpt must quote the supplied content exactly (received ${
-          truncateDiagnosticValue(sourceExcerpt, 80) || "an empty excerpt"
-        }). Mark the objective PARTIAL or UNSUPPORTED with notes instead of inventing evidence.`,
-        502,
-      );
-    }
+    // An unverifiable excerpt is a coverage-review concern for the admin, not a
+    // technical failure: downgrade it to a reviewable coverage issue instead of
+    // rejecting the whole proposal (and burning another AI call on a repair).
+    const excerptIssue =
+      (status === "COVERED" || status === "PARTIAL") && !excerptInSource
+        ? sourceExcerpt
+          ? "The quoted source excerpt does not appear verbatim in the supplied reference content, so the coverage claim could not be verified."
+          : "No source excerpt was provided, so the coverage claim could not be verified."
+        : null;
+    const resolvedStatus =
+      excerptIssue && status === "COVERED" ? "PARTIAL" : status;
     coverageByKey.set(objectiveKey, {
       objectiveKey,
-      status,
+      status: resolvedStatus,
       sourceExcerpt: excerptInSource ? sourceExcerpt : "",
-      notes: String(item.notes || "")
-        .trim()
-        .slice(0, 1000),
+      notes: [
+        String(item.notes || "")
+          .trim()
+          .slice(0, 1000),
+        excerptIssue,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .slice(0, 1200),
     });
   }
   const practiceTasks = proposal.practiceTasks;
