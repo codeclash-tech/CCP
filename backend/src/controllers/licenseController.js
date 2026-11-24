@@ -145,10 +145,10 @@ export async function generateLicense(req, res) {
     }
 
     const existingUser = await User.findOne({ email: cleanEmail });
-    if (existingUser?.isVerified) {
-      return res.status(409).json({
-        error: "An account already exists for that email address.",
-      });
+    if (existingUser && existingUser.role === "ADMIN") {
+      return res
+        .status(409)
+        .json({ error: "That email belongs to a super admin account." });
     }
 
     const licenseKey = generateLicenseKey();
@@ -163,25 +163,50 @@ export async function generateLicense(req, res) {
     });
     await license.save();
 
+    // If an account already exists for that email, immediately promote it to
+    // a primary-admin (organisation) account tied to this license instead of
+    // blocking generation. License expiry/cancel demotes it back to a user.
+    let existingAccountPromoted = false;
+    if (existingUser) {
+      existingUser.creatorType = "ORGANIZATION";
+      existingUser.organization = organizationName.trim();
+      existingUser.organizationId = license._id;
+      await existingUser.save();
+      license.status = "USED";
+      license.usedByUserId = existingUser._id;
+      license.usedAt = new Date();
+      await license.save();
+      existingAccountPromoted = true;
+    }
+
     const client = getResendClient();
     const sendResult = await client.resend.emails.send({
       from: client.from,
       to: [cleanEmail],
       subject: "Your CodeClash organisation license",
       text:
-        `Your CodeClash license key is: ${licenseKey}\n\n` +
-        `Organisation: ${organizationName.trim()}\n` +
-        `This license expires on ${expiry.toDateString()}.\n\n` +
-        "Use this key once during registration to create your organisation account.\n",
-      html:
-        '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">' +
-        '<h2 style="color:#2563eb;">CodeClash Organisation License</h2>' +
-        `<p>Your 16-digit license key is:</p>` +
-        `<div style="background:#eff6ff;color:#1d4ed8;font-size:22px;font-weight:700;letter-spacing:4px;padding:16px;text-align:center;border-radius:10px;">${licenseKey}</div>` +
-        `<p>Organisation: <strong>${organizationName.trim()}</strong></p>` +
-        `<p>This license expires on <strong>${expiry.toDateString()}</strong>.</p>` +
-        "<p>Use this key once during registration to create your organisation account.</p>" +
-        "</div>",
+        existingAccountPromoted
+          ? `An organisation license for ${organizationName.trim()} has been activated on your existing CodeClash account. ` +
+            `You are now the primary admin of this organisation. ` +
+            `This license expires on ${expiry.toDateString()}, after which your account returns to a normal user account.\n`
+          : `Your CodeClash license key is: ${licenseKey}\n\n` +
+            `Organisation: ${organizationName.trim()}\n` +
+            `This license expires on ${expiry.toDateString()}.\n\n` +
+            "Use this key once during registration to create your organisation account.\n",
+      html: existingAccountPromoted
+        ? '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">' +
+          '<h2 style="color:#2563eb;">CodeClash Organisation License Activated</h2>' +
+          `<p>Your existing account <strong>${cleanEmail}</strong> has been promoted to the primary admin of <strong>${organizationName.trim()}</strong>.</p>` +
+          `<p>This license expires on <strong>${expiry.toDateString()}</strong>. After expiry or cancellation your account returns to a normal user account.</p>` +
+          "</div>"
+        : '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">' +
+          '<h2 style="color:#2563eb;">CodeClash Organisation License</h2>' +
+          `<p>Your 16-digit license key is:</p>` +
+          `<div style="background:#eff6ff;color:#1d4ed8;font-size:22px;font-weight:700;letter-spacing:4px;padding:16px;text-align:center;border-radius:10px;">${licenseKey}</div>` +
+          `<p>Organisation: <strong>${organizationName.trim()}</strong></p>` +
+          `<p>This license expires on <strong>${expiry.toDateString()}</strong>.</p>` +
+          "<p>Use this key once during registration to create your organisation account.</p>" +
+          "</div>",
     });
 
     if (sendResult.error) {
@@ -190,14 +215,24 @@ export async function generateLicense(req, res) {
         sendResult.error,
       );
       await License.deleteOne({ _id: license._id }).catch(() => {});
+      // Roll back the promotion so the account is not left as an
+      // organisation without a live license.
+      if (existingAccountPromoted) {
+        existingUser.creatorType = "INDIVIDUAL";
+        existingUser.organization = "Unspecified";
+        await existingUser.save().catch(() => {});
+      }
       return res
         .status(500)
         .json({ error: "License could not be emailed. Please try again." });
     }
 
-    return res.status(201).json({
-      message: `License generated and emailed to ${cleanEmail}.`,
+    return res.status(existingAccountPromoted ? 200 : 201).json({
+      message: existingAccountPromoted
+        ? `Account ${cleanEmail} already existed — it has been promoted to a primary admin of ${organizationName.trim()} under this license.`
+        : `License generated and emailed to ${cleanEmail}.`,
       license: license.toPublicJSON(),
+      promotedExistingAccount: existingAccountPromoted,
     });
   } catch (error) {
     console.error("[LicenseController] generate failed:", error.message);
@@ -207,7 +242,9 @@ export async function generateLicense(req, res) {
 
 /**
  * POST /api/licenses/:id/cancel
- * Super admin only — cancel (revoke) an active, unused license.
+ * Super admin only — cancel (revoke) an active or in-use license.
+ * Revoking an in-use (USED) license demotes the organisation's primary
+ * admin account back to a normal user account.
  */
 export async function cancelLicense(req, res) {
   if (!requireSuperAdmin(req, res)) return;
@@ -216,21 +253,38 @@ export async function cancelLicense(req, res) {
     if (!license) {
       return res.status(404).json({ error: "License not found." });
     }
-    if (license.status === "USED") {
-      return res
-        .status(409)
-        .json({ error: "This license has already been redeemed and cannot be cancelled." });
-    }
     if (license.status === "REVOKED") {
       return res
         .status(409)
         .json({ error: "This license has already been cancelled." });
     }
+    const wasUsed = license.status === "USED";
     license.status = "REVOKED";
     await license.save();
+
+    let accountDemoted = false;
+    if (wasUsed && license.usedByUserId) {
+      const User = (await import("../models/User.js")).default;
+      const user = await User.findById(license.usedByUserId);
+      if (
+        user &&
+        user.role === "USER" &&
+        user.creatorType === "ORGANIZATION" &&
+        (!user.organizationId || String(user.organizationId) === String(license._id))
+      ) {
+        user.creatorType = "INDIVIDUAL";
+        user.organization = "Unspecified";
+        user.organizationId = null;
+        await user.save();
+        accountDemoted = true;
+      }
+    }
     return res.status(200).json({
-      message: `License for ${license.email} has been cancelled.`,
+      message: accountDemoted
+        ? `License for ${license.email} has been cancelled and the account has been returned to a normal user account.`
+        : `License for ${license.email} has been cancelled.`,
       license: license.toPublicJSON(),
+      accountDemoted,
     });
   } catch (error) {
     console.error("[LicenseController] cancel failed:", error.message);

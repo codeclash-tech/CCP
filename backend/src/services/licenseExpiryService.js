@@ -27,6 +27,7 @@ export async function checkLicenseExpiry({
     }
     user.creatorType = "INDIVIDUAL";
     user.organization = "Unspecified";
+    user.organizationId = null;
     await user.save();
     downgraded += 1;
 

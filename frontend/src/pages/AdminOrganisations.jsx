@@ -258,7 +258,8 @@ export default function AdminOrganisations() {
                         </td>
                         <td>
                           {organization.license?.id &&
-                          organization.license?.status === "ACTIVE" &&
+                          (organization.license?.status === "ACTIVE" ||
+                            organization.license?.status === "USED") &&
                           remaining > 0 ? (
                             <button
                               type="button"
@@ -363,7 +364,9 @@ export default function AdminOrganisations() {
                           )}
                         </td>
                         <td>
-                          {license.status === "ACTIVE" && remaining > 0 ? (
+                          {(license.status === "ACTIVE" ||
+                            license.status === "USED") &&
+                          remaining > 0 ? (
                             <button
                               type="button"
                               className="btn-secondary admin-org-cancel"
@@ -373,7 +376,9 @@ export default function AdminOrganisations() {
                               <XCircle size={14} />{" "}
                               {cancelingId === licenseId
                                 ? "Cancelling…"
-                                : "Cancel"}
+                                : license.status === "USED"
+                                  ? "Cancel license"
+                                  : "Cancel"}
                             </button>
                           ) : null}
                         </td>
