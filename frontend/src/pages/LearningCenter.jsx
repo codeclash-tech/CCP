@@ -1501,7 +1501,7 @@ function AdminLearning() {
                   )}
                 </section>
               )}
-              {!newModule && adminPage === "topics-inline" && (
+              {!newModule && false && adminPage === "topics-inline" && ( // legacy editor retired — prompt-first topics-editor is the only topic form
                 <section className="learning-form learning-form-divider">
                   <div className="learning-panel-title">
                     <div>
@@ -2914,7 +2914,7 @@ function AdminLearning() {
             <section className="learning-panel learning-topic-management">
               <h2>{editingTopicId ? "Edit topic" : "Create topic"}</h2>
               <p className="learning-help">
-                Provide the source material and objectives. CodeClash will draft the teaching and verification structure for your review.
+                Pick the content type, write a prompt — the AI builds the objectives, material and questions for you.
               </p>
               {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
               <label className="learning-field">
@@ -2932,6 +2932,8 @@ function AdminLearning() {
                   <option value="MCQS">MCQs</option>
                 </select>
               </label>
+              <details className="learning-topic-advanced">
+                <summary>Topic configuration (optional — the AI derives sensible defaults from your prompt)</summary>
               {topicDraft.contentType === "CONCEPTS" &&
                 moduleForm.evaluationMode === "SELF_EVALUATION" && (
                 <fieldset className="learning-fieldset">
@@ -3061,6 +3063,7 @@ function AdminLearning() {
                   </label>
                 </fieldset>
               )}
+              </details>
               <label className="learning-field">
                 Topic title
                 <input
