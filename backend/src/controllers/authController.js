@@ -34,7 +34,7 @@ import WeeklyRosterEntry from "../models/WeeklyRosterEntry.js";
  */
 export async function requestOTP(req, res) {
   try {
-    const { email, name, password, termsAccepted, accountType, licenseKey } = req.body || {};
+    const { email, name, password, termsAccepted } = req.body || {};
     const ip = req.ip || req.connection?.remoteAddress || "";
 
     if (!email) {
@@ -47,8 +47,6 @@ export async function requestOTP(req, res) {
       password,
       termsAccepted,
       ip,
-      accountType,
-      licenseKey,
     });
 
                 return res.status(200).json({

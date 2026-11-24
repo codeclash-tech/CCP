@@ -37,8 +37,6 @@ export default function AuthPage({ mode }) {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [name, setName] = useState("");
-  const [accountType, setAccountType] = useState("STUDENT");
-  const [licenseKey, setLicenseKey] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -90,11 +88,6 @@ export default function AuthPage({ mode }) {
       setError("Please read and agree to the Terms and Conditions.");
       return;
     }
-    const cleanLicense = licenseKey.replace(/\D/g, "");
-    if (accountType === "ORGANISATION" && cleanLicense.length !== 16) {
-      setError("Enter the 16-digit organisation license key sent to your email.");
-      return;
-    }
 
     setBusy(true);
     try {
@@ -103,8 +96,6 @@ export default function AuthPage({ mode }) {
         email: normalizedEmail,
         password,
         termsAccepted,
-        accountType,
-        licenseKey: licenseKey.replace(/\D/g, ""),
       });
       setUserId(result.userId);
       setRequested(true);
@@ -297,7 +288,7 @@ export default function AuthPage({ mode }) {
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: 13, margin: "0 0 22px" }}>
           {isRegistration
-            ? "Register with your name, email, and password. Students register directly; organisations register with the license key emailed to them. Email verification is required before entering the platform."
+            ? "Register with your name, email, and password. Email verification is required before entering the platform. Organisation primary-admin access is granted by the Super Admin through a license."
             : resetMode
               ? resetRequested
                 ? "Enter the code sent to your email and choose a new password."
@@ -340,105 +331,6 @@ export default function AuthPage({ mode }) {
                     Terms and Conditions
                   </Link>
                   .
-                </span>
-              </label>
-            )}
-            {isRegistration && (
-              <fieldset
-                style={{
-                  border: 0,
-                  padding: 0,
-                  margin: 0,
-                  display: "grid",
-                  gap: 10,
-                }}
-                disabled={requested}
-              >
-                <legend
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontSize: 12,
-                    padding: 0,
-                  }}
-                >
-                  Registering as
-                </legend>
-                <div style={{ display: "flex", gap: 10 }}>
-                  {[
-                    { value: "STUDENT", label: "Student" },
-                    { value: "ORGANISATION", label: "Organisation" },
-                  ].map((option) => (
-                    <label
-                      key={option.value}
-                      style={{
-                        flex: 1,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "10px 12px",
-                        border: `1px solid ${
-                          accountType === option.value
-                            ? "var(--accent-blue-bright)"
-                            : "var(--border-color)"
-                        }`,
-                        borderRadius: 8,
-                        background:
-                          accountType === option.value
-                            ? "rgba(37, 99, 235, 0.1)"
-                            : "var(--bg-main)",
-                        color: "var(--text-primary)",
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="accountType"
-                        value={option.value}
-                        checked={accountType === option.value}
-                        onChange={(event) => {
-                          detailsChanged();
-                          setAccountType(event.target.value);
-                        }}
-                        style={{ accentColor: "var(--accent-blue-bright)" }}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-            {isRegistration && accountType === "ORGANISATION" && (
-              <label style={{ color: "var(--text-secondary)", fontSize: 12 }}>
-                Organisation license (16 digits)
-                <input
-                  value={licenseKey}
-                  onChange={(event) => {
-                    detailsChanged();
-                    setLicenseKey(event.target.value.replace(/\D/g, "").slice(0, 16));
-                  }}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  placeholder="0000000000000000"
-                  maxLength={16}
-                  required
-                  disabled={requested}
-                  style={{
-                    ...fieldStyle,
-                    marginTop: 6,
-                    letterSpacing: 3,
-                    fontFamily: "var(--font-code, monospace)",
-                  }}
-                />
-                <span
-                  style={{
-                    display: "block",
-                    marginTop: 4,
-                    color: "var(--text-muted)",
-                    fontSize: 11,
-                  }}
-                >
-                  The 16-digit license emailed to this address by the Super Admin.
                 </span>
               </label>
             )}
