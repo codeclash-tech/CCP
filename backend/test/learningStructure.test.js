@@ -183,7 +183,7 @@ test("module publication requires topics with learning objectives", async () => 
     });
     await assert.rejects(
       setLearningModuleStatus(module._id, "PUBLISHED"),
-      /needs at least one learning objective/,
+      /needs a prompt describing what it should teach or assess/,
     );
     module.topics[0].objectives = ["Explain how devices connect."];
     const published = await setLearningModuleStatus(module._id, "PUBLISHED");

@@ -127,7 +127,16 @@ async function generateStrictMcqSet(topic, moduleTitle) {
   const difficulties = normalizeDifficultyRange(
     mcqConfig.difficultyDistribution,
   );
-  const objectives = getTopicObjectives(topic);
+  // Prompt-first: derive objectives/reference from the admin's prompt when
+  // the topic has no manual structure.
+  const plan = await ensureTopicAiPlan(topic, {
+    title: moduleTitle,
+    evaluationMode: "STRICT_EVALUATION",
+    description: "",
+  });
+  const objectives = plan.objectives.length
+    ? plan.objectives
+    : getTopicObjectives(topic);
   const objectiveKeys = objectives.length
     ? objectives.map((objective) => objective.key)
     : [""];
@@ -137,7 +146,8 @@ async function generateStrictMcqSet(topic, moduleTitle) {
     moduleTitle,
     topicTitle: topic.title,
     topicDescription: topic.description,
-    referenceContent: topic.explanation || "",
+    adminPrompt: topic.aiPrompt || "",
+    referenceContent: plan.referenceContent || topic.explanation || "",
     coreKnowledge: topic.coreKnowledge || [],
     examples: topic.examples || [],
     objectives: objectives.map((objective) => ({
@@ -222,13 +232,22 @@ async function generateStrictMcqSet(topic, moduleTitle) {
 async function generateStrictConceptQuestions(topic, moduleTitle) {
   const conceptConfig = topic.strictConceptConfig || {};
   const count = Math.max(1, Number(conceptConfig.questionCount) || 5);
-  const objectives = getTopicObjectives(topic);
+  // Prompt-first: derive objectives/reference from the admin's prompt.
+  const plan = await ensureTopicAiPlan(topic, {
+    title: moduleTitle,
+    evaluationMode: "STRICT_EVALUATION",
+    description: "",
+  });
+  const objectives = plan.objectives.length
+    ? plan.objectives
+    : getTopicObjectives(topic);
   const provider = createTutorProvider(config);
   const approvedContent = JSON.stringify({
     moduleTitle,
     topicTitle: topic.title,
     topicDescription: topic.description,
-    referenceContent: topic.explanation || "",
+    adminPrompt: topic.aiPrompt || "",
+    referenceContent: plan.referenceContent || topic.explanation || "",
     coreKnowledge: topic.coreKnowledge || [],
     examples: topic.examples || [],
     objectives: objectives.map((objective) => ({
@@ -460,13 +479,22 @@ function buildObjectiveSummary(questions, answers, topic) {
 
 async function evaluateStrictConceptAnswers(attempt, topic, moduleTitle) {
   const provider = createTutorProvider(config);
-  const objectives = getTopicObjectives(topic);
+  const plan = await ensureTopicAiPlan(topic, {
+    title: moduleTitle,
+    evaluationMode: "STRICT_EVALUATION",
+    description: "",
+  });
+  const objectives = plan.objectives.length
+    ? plan.objectives
+    : getTopicObjectives(topic);
   const conceptConfig = topic.strictConceptConfig || {};
   const evaluationRequest = JSON.stringify({
     moduleTitle,
     topicTitle: topic.title,
     levelClassificationCriteria:
-      conceptConfig.levelClassificationCriteria || "",
+      plan.levelClassificationCriteria ||
+      conceptConfig.levelClassificationCriteria ||
+      "",
     evaluationCriteria: conceptConfig.evaluationCriteria || [],
     expectedKnowledgeIndicators:
       conceptConfig.expectedKnowledgeIndicators || [],

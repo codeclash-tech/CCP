@@ -62,6 +62,7 @@ const EMPTY_TOPIC = {
   subject: "",
   description: "",
   contentType: "CONCEPTS",
+  aiPrompt: "",
   selfConceptConfig: {
     keyConcepts: [],
     expectedKnowledge: [],
@@ -182,6 +183,7 @@ function createTopicDraft(topic = {}) {
     subject: topic.subject || "",
     description: topic.description || "",
     contentType: topic.contentType === "MCQS" ? "MCQS" : "CONCEPTS",
+    aiPrompt: topic.aiPrompt || "",
     selfConceptConfig: (() => {
       const config = topic.selfConceptConfig || {};
       return {
@@ -650,18 +652,55 @@ function AdminLearning() {
         })),
       }))
       .filter((objective) => objective.title);
-    if (!objectiveDefinitions.length) {
-      setTopicError("Add at least one learning objective.");
+    if (
+      !topicDraft.aiPrompt.trim() &&
+      !objectiveDefinitions.length &&
+      !topicDraft.objectivesText.trim()
+    ) {
+      setTopicError(
+        "Describe what this topic should teach or assess — the AI builds everything from that prompt.",
+      );
       return;
     }
-    if (objectiveDefinitions.some((objective) =>
-      !objective.description ||
-      !objective.expectedOutcome ||
-      !objective.masteryCriteria.length ||
-      objective.masteryCriteria.some((criterion) => !criterion.description),
-    )) {
-      setTopicError("Each objective needs an expected outcome and at least one specific mastery criterion.");
-      return;
+    if (objectiveDefinitions.length) {
+      if (objectiveDefinitions.some((objective) =>
+        !objective.description ||
+        !objective.expectedOutcome ||
+        !objective.masteryCriteria.length ||
+        objective.masteryCriteria.some((criterion) => !criterion.description),
+      )) {
+        setTopicError("Each objective needs an expected outcome and at least one specific mastery criterion.");
+        return;
+      }
+      const objectiveKeys = objectiveDefinitions.map((objective) => objective.key);
+      if (new Set(objectiveKeys).size !== objectiveKeys.length) {
+        setTopicError("Learning objective identifiers must be unique.");
+        return;
+      }
+    } else if (
+      topicDraft.objectivesText.trim()
+    ) {
+      // Prompt path with free-text objectives line list.
+      objectiveDefinitions.push(...topicDraft.objectivesText
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 50)
+        .map((line, index) => ({
+          key: `prompt-objective-${index + 1}`,
+          title: line,
+          description: line,
+          expectedOutcome: line,
+          masteryCriteria: [{
+            key: "understanding",
+            description: line,
+            evaluationMethod: "EXPLANATION",
+            requiredEvidenceCount: 1,
+          }],
+          commonMisconceptionsText: "",
+          requiredKnowledgeText: "",
+          prerequisites: [],
+        })));
     }
     if (
       Number(topicDraft.estimatedDurationMinutes) < 1 ||
@@ -672,7 +711,7 @@ function AdminLearning() {
       return;
     }
     const objectiveKeys = objectiveDefinitions.map((objective) => objective.key);
-    if (new Set(objectiveKeys).size !== objectiveKeys.length) {
+    if (objectiveKeys.length && new Set(objectiveKeys).size !== objectiveKeys.length) {
       setTopicError("Learning objective identifiers must be unique.");
       return;
     }
@@ -698,6 +737,7 @@ function AdminLearning() {
         subject: topicDraft.subject.trim(),
         description: topicDraft.description.trim(),
         contentType: topicDraft.contentType === "MCQS" ? "MCQS" : "CONCEPTS",
+        aiPrompt: topicDraft.aiPrompt.trim(),
         selfConceptConfig: topicDraft.contentType === "CONCEPTS"
           ? {
               keyConcepts: textToLines(topicDraft.selfConceptConfig.keyConceptsText),
@@ -742,9 +782,15 @@ function AdminLearning() {
           : null,
         prerequisiteTopicIds: topicDraft.prerequisiteTopicIds,
         explanation: "",
-        coreKnowledge,
-        objectives: objectiveDefinitions.map((objective) => objective.title),
-        objectiveDefinitions,
+        // Prompt-first topics: leave objectives empty so the AI derives the
+        // teaching structure from the prompt at publish time.
+        ...(objectiveDefinitions.length
+          ? {
+              coreKnowledge,
+              objectives: objectiveDefinitions.map((objective) => objective.title),
+              objectiveDefinitions,
+            }
+          : { coreKnowledge: [], objectives: [], objectiveDefinitions: [] }),
         examples: topicDraft.examples,
         questions: topicDraft.questions,
         exercises: topicDraft.exercises,
@@ -3045,37 +3091,67 @@ function AdminLearning() {
                 />
               </label>
               <label className="learning-field">
-                Learning objectives
+                What should this topic teach or assess? (prompt)
+                <span className="learning-field-required">Required</span>
                 <textarea
                   required
-                  rows={6}
+                  rows={5}
                   maxLength={12000}
-                  placeholder={"Paste objectives as bullets or paragraphs.\n\n- Explain how a class groups related code.\n- Construct a basic program using the main method."}
-                  value={topicDraft.objectivesText}
+                  placeholder={
+                    moduleForm.evaluationMode === "STRICT_EVALUATION"
+                      ? "Describe what to assess. e.g. 'Assess the learner's understanding of exception handling in Java — try-with-resources, custom exceptions, and when finally blocks run. About 5 questions, medium difficulty, include a scenario question.'"
+                      : "Describe what to teach. e.g. 'Teach how classes group related code in Java, ending with the learner writing their own class with two fields and a method. Use relatable everyday examples.'"
+                  }
+                  value={topicDraft.aiPrompt}
                   onChange={(event) => setTopicDraft({
                     ...topicDraft,
-                    objectivesText: event.target.value,
-                    curriculumProposal: null,
-                    curriculumApproved: false,
+                    aiPrompt: event.target.value,
                   })}
                 />
+                <span
+                  style={{
+                    display: "block",
+                    marginTop: 4,
+                    color: "var(--text-muted)",
+                    fontSize: 11,
+                  }}
+                >
+                  The AI builds the objectives, teaching material and questions from this prompt when the course is published. Anything you add below only refines it.
+                </span>
               </label>
-              <label className="learning-field">
-                Content delivery
-                <textarea
-                  required
-                  rows={14}
-                  maxLength={64000}
-                  placeholder="Paste the authoritative explanations, definitions, examples, code, formulas, procedures, or other learning material."
-                  value={topicDraft.coreKnowledgeText}
-                  onChange={(event) => setTopicDraft({
-                    ...topicDraft,
-                    coreKnowledgeText: event.target.value,
-                    curriculumProposal: null,
-                    curriculumApproved: false,
-                  })}
-                />
-              </label>
+              <details className="learning-topic-advanced">
+                <summary>Advanced authoring (optional — manual objectives and source material)</summary>
+                <label className="learning-field" style={{ marginTop: 12 }}>
+                  Learning objectives (optional — overrides the prompt-derived objectives)
+                  <textarea
+                    rows={6}
+                    maxLength={12000}
+                    placeholder={"Leave empty to let the AI derive these from your prompt.\n\nOr paste objectives as bullets:\n- Explain how a class groups related code.\n- Construct a basic program using the main method."}
+                    value={topicDraft.objectivesText}
+                    onChange={(event) => setTopicDraft({
+                      ...topicDraft,
+                      objectivesText: event.target.value,
+                      curriculumProposal: null,
+                      curriculumApproved: false,
+                    })}
+                  />
+                </label>
+                <label className="learning-field">
+                  Source material (optional — exact reference content the AI must teach/assess from)
+                  <textarea
+                    rows={8}
+                    maxLength={64000}
+                    placeholder="Paste authoritative explanations, definitions, examples, formulas or other material. Leave empty and the AI writes the teaching material from your prompt."
+                    value={topicDraft.coreKnowledgeText}
+                    onChange={(event) => setTopicDraft({
+                      ...topicDraft,
+                      coreKnowledgeText: event.target.value,
+                      curriculumProposal: null,
+                      curriculumApproved: false,
+                    })}
+                  />
+                </label>
+              </details>
               {!!moduleForm.topics?.length && (
                 <label className="learning-field">
                   Prerequisite topics (optional)
@@ -3099,7 +3175,7 @@ function AdminLearning() {
                 moduleForm.evaluationMode === "SELF_EVALUATION" && (
                 <button
                   className="learning-button learning-button-secondary"
-                  disabled={saving || !topicDraft.title.trim() || !topicDraft.objectivesText.trim() || !topicDraft.coreKnowledgeText.trim()}
+                  disabled={saving || !topicDraft.title.trim() || (!topicDraft.aiPrompt.trim() && !topicDraft.objectivesText.trim())}
                   onClick={generateTopicProposal}
                   type="button"
                 >

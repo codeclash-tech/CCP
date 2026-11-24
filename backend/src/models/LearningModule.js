@@ -184,6 +184,14 @@ const topicSchema = new mongoose.Schema(
       default: "CONCEPTS",
       index: true,
     },
+    /**
+     * Prompt-first authoring: the admin writes a natural-language prompt
+     * describing what the topic must teach or assess. The AI derives the
+     * objectives/teaching structure from this prompt; every other field is
+     * optional enrichment. Cached derived structure lives in aiPlan.
+     */
+    aiPrompt: { type: String, trim: true, maxlength: 12000, default: "" },
+    aiPlan: { type: mongoose.Schema.Types.Mixed, default: null },
     selfConceptConfig: { type: selfConceptConfigSchema, default: null },
     selfMcqConfig: { type: selfMcqConfigSchema, default: null },
     strictConceptConfig: { type: strictConceptConfigSchema, default: null },

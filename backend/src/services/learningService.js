@@ -35,6 +35,10 @@ import {
   objectiveProgressKey,
 } from "./learningObjectiveEngine.js";
 import { evaluateMathematicsTask } from "./learningTaskEngine.js";
+import {
+  ensureTopicAiPlan,
+  attachAiPlanToTopic,
+} from "./topicAiPlanService.js";
 
 const MAX_PAGE_SIZE = 50;
 const MAX_SESSION_MESSAGES = 40;
@@ -418,9 +422,13 @@ function approvedTopicContext(topic, activeObjectiveKey) {
   return JSON.stringify({
     title: plain.title,
     description: plain.description,
+    adminPrompt: plain.aiPrompt || "",
     objective,
     coreKnowledge: knowledge,
-    explanation: plain.explanation,
+    explanation:
+      plain.explanation ||
+      // Prompt-first topics: teach from the AI-derived reference content.
+      (plain.aiPlan?.source === "AI" ? plain.aiPlan.referenceContent : ""),
     examples: plain.examples,
   });
 }
@@ -527,13 +535,17 @@ function validateModuleCompletionConfiguration(module) {
   if (
     topics.some(
       (topic) =>
+        // Prompt-first authoring: a natural-language prompt is enough — the
+        // AI derives the teaching structure and assessment from it.
+        !String(topic.aiPrompt || "").trim() &&
         !(topic.objectives || []).some((objective) =>
           String(objective || "").trim(),
-        ) && !(topic.objectiveDefinitions || []).length,
+        ) &&
+        !(topic.objectiveDefinitions || []).length,
     )
   ) {
     throw requestError(
-      `Every topic in "${module.title}" needs at least one learning objective before publishing.`,
+      `Every topic in "${module.title}" needs a prompt describing what it should teach or assess (or at least one learning objective).`,
     );
   }
   for (const topic of topics) {
@@ -562,7 +574,7 @@ function validateModuleCompletionConfiguration(module) {
       );
     }
     const objectives = topic.objectiveDefinitions || [];
-    if (!objectives.length) continue;
+    if (!objectives.length) continue; // prompt-first topics derive structure from AI
     const keys = objectives.map((objective) =>
       String(objective.key || "").trim(),
     );
@@ -701,6 +713,20 @@ function validateAiConfiguration(value) {
       "AI configuration must be a valid prompt and small advanced-settings object.",
     );
   }
+}
+
+/**
+ * Plan-aware objective list: for prompt-first topics the AI-derived plan
+ * supplies the objectives (materialized as objectiveDefinitions); manual
+ * structure always wins. No AI call happens here — the plan must already
+ * exist on the topic (derived when the module was published).
+ */
+function planAwareTopicObjectives(topic) {
+  const manual = getTopicObjectives(topic);
+  if (manual.length) return manual;
+  const derived = topic?.aiPlan?.source === "AI" ? topic.aiPlan.objectiveDefinitions : null;
+  if (derived?.length) return getTopicObjectives({ objectiveDefinitions: derived });
+  return [];
 }
 
 async function loadProgress(userId, moduleId) {
@@ -857,7 +883,7 @@ async function savePublishedModuleVersion(module) {
   }
 }
 
-async function preparePublishedModuleEdit(module) {
+async function preparePublishedModuleEdit(module, adminId) {
   const wasPublished = module.status === "PUBLISHED";
   let version = Number(module.currentPublishedVersion) || 0;
   if (wasPublished) {
@@ -871,7 +897,41 @@ async function preparePublishedModuleEdit(module) {
       { $set: { moduleVersion: version } },
     );
   }
-  return { wasPublished, version };
+  return { wasPublished, version, adminId };
+}
+
+async function materializePromptTopicPlans(module, adminId) {
+  for (const topic of module.topics || []) {
+    const hasManual =
+      (topic.objectiveDefinitions || []).length ||
+      (topic.objectives || []).some((objective) => String(objective || "").trim());
+    if (hasManual) continue;
+    if (!String(topic.aiPrompt || "").trim()) continue;
+    const plan = await ensureTopicAiPlan(topic, module, { adminId });
+    if (plan?.source === "AI") {
+      attachAiPlanToTopic(topic, plan);
+      // Materialize the derived objectives so the whole objective/mastery
+      // engine (progress, verification, completion) works unchanged.
+      topic.objectiveDefinitions = plan.objectives.map((objective) => ({
+        key: objective.key,
+        title: objective.title,
+        description: objective.description,
+        requiredKnowledge: objective.requiredKnowledge,
+        expectedOutcome: objective.expectedOutcome,
+        masteryCriteria: (objective.masteryCriteria || []).map((criterion) => ({
+          key: criterion.key,
+          description: criterion.description,
+          evaluationMethod: criterion.evaluationMethod,
+          requiredEvidenceCount: criterion.requiredEvidenceCount,
+        })),
+        commonMisconceptions: objective.commonMisconceptions,
+        prerequisites: objective.prerequisites,
+      }));
+      if (!topic.explanation) {
+        topic.explanation = String(plan.referenceContent || "").slice(0, 12000);
+      }
+    }
+  }
 }
 
 async function saveModuleEdit(module, revision) {
@@ -885,6 +945,9 @@ async function saveModuleEdit(module, revision) {
     validateModuleCompletionConfiguration(module);
     validateEvaluationModeConfiguration(module);
     assertStrictModuleIsFree(module);
+    // Prompt-first topics: derive their AI plan before saving a published
+    // version so student sessions never need an extra AI call.
+    await materializePromptTopicPlans(module, revision.adminId);
   }
   if (revision.wasPublished)
     module.currentPublishedVersion = revision.version + 1;
@@ -896,6 +959,8 @@ async function saveModuleEdit(module, revision) {
 const editableTopicFields = [
   "title",
   "description",
+  "contentType",
+  "aiPrompt",
   "explanation",
   "tutorInstructions",
   "validationInstructions",
@@ -909,6 +974,10 @@ const editableTopicFields = [
   "questions",
   "exercises",
   "subtopics",
+  "selfConceptConfig",
+  "selfMcqConfig",
+  "strictConceptConfig",
+  "strictMcqConfig",
 ];
 
 const PREVIEW_SCENARIOS = new Set([
@@ -3054,6 +3123,7 @@ export async function updateLearningProgram(userId, programId, input) {
       modules.forEach(validateEvaluationModeConfiguration);
       modules.forEach(assertStrictModuleIsFree);
       for (const module of modules) {
+        await materializePromptTopicPlans(module);
         if (module.status === "PUBLISHED" && module.currentPublishedVersion)
           continue;
         module.status = "PUBLISHED";
@@ -3155,47 +3225,43 @@ function validateEvaluationModeConfiguration(module) {
   );
   for (const topic of topics) {
     const contentType = topic.contentType === "MCQS" ? "MCQS" : "CONCEPTS";
+    const hasPrompt = String(topic.aiPrompt || "").trim().length > 0;
     if (contentType === "CONCEPTS" && mode === "SELF_EVALUATION") {
-      // Self concepts rely on objectives; reference content lives in the
-      // topic explanation/coreKnowledge which publishing already validates.
+      // Prompt-first: a prompt (or objectives) is enough.
       continue;
     }
     if (contentType === "MCQS" && mode === "SELF_EVALUATION") {
       if (
-        !topic.selfMcqConfig ||
-        !Number.isInteger(Number(topic.selfMcqConfig.questionsPerSession)) ||
-        Number(topic.selfMcqConfig.questionsPerSession) < 1 ||
-        !(topic.objectives || []).length
+        !hasPrompt &&
+        !(topic.objectives || []).length &&
+        !(topic.objectiveDefinitions || []).length
       ) {
         throw requestError(
-          `Self Evaluation MCQ topic "${topic.title}" needs question coverage and at least one learning objective.`,
+          `Self Evaluation MCQ topic "${topic.title}" needs a prompt or at least one learning objective.`,
         );
       }
       continue;
     }
     if (contentType === "CONCEPTS" && mode === "STRICT_EVALUATION") {
       if (
-        !topic.strictConceptConfig ||
-        !Number.isInteger(Number(topic.strictConceptConfig.questionCount)) ||
-        Number(topic.strictConceptConfig.questionCount) < 1 ||
-        !(topic.strictConceptConfig.evaluationCriteria || []).length ||
-        !String(topic.strictConceptConfig.levelClassificationCriteria || "").trim()
+        !hasPrompt &&
+        !(topic.objectives || []).length &&
+        !(topic.objectiveDefinitions || []).length
       ) {
         throw requestError(
-          `Strict Evaluation concepts topic "${topic.title}" needs expected knowledge indicators, evaluation criteria, level classification criteria and a question count.`,
+          `Strict Evaluation concepts topic "${topic.title}" needs a prompt or at least one learning objective.`,
         );
       }
       continue;
     }
     // STRICT MCQ
     if (
-      !topic.strictMcqConfig ||
-      !Number.isInteger(Number(topic.strictMcqConfig.questionCount)) ||
-      Number(topic.strictMcqConfig.questionCount) < 1 ||
-      !(topic.objectives || []).length
+      !hasPrompt &&
+      !(topic.objectives || []).length &&
+      !(topic.objectiveDefinitions || []).length
     ) {
       throw requestError(
-        `Strict Evaluation MCQ topic "${topic.title}" needs a question count and at least one learning objective.`,
+        `Strict Evaluation MCQ topic "${topic.title}" needs a prompt or at least one learning objective.`,
       );
     }
   }
@@ -3417,6 +3483,7 @@ export async function setLearningModuleStatus(moduleId, status) {
       validateModuleCompletionConfiguration(module);
       validateEvaluationModeConfiguration(module);
       assertStrictModuleIsFree(module);
+      await materializePromptTopicPlans(module);
       module.currentPublishedVersion = Math.max(
         1,
         Number(module.currentPublishedVersion) + 1 || 1,
