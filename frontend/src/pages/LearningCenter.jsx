@@ -616,9 +616,18 @@ function AdminLearning() {
       setTopicError("Add a short topic description.");
       return;
     }
-    if (adminPage === "topics-editor" && !topicDraft.curriculumApproved) {
-      setTopicError("Review and approve the generated curriculum preview before saving.");
-      return;
+    if (
+      adminPage === "topics-editor" &&
+      topicDraft.contentType === "CONCEPTS" &&
+      moduleForm.evaluationMode === "SELF_EVALUATION" &&
+      !topicDraft.curriculumApproved
+    ) {
+      // AI curriculum draft is optional; approval is only needed when an AI
+      // draft was actually generated for self-eval concepts topics.
+      if (topicDraft.curriculumProposal) {
+        setTopicError("Review and approve the generated curriculum preview before saving.");
+        return;
+      }
     }
     const objectiveDefinitions = topicDraft.objectiveDefinitions
       .map((objective) => ({
@@ -2863,6 +2872,150 @@ function AdminLearning() {
               </p>
               {topicError && <p className="learning-field-error" role="alert">{topicError}</p>}
               <label className="learning-field">
+                Content type
+                <select
+                  value={topicDraft.contentType}
+                  onChange={(event) => setTopicDraft({
+                    ...topicDraft,
+                    contentType: event.target.value,
+                    curriculumProposal: null,
+                    curriculumApproved: false,
+                  })}
+                >
+                  <option value="CONCEPTS">Concepts</option>
+                  <option value="MCQS">MCQs</option>
+                </select>
+              </label>
+              {topicDraft.contentType === "CONCEPTS" &&
+                moduleForm.evaluationMode === "SELF_EVALUATION" && (
+                <fieldset className="learning-fieldset">
+                  <legend>Self Evaluation · Concepts configuration</legend>
+                  <label className="learning-field">
+                    Key concepts to understand (one per line)
+                    <textarea rows={3} value={topicDraft.selfConceptConfig.keyConceptsText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, keyConceptsText: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Expected knowledge (one per line)
+                    <textarea rows={3} value={topicDraft.selfConceptConfig.expectedKnowledgeText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, expectedKnowledgeText: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Important definitions (optional, one per line)
+                    <textarea rows={2} value={topicDraft.selfConceptConfig.importantDefinitionsText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, importantDefinitionsText: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Real-life examples (optional, one per line)
+                    <textarea rows={2} value={topicDraft.selfConceptConfig.realLifeExamplesText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, realLifeExamplesText: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Common misconceptions (optional, one per line)
+                    <textarea rows={2} value={topicDraft.selfConceptConfig.commonMisconceptionsText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, commonMisconceptionsText: event.target.value } })} />
+                  </label>
+                </fieldset>
+              )}
+              {topicDraft.contentType === "MCQS" &&
+                moduleForm.evaluationMode === "SELF_EVALUATION" && (
+                <fieldset className="learning-fieldset">
+                  <legend>Self Evaluation · MCQ configuration</legend>
+                  <label className="learning-field">
+                    Question coverage (what the questions must cover)
+                    <textarea rows={3} maxLength={4000} value={topicDraft.selfMcqConfig.questionCoverage || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfMcqConfig: { ...topicDraft.selfMcqConfig, questionCoverage: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Questions per session
+                    <input type="number" min="1" max="50" value={topicDraft.selfMcqConfig.questionsPerSession ?? 5}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfMcqConfig: { ...topicDraft.selfMcqConfig, questionsPerSession: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Difficulty range
+                    <select value={topicDraft.selfMcqConfig.difficultyRange || "EASY_TO_MEDIUM"}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, selfMcqConfig: { ...topicDraft.selfMcqConfig, difficultyRange: event.target.value } })}>
+                      <option value="EASY_TO_MEDIUM">Easy to medium</option>
+                      <option value="EASY_TO_HARD">Easy to hard</option>
+                      <option value="MEDIUM_TO_HARD">Medium to hard</option>
+                    </select>
+                  </label>
+                </fieldset>
+              )}
+              {topicDraft.contentType === "CONCEPTS" &&
+                moduleForm.evaluationMode === "STRICT_EVALUATION" && (
+                <fieldset className="learning-fieldset">
+                  <legend>Strict Evaluation · Concepts configuration</legend>
+                  <label className="learning-field">
+                    Expected knowledge indicators (one per line)
+                    <textarea rows={3} value={topicDraft.strictConceptConfig.expectedKnowledgeIndicatorsText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, expectedKnowledgeIndicatorsText: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Evaluation criteria (one per line)
+                    <textarea rows={3} value={topicDraft.strictConceptConfig.evaluationCriteriaText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, evaluationCriteriaText: event.target.value } })} />
+                  </label>
+                  <label className="learning-field">
+                    Level classification criteria
+                    <textarea rows={4} maxLength={8000} value={topicDraft.strictConceptConfig.levelClassificationCriteria || ""}
+                      placeholder="Describe what separates Beginner, Developing, Intermediate, Advanced and Expert."
+                      onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, levelClassificationCriteria: event.target.value } })} />
+                  </label>
+                  <div className="learning-field-row">
+                    <label className="learning-field">
+                      Number of evaluation questions
+                      <input type="number" min="1" max="60" value={topicDraft.strictConceptConfig.questionCount ?? 5}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, questionCount: event.target.value } })} />
+                    </label>
+                    <label className="learning-field">
+                      Time limit (minutes, optional)
+                      <input type="number" min="1" max="600" value={topicDraft.strictConceptConfig.timeLimitMinutes ?? ""}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, timeLimitMinutes: event.target.value } })} />
+                    </label>
+                  </div>
+                </fieldset>
+              )}
+              {topicDraft.contentType === "MCQS" &&
+                moduleForm.evaluationMode === "STRICT_EVALUATION" && (
+                <fieldset className="learning-fieldset">
+                  <legend>Strict Evaluation · MCQ configuration</legend>
+                  <div className="learning-field-row">
+                    <label className="learning-field">
+                      Number of questions
+                      <input type="number" min="1" max="200" value={topicDraft.strictMcqConfig.questionCount ?? 10}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, questionCount: event.target.value } })} />
+                    </label>
+                    <label className="learning-field">
+                      Difficulty distribution
+                      <select value={topicDraft.strictMcqConfig.difficultyDistribution || "BALANCED"}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, difficultyDistribution: event.target.value } })}>
+                        <option value="EASY">Mostly easy</option>
+                        <option value="BALANCED">Balanced</option>
+                        <option value="CHALLENGING">Mostly challenging</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div className="learning-field-row">
+                    <label className="learning-field">
+                      Time limit (minutes, optional)
+                      <input type="number" min="1" max="600" value={topicDraft.strictMcqConfig.timeLimitMinutes ?? ""}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, timeLimitMinutes: event.target.value } })} />
+                    </label>
+                    <label className="learning-field">
+                      Negative marking (%)
+                      <input type="number" min="0" max="100" value={topicDraft.strictMcqConfig.negativeMarkingPercent ?? 0}
+                        onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, negativeMarkingPercent: event.target.value } })} />
+                    </label>
+                  </div>
+                  <label className="learning-field">
+                    Evaluation criteria (one per line)
+                    <textarea rows={2} value={topicDraft.strictMcqConfig.evaluationCriteriaText || ""}
+                      onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, evaluationCriteriaText: event.target.value } })} />
+                  </label>
+                </fieldset>
+              )}
+              <label className="learning-field">
                 Topic title
                 <input
                   required
@@ -2942,14 +3095,17 @@ function AdminLearning() {
                   </select>
                 </label>
               )}
-              <button
-                className="learning-button learning-button-secondary"
-                disabled={saving || !topicDraft.title.trim() || !topicDraft.objectivesText.trim() || !topicDraft.coreKnowledgeText.trim()}
-                onClick={generateTopicProposal}
-                type="button"
-              >
-                {saving ? "Analyzing curriculum…" : "Generate curriculum preview"}
-              </button>
+              {topicDraft.contentType === "CONCEPTS" &&
+                moduleForm.evaluationMode === "SELF_EVALUATION" && (
+                <button
+                  className="learning-button learning-button-secondary"
+                  disabled={saving || !topicDraft.title.trim() || !topicDraft.objectivesText.trim() || !topicDraft.coreKnowledgeText.trim()}
+                  onClick={generateTopicProposal}
+                  type="button"
+                >
+                  {saving ? "Analyzing curriculum…" : "Generate curriculum preview (optional AI draft)"}
+                </button>
+              )}
               {topicDraft.curriculumProposal && (
                 <section className="learning-topic-editor-group" aria-label="Generated curriculum preview">
                   <h3>Curriculum preview</h3>
@@ -2997,11 +3153,11 @@ function AdminLearning() {
               <div className="learning-actions">
                 <button
                   className="learning-button"
-                  disabled={saving || !topicDraft.curriculumApproved}
+                  disabled={saving}
                   onClick={saveTopic}
                   type="button"
                 >
-                  {saving ? "Saving…" : "Save approved topic"}
+                  {saving ? "Saving…" : editingTopicId ? "Save approved topic" : "Save topic"}
                 </button>
                 <button className="learning-button learning-button-secondary" onClick={() => setAdminPage("topics")} type="button">Cancel</button>
               </div>
