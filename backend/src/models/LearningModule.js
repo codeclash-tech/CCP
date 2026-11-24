@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+﻿import mongoose from "mongoose";
 
 const exampleSchema = new mongoose.Schema(
   {
@@ -111,10 +111,83 @@ const coreKnowledgeSchema = new mongoose.Schema(
   },
   { _id: false },
 );
+/** Strict Evaluation (Concepts) configuration â€” set on topics. */
+const strictConceptConfigSchema = new mongoose.Schema(
+  {
+    expectedKnowledgeIndicators: { type: [String], default: [] },
+    evaluationCriteria: { type: [String], default: [] },
+    levelClassificationCriteria: { type: String, trim: true, maxlength: 8000, default: "" },
+    questionCount: { type: Number, min: 1, max: 60, default: 5 },
+    timeLimitMinutes: { type: Number, min: 1, max: 600, default: null },
+  },
+  { _id: false },
+);
+
+/** Strict Evaluation (MCQ) configuration â€” set on topics. */
+const strictMcqConfigSchema = new mongoose.Schema(
+  {
+    questionCount: { type: Number, min: 1, max: 200, default: 10 },
+    objectiveAllocation: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+    difficultyDistribution: {
+      type: String,
+      enum: ["EASY", "BALANCED", "CHALLENGING"],
+      default: "BALANCED",
+    },
+    timeLimitMinutes: { type: Number, min: 1, max: 600, default: null },
+    negativeMarkingPercent: { type: Number, min: 0, max: 100, default: 0 },
+    evaluationCriteria: { type: [String], default: [] },
+  },
+  { _id: false },
+);
+
+/** Self Evaluation (MCQ) configuration â€” set on topics. */
+const selfMcqConfigSchema = new mongoose.Schema(
+  {
+    questionCoverage: { type: String, trim: true, maxlength: 4000, default: "" },
+    questionsPerSession: { type: Number, min: 1, max: 50, default: 5 },
+    difficultyRange: {
+      type: String,
+      enum: ["EASY_TO_MEDIUM", "EASY_TO_HARD", "MEDIUM_TO_HARD"],
+      default: "EASY_TO_MEDIUM",
+    },
+  },
+  { _id: false },
+);
+
+/** Self Evaluation (Concepts) configuration â€” set on topics. */
+const selfConceptConfigSchema = new mongoose.Schema(
+  {
+    keyConcepts: { type: [String], default: [] },
+    expectedKnowledge: { type: [String], default: [] },
+    importantDefinitions: { type: [String], default: [] },
+    realLifeExamples: { type: [String], default: [] },
+    commonMisconceptions: { type: [String], default: [] },
+  },
+  { _id: false },
+);
+
+const completionRequirementsSchema = new mongoose.Schema(
+  {
+    minCompletedTopics: { type: Number, min: 0, default: 1 },
+    requiredExercises: { type: Number, min: 0, default: 0 },
+    requireAssessment: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
 
 const topicSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 160 },
+    contentType: {
+      type: String,
+      enum: ["CONCEPTS", "MCQS"],
+      default: "CONCEPTS",
+      index: true,
+    },
+    selfConceptConfig: { type: selfConceptConfigSchema, default: null },
+    selfMcqConfig: { type: selfMcqConfigSchema, default: null },
+    strictConceptConfig: { type: strictConceptConfigSchema, default: null },
+    strictMcqConfig: { type: strictMcqConfigSchema, default: null },
     subject: { type: String, trim: true, maxlength: 100, default: "" },
     description: { type: String, trim: true, maxlength: 2000, default: "" },
     estimatedDurationMinutes: { type: Number, min: 1, max: 100000, default: null },
@@ -137,15 +210,6 @@ const assessmentSchema = new mongoose.Schema(
   {
     questions: { type: [questionSchema], default: [] },
     passingScorePercent: { type: Number, min: 1, max: 100, default: 70 },
-  },
-  { _id: false },
-);
-
-const completionRequirementsSchema = new mongoose.Schema(
-  {
-    minCompletedTopics: { type: Number, min: 0, default: 1 },
-    requiredExercises: { type: Number, min: 0, default: 0 },
-    requireAssessment: { type: Boolean, default: false },
   },
   { _id: false },
 );
@@ -181,6 +245,15 @@ const learningModuleSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    evaluationMode: {
+      type: String,
+      enum: ["SELF_EVALUATION", "STRICT_EVALUATION"],
+      default: "SELF_EVALUATION",
+      index: true,
+    },
+    requiredForCompletion: { type: Boolean, default: true },
+    scheduleStartAt: { type: Date, default: null },
+    scheduleEndAt: { type: Date, default: null },
     title: { type: String, required: true, trim: true, maxlength: 160 },
     shortDescription: { type: String, trim: true, maxlength: 300, default: "" },
     description: { type: String, required: true, trim: true, maxlength: 4000 },

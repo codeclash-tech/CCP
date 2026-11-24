@@ -39,6 +39,14 @@ const EMPTY_MODULE = {
   difficulty: "BEGINNER",
   sequence: 1,
   estimatedDurationMinutes: 60,
+  evaluationMode: "SELF_EVALUATION",
+  requiredForCompletion: true,
+  scheduleStartAt: "",
+  scheduleEndAt: "",
+  evaluationMode: "SELF_EVALUATION",
+  requiredForCompletion: true,
+  scheduleStartAt: "",
+  scheduleEndAt: "",
   objectives: [],
   prerequisites: [],
   topics: [],
@@ -53,6 +61,34 @@ const EMPTY_TOPIC = {
   title: "",
   subject: "",
   description: "",
+  contentType: "CONCEPTS",
+  selfConceptConfig: {
+    keyConcepts: [],
+    expectedKnowledge: [],
+    importantDefinitions: [],
+    realLifeExamples: [],
+    commonMisconceptions: [],
+  },
+  selfMcqConfig: {
+    questionCoverage: "",
+    questionsPerSession: 5,
+    difficultyRange: "EASY_TO_MEDIUM",
+  },
+  strictConceptConfig: {
+    expectedKnowledgeIndicators: [],
+    evaluationCriteria: [],
+    levelClassificationCriteria: "",
+    questionCount: 5,
+    timeLimitMinutes: "",
+  },
+  strictMcqConfig: {
+    questionCount: 10,
+    objectiveAllocation: {},
+    difficultyDistribution: "BALANCED",
+    timeLimitMinutes: "",
+    negativeMarkingPercent: 0,
+    evaluationCriteria: [],
+  },
   objectivesText: "",
   curriculumProposal: null,
   curriculumApproved: false,
@@ -69,6 +105,19 @@ const EMPTY_TOPIC = {
   exercises: [],
   subtopics: [],
 };
+function toLines(value) {
+  return Array.isArray(value) ? value : String(value || "").split(/\r?\n/);
+}
+function linesToText(value) {
+  return Array.isArray(value) ? value.join("\n") : String(value || "");
+}
+function textToLines(value, max = 40) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
 function displayPrice(price, currencyInput = "INR") {
   const currency = /^[A-Z]{3}$/.test(currencyInput) ? currencyInput : "INR";
   return Number(price) === 0
@@ -132,6 +181,34 @@ function createTopicDraft(topic = {}) {
     title: topic.title || "",
     subject: topic.subject || "",
     description: topic.description || "",
+    contentType: topic.contentType === "MCQS" ? "MCQS" : "CONCEPTS",
+    selfConceptConfig: (() => {
+      const config = topic.selfConceptConfig || {};
+      return {
+        ...config,
+        keyConceptsText: linesToText(config.keyConcepts),
+        expectedKnowledgeText: linesToText(config.expectedKnowledge),
+        importantDefinitionsText: linesToText(config.importantDefinitions),
+        realLifeExamplesText: linesToText(config.realLifeExamples),
+        commonMisconceptionsText: linesToText(config.commonMisconceptions),
+      };
+    })(),
+    selfMcqConfig: { ...(topic.selfMcqConfig || { questionCoverage: "", questionsPerSession: 5, difficultyRange: "EASY_TO_MEDIUM" }), evaluationCriteriaText: "" },
+    strictConceptConfig: (() => {
+      const config = topic.strictConceptConfig || {};
+      return {
+        ...config,
+        expectedKnowledgeIndicatorsText: linesToText(config.expectedKnowledgeIndicators),
+        evaluationCriteriaText: linesToText(config.evaluationCriteria),
+      };
+    })(),
+    strictMcqConfig: (() => {
+      const config = topic.strictMcqConfig || {};
+      return {
+        ...config,
+        evaluationCriteriaText: linesToText(config.evaluationCriteria),
+      };
+    })(),
     objectivesText: (topic.objectives?.length
       ? topic.objectives
       : objectiveDefinitions.map((objective) => objective.title)).join("\n"),
@@ -225,6 +302,8 @@ function AdminLearning() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [adminPage, setAdminPage] = useState("courses");
+  const [strictResults, setStrictResults] = useState(null);
+  const [resultsLoading, setResultsLoading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewScenario, setPreviewScenario] = useState("NO_PRIOR_KNOWLEDGE");
   const [previewMode, setPreviewMode] = useState("TUTOR");
@@ -307,11 +386,56 @@ function AdminLearning() {
       setAdminPage(destination);
       setNewModule(false);
       setModuleForm(module);
+      setStrictResults(null);
       setEditingTopicId("");
       setTopicError("");
       setTopicDraft(EMPTY_TOPIC);
     } catch (loadError) {
       setError(loadError.message || "Could not load the learning module.");
+    }
+  };
+
+  const loadStrictResults = useCallback(async () => {
+    if (!moduleId) return;
+    setResultsLoading(true);
+    setError("");
+    try {
+      const { data } = await api.get(
+        `/learning-strict/admin/modules/${moduleId}/results`,
+      );
+      setStrictResults(data);
+    } catch (resultsError) {
+      setError(
+        resultsError.response?.data?.error ||
+          resultsError.message ||
+          "Could not load assessment results.",
+      );
+    } finally {
+      setResultsLoading(false);
+    }
+  }, [moduleId]);
+
+  useEffect(() => {
+    if (adminPage === "results") loadStrictResults();
+  }, [adminPage, loadStrictResults]);
+
+  const downloadResultsExport = async () => {
+    setError("");
+    try {
+      const { data } = await api.get(
+        `/learning-strict/admin/modules/${moduleId}/results.xlsx`,
+        { responseType: "blob" },
+      );
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `strict-results-${moduleId}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (exportError) {
+      setError(exportError.message || "Could not export results.");
     }
   };
 
@@ -444,13 +568,17 @@ function AdminLearning() {
         title: moduleForm.title,
         shortDescription: moduleForm.shortDescription || moduleForm.description,
         description: moduleForm.description,
-        price: Number(moduleForm.price),
+        price: Number(moduleForm.price) || 0,
         accessDurationDays: moduleForm.accessDurationDays === "" ||
           moduleForm.accessDurationDays === null
           ? null
           : Number(moduleForm.accessDurationDays),
         sequence: moduleId ? Number(moduleForm.sequence) : undefined,
         estimatedDurationMinutes: Number(moduleForm.estimatedDurationMinutes) || 60,
+        evaluationMode: moduleForm.evaluationMode || "SELF_EVALUATION",
+        requiredForCompletion: moduleForm.requiredForCompletion !== false,
+        scheduleStartAt: moduleForm.scheduleStartAt || null,
+        scheduleEndAt: moduleForm.scheduleEndAt || null,
         topics: newModule ? [] : (moduleForm.topics || []),
       };
       if (newModule) {
@@ -560,6 +688,46 @@ function AdminLearning() {
         title: topicDraft.title.trim(),
         subject: topicDraft.subject.trim(),
         description: topicDraft.description.trim(),
+        contentType: topicDraft.contentType === "MCQS" ? "MCQS" : "CONCEPTS",
+        selfConceptConfig: topicDraft.contentType === "CONCEPTS"
+          ? {
+              keyConcepts: textToLines(topicDraft.selfConceptConfig.keyConceptsText),
+              expectedKnowledge: textToLines(topicDraft.selfConceptConfig.expectedKnowledgeText),
+              importantDefinitions: textToLines(topicDraft.selfConceptConfig.importantDefinitionsText),
+              realLifeExamples: textToLines(topicDraft.selfConceptConfig.realLifeExamplesText),
+              commonMisconceptions: textToLines(topicDraft.selfConceptConfig.commonMisconceptionsText),
+            }
+          : undefined,
+        selfMcqConfig: topicDraft.contentType === "MCQS"
+          ? {
+              questionCoverage: String(topicDraft.selfMcqConfig.questionCoverage || "").trim(),
+              questionsPerSession: Number(topicDraft.selfMcqConfig.questionsPerSession) || 5,
+              difficultyRange: topicDraft.selfMcqConfig.difficultyRange || "EASY_TO_MEDIUM",
+            }
+          : undefined,
+        strictConceptConfig: topicDraft.contentType === "CONCEPTS"
+          ? {
+              expectedKnowledgeIndicators: textToLines(topicDraft.strictConceptConfig.expectedKnowledgeIndicatorsText),
+              evaluationCriteria: textToLines(topicDraft.strictConceptConfig.evaluationCriteriaText),
+              levelClassificationCriteria: String(topicDraft.strictConceptConfig.levelClassificationCriteria || "").trim(),
+              questionCount: Number(topicDraft.strictConceptConfig.questionCount) || 5,
+              timeLimitMinutes: topicDraft.strictConceptConfig.timeLimitMinutes
+                ? Number(topicDraft.strictConceptConfig.timeLimitMinutes)
+                : null,
+            }
+          : undefined,
+        strictMcqConfig: topicDraft.contentType === "MCQS"
+          ? {
+              questionCount: Number(topicDraft.strictMcqConfig.questionCount) || 10,
+              objectiveAllocation: topicDraft.strictMcqConfig.objectiveAllocation || {},
+              difficultyDistribution: topicDraft.strictMcqConfig.difficultyDistribution || "BALANCED",
+              timeLimitMinutes: topicDraft.strictMcqConfig.timeLimitMinutes
+                ? Number(topicDraft.strictMcqConfig.timeLimitMinutes)
+                : null,
+              negativeMarkingPercent: Number(topicDraft.strictMcqConfig.negativeMarkingPercent) || 0,
+              evaluationCriteria: textToLines(topicDraft.strictMcqConfig.evaluationCriteriaText),
+            }
+          : undefined,
         estimatedDurationMinutes: topicDraft.estimatedDurationMinutes
           ? Number(topicDraft.estimatedDurationMinutes)
           : null,
@@ -857,6 +1025,20 @@ function AdminLearning() {
           onClick={() => setAdminPage("topics")}
           type="button"
         >Topics</button>
+        <button
+          className={adminPage === "results" ? "is-active" : ""}
+          disabled={
+            !moduleId ||
+            (moduleForm.evaluationMode || "SELF_EVALUATION") !== "STRICT_EVALUATION"
+          }
+          title={
+            (moduleForm.evaluationMode || "SELF_EVALUATION") === "STRICT_EVALUATION"
+              ? "View assessment results"
+              : "Results are available for Strict Evaluation modules"
+          }
+          onClick={() => setAdminPage("results")}
+          type="button"
+        >Results</button>
       </nav>
 
       <section className="learning-management-grid">
@@ -1145,16 +1327,124 @@ function AdminLearning() {
                     />
                   </label>
                   <label className="learning-field">
+                    Evaluation mode
+                    <select
+                      value={moduleForm.evaluationMode || "SELF_EVALUATION"}
+                      onChange={(event) => setModuleForm({ ...moduleForm, evaluationMode: event.target.value })}
+                    >
+                      <option value="SELF_EVALUATION">Self Evaluation (Thrive · paid learning)</option>
+                      <option value="STRICT_EVALUATION">Strict Evaluation (Challenges · free assessment)</option>
+                    </select>
+                  </label>
+                  {moduleForm.evaluationMode === "STRICT_EVALUATION" && (
+                    <p className="learning-help">
+                      Strict Evaluation modules are free assessments published to the Challenges page.
+                      Price is forced to 0 and no purchase is required.
+                    </p>
+                  )}
+                  <label className="learning-field">
+                    Required for course completion
+                    <select
+                      value={moduleForm.requiredForCompletion === false ? "no" : "yes"}
+                      onChange={(event) => setModuleForm({ ...moduleForm, requiredForCompletion: event.target.value === "yes" })}
+                    >
+                      <option value="yes">Yes — needed for the course certificate</option>
+                      <option value="no">No — optional module</option>
+                    </select>
+                  </label>
+                  {moduleForm.evaluationMode === "STRICT_EVALUATION" && (
+                    <div className="learning-field-row">
+                      <label className="learning-field">
+                        Available from (optional)
+                        <input
+                          type="datetime-local"
+                          value={(moduleForm.scheduleStartAt || "").slice(0, 16)}
+                          onChange={(event) => setModuleForm({ ...moduleForm, scheduleStartAt: event.target.value })}
+                        />
+                      </label>
+                      <label className="learning-field">
+                        Available until (optional)
+                        <input
+                          type="datetime-local"
+                          value={(moduleForm.scheduleEndAt || "").slice(0, 16)}
+                          onChange={(event) => setModuleForm({ ...moduleForm, scheduleEndAt: event.target.value })}
+                        />
+                      </label>
+                    </div>
+                  )}
+                  <label className="learning-field">
                     Fee (INR)
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      value={moduleForm.price ?? 0}
+                      disabled={moduleForm.evaluationMode === "STRICT_EVALUATION"}
+                      value={moduleForm.evaluationMode === "STRICT_EVALUATION" ? 0 : (moduleForm.price ?? 0)}
                       onChange={(event) => setModuleForm({ ...moduleForm, price: event.target.value })}
                     />
                   </label>
                 </>
+              )}
+              {!newModule && adminPage === "results" && (
+                <section className="learning-form learning-form-divider learning-strict-results">
+                  <div className="learning-panel-title">
+                    <div>
+                      <h4>Assessment results</h4>
+                      <p>Performance for every student who started this Strict Evaluation module.</p>
+                    </div>
+                    <div className="learning-actions">
+                      <button className="learning-button learning-button-small learning-button-secondary" onClick={loadStrictResults} type="button">
+                        Refresh
+                      </button>
+                      <button className="learning-button learning-button-small" onClick={downloadResultsExport} type="button">
+                        Download Excel (.xlsx)
+                      </button>
+                    </div>
+                  </div>
+                  {resultsLoading && <p className="learning-muted">Loading results…</p>}
+                  {strictResults && (
+                    <>
+                      <div className="learning-stats-row">
+                        <div><strong>{strictResults.stats.eligibleParticipants}</strong><span>Participants</span></div>
+                        <div><strong>{strictResults.stats.startedAssessments}</strong><span>Started</span></div>
+                        <div><strong>{strictResults.stats.completedAssessments}</strong><span>Completed</span></div>
+                        {Object.entries(strictResults.stats.levelDistribution || {}).map(([level, count]) => (
+                          <div key={level}><strong>{count}</strong><span>{level}</span></div>
+                        ))}
+                      </div>
+                      {strictResults.objectiveAnalysis?.length > 0 && (
+                        <table className="learning-results-table">
+                          <thead><tr><th>Objective</th><th>Average %</th><th>Below 60%</th></tr></thead>
+                          <tbody>
+                            {strictResults.objectiveAnalysis.map((entry) => (
+                              <tr key={entry.objectiveKey}>
+                                <td>{entry.objectiveTitle}</td>
+                                <td>{entry.averagePercent}%</td>
+                                <td>{entry.weakCount}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                      {strictResults.students?.length > 0 && (
+                        <table className="learning-results-table">
+                          <thead><tr><th>Student</th><th>Email</th><th>Status</th><th>Score</th><th>Level</th></tr></thead>
+                          <tbody>
+                            {strictResults.students.map((student) => (
+                              <tr key={student.attemptId}>
+                                <td>{student.name || "—"}</td>
+                                <td>{student.email}</td>
+                                <td>{student.status}</td>
+                                <td>{student.scorePercent === null ? "—" : `${student.scorePercent}%`}</td>
+                                <td>{student.overallLevel || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
+                  )}
+                </section>
               )}
               {!newModule && adminPage === "topics-inline" && (
                 <section className="learning-form learning-form-divider">
@@ -1226,6 +1516,148 @@ function AdminLearning() {
                         onChange={(event) => setTopicDraft({ ...topicDraft, description: event.target.value })}
                       />
                     </label>
+                    <label className="learning-field">
+                      Content type
+                      <select
+                        value={topicDraft.contentType}
+                        onChange={(event) => setTopicDraft({
+                          ...topicDraft,
+                          contentType: event.target.value,
+                        })}
+                      >
+                        <option value="CONCEPTS">Concepts</option>
+                        <option value="MCQS">MCQs</option>
+                      </select>
+                    </label>
+                    {topicDraft.contentType === "CONCEPTS" &&
+                      moduleForm.evaluationMode === "SELF_EVALUATION" && (
+                      <fieldset className="learning-fieldset">
+                        <legend>Self Evaluation · Concepts configuration</legend>
+                        <label className="learning-field">
+                          Key concepts to understand (one per line)
+                          <textarea rows={3} value={topicDraft.selfConceptConfig.keyConceptsText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, keyConceptsText: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Expected knowledge (one per line)
+                          <textarea rows={3} value={topicDraft.selfConceptConfig.expectedKnowledgeText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, expectedKnowledgeText: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Important definitions (optional, one per line)
+                          <textarea rows={2} value={topicDraft.selfConceptConfig.importantDefinitionsText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, importantDefinitionsText: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Real-life examples (optional, one per line)
+                          <textarea rows={2} value={topicDraft.selfConceptConfig.realLifeExamplesText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, realLifeExamplesText: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Common misconceptions (optional, one per line)
+                          <textarea rows={2} value={topicDraft.selfConceptConfig.commonMisconceptionsText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfConceptConfig: { ...topicDraft.selfConceptConfig, commonMisconceptionsText: event.target.value } })} />
+                        </label>
+                      </fieldset>
+                    )}
+                    {topicDraft.contentType === "MCQS" &&
+                      moduleForm.evaluationMode === "SELF_EVALUATION" && (
+                      <fieldset className="learning-fieldset">
+                        <legend>Self Evaluation · MCQ configuration</legend>
+                        <label className="learning-field">
+                          Question coverage (what the questions must cover)
+                          <textarea rows={3} maxLength={4000} value={topicDraft.selfMcqConfig.questionCoverage || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfMcqConfig: { ...topicDraft.selfMcqConfig, questionCoverage: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Questions per session
+                          <input type="number" min="1" max="50" value={topicDraft.selfMcqConfig.questionsPerSession ?? 5}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfMcqConfig: { ...topicDraft.selfMcqConfig, questionsPerSession: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Difficulty range
+                          <select value={topicDraft.selfMcqConfig.difficultyRange || "EASY_TO_MEDIUM"}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, selfMcqConfig: { ...topicDraft.selfMcqConfig, difficultyRange: event.target.value } })}>
+                            <option value="EASY_TO_MEDIUM">Easy to medium</option>
+                            <option value="EASY_TO_HARD">Easy to hard</option>
+                            <option value="MEDIUM_TO_HARD">Medium to hard</option>
+                          </select>
+                        </label>
+                      </fieldset>
+                    )}
+                    {topicDraft.contentType === "CONCEPTS" &&
+                      moduleForm.evaluationMode === "STRICT_EVALUATION" && (
+                      <fieldset className="learning-fieldset">
+                        <legend>Strict Evaluation · Concepts configuration</legend>
+                        <label className="learning-field">
+                          Expected knowledge indicators (one per line)
+                          <textarea rows={3} value={topicDraft.strictConceptConfig.expectedKnowledgeIndicatorsText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, expectedKnowledgeIndicatorsText: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Evaluation criteria (one per line)
+                          <textarea rows={3} value={topicDraft.strictConceptConfig.evaluationCriteriaText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, evaluationCriteriaText: event.target.value } })} />
+                        </label>
+                        <label className="learning-field">
+                          Level classification criteria
+                          <textarea rows={4} maxLength={8000} value={topicDraft.strictConceptConfig.levelClassificationCriteria || ""}
+                            placeholder="Describe what separates Beginner, Developing, Intermediate, Advanced and Expert."
+                            onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, levelClassificationCriteria: event.target.value } })} />
+                        </label>
+                        <div className="learning-field-row">
+                          <label className="learning-field">
+                            Number of evaluation questions
+                            <input type="number" min="1" max="60" value={topicDraft.strictConceptConfig.questionCount ?? 5}
+                              onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, questionCount: event.target.value } })} />
+                          </label>
+                          <label className="learning-field">
+                            Time limit (minutes, optional)
+                            <input type="number" min="1" max="600" value={topicDraft.strictConceptConfig.timeLimitMinutes ?? ""}
+                              onChange={(event) => setTopicDraft({ ...topicDraft, strictConceptConfig: { ...topicDraft.strictConceptConfig, timeLimitMinutes: event.target.value } })} />
+                          </label>
+                        </div>
+                      </fieldset>
+                    )}
+                    {topicDraft.contentType === "MCQS" &&
+                      moduleForm.evaluationMode === "STRICT_EVALUATION" && (
+                      <fieldset className="learning-fieldset">
+                        <legend>Strict Evaluation · MCQ configuration</legend>
+                        <div className="learning-field-row">
+                          <label className="learning-field">
+                            Number of questions
+                            <input type="number" min="1" max="200" value={topicDraft.strictMcqConfig.questionCount ?? 10}
+                              onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, questionCount: event.target.value } })} />
+                          </label>
+                          <label className="learning-field">
+                            Difficulty distribution
+                            <select value={topicDraft.strictMcqConfig.difficultyDistribution || "BALANCED"}
+                              onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, difficultyDistribution: event.target.value } })}>
+                              <option value="EASY">Mostly easy</option>
+                              <option value="BALANCED">Balanced</option>
+                              <option value="CHALLENGING">Mostly challenging</option>
+                            </select>
+                          </label>
+                        </div>
+                        <div className="learning-field-row">
+                          <label className="learning-field">
+                            Time limit (minutes, optional)
+                            <input type="number" min="1" max="600" value={topicDraft.strictMcqConfig.timeLimitMinutes ?? ""}
+                              onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, timeLimitMinutes: event.target.value } })} />
+                          </label>
+                          <label className="learning-field">
+                            Negative marking (%)
+                            <input type="number" min="0" max="100" value={topicDraft.strictMcqConfig.negativeMarkingPercent ?? 0}
+                              onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, negativeMarkingPercent: event.target.value } })} />
+                          </label>
+                        </div>
+                        <label className="learning-field">
+                          Evaluation criteria (one per line)
+                          <textarea rows={2} value={topicDraft.strictMcqConfig.evaluationCriteriaText || ""}
+                            onChange={(event) => setTopicDraft({ ...topicDraft, strictMcqConfig: { ...topicDraft.strictMcqConfig, evaluationCriteriaText: event.target.value } })} />
+                        </label>
+                      </fieldset>
+                    )}
                     <label className="learning-field">
                       Estimated learning time (minutes, optional)
                       <input
@@ -2611,6 +3043,7 @@ function StudentLearning() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [courseSummary, setCourseSummary] = useState(null);
   const voiceProviders = useMemo(
     () => ({
       input: createSpeechInputProvider(window),
@@ -2794,6 +3227,10 @@ function StudentLearning() {
     setSelectedProgramId(String(programId));
     setError("");
     setNotice("");
+    api
+      .get(`/learning/certification/${programId}/summary`)
+      .then(({ data }) => setCourseSummary(data))
+      .catch(() => setCourseSummary(null));
   };
 
   const openModule = async (programId, moduleId) => {
@@ -2905,7 +3342,11 @@ function StudentLearning() {
           }
         }
         await loadStudentData();
-        if (data.certificate) {
+        if (data.courseCertificate) {
+          setNotice(data.courseCertificateEmailSent
+            ? "You completed the whole course! Your course certificate has been emailed and is available to download."
+            : "You completed the whole course! Your course certificate is ready to download.");
+        } else if (data.certificate) {
           setNotice(data.certificateEmailSent
             ? "You completed this module. Your certificate is ready and has been emailed."
             : "You completed this module. Your certificate is ready to download.");
@@ -2987,7 +3428,11 @@ function StudentLearning() {
           }
         }
         await loadStudentData();
-        if (data.certificate) {
+        if (data.courseCertificate) {
+          setNotice(data.courseCertificateEmailSent
+            ? "You completed the whole course! Your course certificate has been emailed and is available to download."
+            : "You completed the whole course! Your course certificate is ready to download.");
+        } else if (data.certificate) {
           setNotice(data.certificateEmailSent
             ? "You completed this module. Your certificate is ready and has been emailed."
             : "You completed this module. Your certificate is ready to download.");
@@ -3409,6 +3854,35 @@ function StudentLearning() {
         </header>
         {error && <p className="learning-alert learning-alert-error" role="alert">{error}</p>}
         {notice && <p className="learning-alert learning-alert-success" role="status">{notice}</p>}
+        {courseSummary && (
+          <section className="learning-panel learning-course-certificate">
+            <div>
+              <h2>Course certificate</h2>
+              {courseSummary.certificate ? (
+                <p>
+                  Completed {new Date(courseSummary.certificate.earnedAt).toLocaleDateString("en-IN", { dateStyle: "medium" })} —
+                  your certificate has been emailed and is available below.
+                </p>
+              ) : courseSummary.remaining?.length ? (
+                <p>
+                  Complete {courseSummary.remaining.length} more required
+                  module{courseSummary.remaining.length === 1 ? "" : "s"} ({courseSummary.remaining.map((item) => item.title).join(", ")}) to earn the course certificate.
+                </p>
+              ) : (
+                <p>All required modules completed. Your certificate will be issued shortly.</p>
+              )}
+            </div>
+            {courseSummary.certificate && (
+              <button
+                className="learning-button"
+                onClick={() => downloadCertificate(courseSummary.certificate)}
+                type="button"
+              >
+                <Download size={15} /> Download course certificate
+              </button>
+            )}
+          </section>
+        )}
         <div className="learning-module-cards">
           {selectedProgram.modules.map((module, index) => (
             <article className="learning-panel learning-module-card" key={module._id}>
@@ -3428,6 +3902,9 @@ function StudentLearning() {
                     ? "Completed"
                     : `${module.progress.completedTopics || 0} topics completed`}
                 </span>
+                {module.requiredForCompletion === false && (
+                  <span className="learning-module-optional">Optional</span>
+                )}
               </div>
               <div className="learning-module-card-actions">
                 {module.hasAccess ? (

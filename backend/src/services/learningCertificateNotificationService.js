@@ -50,26 +50,31 @@ export async function dispatchLearningCertificateEmail(certificateId) {
 
   let delivery;
   try {
+    const isCourse = claimed.kind === "COURSE" || !claimed.moduleId;
     const [student, program, module] = await Promise.all([
       User.findById(claimed.userId).select("name email").lean(),
       LearningProgram.findById(claimed.programId).select("title").lean(),
-      LearningModule.findById(claimed.moduleId).select("title").lean(),
+      isCourse
+        ? Promise.resolve(null)
+        : LearningModule.findById(claimed.moduleId).select("title").lean(),
     ]);
-    if (!student?.email || !module?.title) {
-      throw new Error("The certificate recipient or module details are unavailable.");
+    if (!student?.email || !program?.title) {
+      throw new Error("The certificate recipient or course details are unavailable.");
     }
     const certificatePdf = await createCertificatePdfBuffer({
-      challengeType: "LEARNING_MODULE",
+      challengeType: isCourse ? "LEARNING_COURSE" : "LEARNING_MODULE",
       participantName: student.name || student.email,
-      challengeName: module.title,
+      challengeName: isCourse ? program.title : module?.title || program.title,
       certificateCode: claimed.code,
       completedAt: claimed.earnedAt,
     });
     delivery = await sendChallengeCompletionEmail({
       email: student.email,
       userName: student.name,
-      challengeName: `${program?.title ? `${program.title}: ` : ""}${module.title}`,
-      challengeType: "LEARNING_MODULE",
+      challengeName: isCourse
+        ? `${program.title} (full course)`
+        : `${program.title}: ${module?.title || ""}`.trim(),
+      challengeType: isCourse ? "LEARNING_COURSE" : "LEARNING_MODULE",
       certificatePdf,
       certificateFilename: `CodeClash-Learning-${claimed.code}.pdf`,
     });

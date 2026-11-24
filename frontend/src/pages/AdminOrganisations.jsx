@@ -6,6 +6,7 @@ import {
   CalendarClock,
   Send,
   CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
@@ -22,6 +23,7 @@ export default function AdminOrganisations() {
   const [organizationName, setOrganizationName] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [activeTab, setActiveTab] = useState("generate");
+  const [cancelingId, setCancelingId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,7 +61,7 @@ export default function AdminOrganisations() {
         email: email.trim(),
         organizationName: organizationName.trim(),
         expiresAt: expiresAt
-          ? new Date(`${expiresAt}:00+05:30`).toISOString()
+          ? new Date(`${expiresAt}T23:59:59+05:30`).toISOString()
           : null,
       });
       setNotice(data.message || "License generated and emailed.");
@@ -75,6 +77,25 @@ export default function AdminOrganisations() {
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleCancelLicense = async (licenseId) => {
+    setError("");
+    setNotice("");
+    setCancelingId(licenseId);
+    try {
+      const { data } = await api.post(`/licenses/${licenseId}/cancel`);
+      setNotice(data.message || "License cancelled.");
+      await load();
+    } catch (cancelError) {
+      setError(
+        cancelError.response?.data?.error ||
+          cancelError.message ||
+          "Could not cancel the license.",
+      );
+    } finally {
+      setCancelingId(null);
     }
   };
 
@@ -204,6 +225,7 @@ export default function AdminOrganisations() {
                     <th>Email</th>
                     <th>License expiry</th>
                     <th>Days remaining</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -234,6 +256,27 @@ export default function AdminOrganisations() {
                             {remaining} day{remaining === 1 ? "" : "s"}
                           </span>
                         </td>
+                        <td>
+                          {organization.license?.id &&
+                          organization.license?.status === "ACTIVE" &&
+                          remaining > 0 ? (
+                            <button
+                              type="button"
+                              className="btn-secondary admin-org-cancel"
+                              disabled={
+                                cancelingId === organization.license.id
+                              }
+                              onClick={() =>
+                                handleCancelLicense(organization.license.id)
+                              }
+                            >
+                              <XCircle size={14} />{" "}
+                              {cancelingId === organization.license.id
+                                ? "Cancelling…"
+                                : "Cancel"}
+                            </button>
+                          ) : null}
+                        </td>
                       </tr>
                     );
                   })}
@@ -261,13 +304,22 @@ export default function AdminOrganisations() {
                     <th>Expires</th>
                     <th>Days remaining</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {licenses.map((license) => {
                     const remaining = license.remainingDays ?? 0;
+                    const licenseId = license.id || license._id;
                     return (
-                      <tr key={license.id || license._id}>
+                      <tr
+                        key={licenseId}
+                        className={
+                          license.status === "REVOKED"
+                            ? "admin-org-license-revoked"
+                            : ""
+                        }
+                      >
                         <td className="admin-org-key">
                           {String(license.licenseKey || "").replace(
                             /(\d{4})(?=\d)/g,
@@ -296,11 +348,34 @@ export default function AdminOrganisations() {
                             <span className="admin-org-status admin-org-status-used">
                               <CheckCircle2 size={13} /> Used
                             </span>
+                          ) : license.status === "REVOKED" ? (
+                            <span className="admin-org-status admin-org-status-revoked">
+                              <XCircle size={13} /> Cancelled
+                            </span>
+                          ) : remaining <= 0 ? (
+                            <span className="admin-org-status">
+                              Expired
+                            </span>
                           ) : (
                             <span className="admin-org-status">
                               {license.status}
                             </span>
                           )}
+                        </td>
+                        <td>
+                          {license.status === "ACTIVE" && remaining > 0 ? (
+                            <button
+                              type="button"
+                              className="btn-secondary admin-org-cancel"
+                              disabled={cancelingId === licenseId}
+                              onClick={() => handleCancelLicense(licenseId)}
+                            >
+                              <XCircle size={14} />{" "}
+                              {cancelingId === licenseId
+                                ? "Cancelling…"
+                                : "Cancel"}
+                            </button>
+                          ) : null}
                         </td>
                       </tr>
                     );

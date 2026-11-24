@@ -3,6 +3,7 @@ import License from "../models/License.js";
 import User from "../models/User.js";
 import { sanitizeEmail } from "../services/emailDispatchService.js";
 import { getResendClient } from "../services/resendClient.js";
+import { checkLicenseExpiry } from "../services/licenseExpiryService.js";
 
 function generateLicenseKey() {
   // 16-digit license key: L-XXXX-XXXX-XXXX-XXXX
@@ -205,6 +206,39 @@ export async function generateLicense(req, res) {
 }
 
 /**
+ * POST /api/licenses/:id/cancel
+ * Super admin only — cancel (revoke) an active, unused license.
+ */
+export async function cancelLicense(req, res) {
+  if (!requireSuperAdmin(req, res)) return;
+  try {
+    const license = await License.findById(req.params.id);
+    if (!license) {
+      return res.status(404).json({ error: "License not found." });
+    }
+    if (license.status === "USED") {
+      return res
+        .status(409)
+        .json({ error: "This license has already been redeemed and cannot be cancelled." });
+    }
+    if (license.status === "REVOKED") {
+      return res
+        .status(409)
+        .json({ error: "This license has already been cancelled." });
+    }
+    license.status = "REVOKED";
+    await license.save();
+    return res.status(200).json({
+      message: `License for ${license.email} has been cancelled.`,
+      license: license.toPublicJSON(),
+    });
+  } catch (error) {
+    console.error("[LicenseController] cancel failed:", error.message);
+    return res.status(500).json({ error: "Could not cancel the license." });
+  }
+}
+
+/**
  * GET /api/licenses/validate?key=XXXX — public check used by the register form.
  */
 export async function validateLicenseKey(req, res) {
@@ -297,11 +331,12 @@ export async function redeemLicenseForKey(key, userId) {
   return license;
 }
 
-export { generateLicenseKey };
+export { generateLicenseKey, checkLicenseExpiry };
 export default {
   listLicenses,
   listOrganizations,
   generateLicense,
+  cancelLicense,
   validateLicenseKey,
   redeemLicenseForKey,
 };

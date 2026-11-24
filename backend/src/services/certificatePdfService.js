@@ -28,6 +28,7 @@ function drawCertificate(document, input) {
   const certificate = normalizedCertificateData(input);
   const dailyChallenge = certificate.challengeType === "DAILY_CHALLENGE";
   const learningModule = certificate.challengeType === "LEARNING_MODULE";
+  const learningCourse = certificate.challengeType === "LEARNING_COURSE";
   const width = document.page.width;
   const height = document.page.height;
   const gradient = document.linearGradient(0, 0, width, height);
@@ -65,9 +66,11 @@ function drawCertificate(document, input) {
     .text(
       dailyChallenge
         ? "DAILY CHALLENGE CERTIFICATE"
-        : learningModule
-          ? "LEARNING MODULE CERTIFICATE"
-          : "CERTIFICATE OF EXCELLENCE",
+        : learningCourse
+          ? "COURSE COMPLETION CERTIFICATE"
+          : learningModule
+            ? "LEARNING MODULE CERTIFICATE"
+            : "CERTIFICATE OF EXCELLENCE",
       81,
       104.25,
       { characterSpacing: 1.5, lineBreak: false },

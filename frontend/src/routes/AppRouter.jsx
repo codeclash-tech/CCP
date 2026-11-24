@@ -38,6 +38,7 @@ const About = lazy(() => import("../pages/About"));
 const Terms = lazy(() => import("../pages/Terms"));
 const PublicLanding = lazy(() => import("../pages/PublicLanding"));
 const Challenges = lazy(() => import("../pages/Challenges"));
+const StrictAssessment = lazy(() => import("../pages/StrictAssessment"));
 const MyChallenges = lazy(() => import("../pages/MyChallenges"));
 const Organisation = lazy(() => import("../pages/Organisation"));
 const AdminOrganisations = lazy(() => import("../pages/AdminOrganisations"));
@@ -328,6 +329,19 @@ export default function AppRouter() {
             element={
               <ProtectedLayout>
                 <Challenges />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/strict-assessment/:moduleId"
+            element={
+              <ProtectedLayout
+                allowedRoles={[
+                  ASSESSMENT_ROLES.CANDIDATE,
+                  ASSESSMENT_ROLES.ORGANIZATION_USER,
+                ]}
+              >
+                <StrictAssessment />
               </ProtectedLayout>
             }
           />

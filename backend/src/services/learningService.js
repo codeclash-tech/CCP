@@ -15,6 +15,7 @@ import config from "../config/env.js";
 import { executionService } from "./executionService.js";
 import { AiProviderError, createTutorProvider } from "./learningAiProvider.js";
 import { dispatchLearningCertificateEmail } from "./learningCertificateNotificationService.js";
+import { updateCourseCertificateProgress } from "./courseCertificationService.js";
 import {
   createRazorpayOrder,
   getRazorpayKeyId,
@@ -768,10 +769,20 @@ async function getEntitledModuleForStudent(userId, moduleId) {
     _id: moduleId,
     status: "PUBLISHED",
     deletedAt: null,
-  }).select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites evaluationMode price");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
-  await requireModulePurchase(userId, currentModule);
+  if (
+    (currentModule.evaluationMode || "SELF_EVALUATION") === "STRICT_EVALUATION"
+  ) {
+    // Strict modules are free assessments; they never require or grant
+    // paid entitlements.
+    if (Number(currentModule.price || 0) !== 0) {
+      throw requestError("This module is not available for purchase.", 403);
+    }
+  } else {
+    await requireModulePurchase(userId, currentModule);
+  }
   const progress = await loadProgress(userId, currentModule);
   const module = await getModuleVersion(
     currentModule,
@@ -872,6 +883,8 @@ async function saveModuleEdit(module, revision) {
   }
   if (module.status === "PUBLISHED") {
     validateModuleCompletionConfiguration(module);
+    validateEvaluationModeConfiguration(module);
+    assertStrictModuleIsFree(module);
   }
   if (revision.wasPublished)
     module.currentPublishedVersion = revision.version + 1;
@@ -2761,8 +2774,10 @@ async function requireModulePrerequisites(userId, module) {
 export async function listLearningPrograms(userId, pageInput, limitInput) {
   const page = normalizePage(pageInput, 1);
   const limit = Math.min(MAX_PAGE_SIZE, normalizePage(limitInput, 20));
+  // Thrive catalogue: published SELF_EVALUATION modules only.
   const publishedModuleProgramIds = await LearningModule.distinct("programId", {
     deletedAt: null,
+    evaluationMode: "SELF_EVALUATION",
     $or: [{ status: "PUBLISHED" }, { status: { $exists: false } }],
   });
   if (!publishedModuleProgramIds.length)
@@ -2786,10 +2801,11 @@ export async function listLearningPrograms(userId, pageInput, limitInput) {
   const modules = await LearningModule.find({
     programId: { $in: programIds },
     deletedAt: null,
+    evaluationMode: "SELF_EVALUATION",
     $or: [{ status: "PUBLISHED" }, { status: { $exists: false } }],
   })
     .select(
-      "programId title description price currency difficulty sequence estimatedDurationMinutes accessDurationDays prerequisites status",
+      "programId title description price currency difficulty sequence estimatedDurationMinutes accessDurationDays prerequisites requiredForCompletion status evaluationMode",
     )
     .sort({ programId: 1, sequence: 1 })
     .lean();
@@ -3035,6 +3051,8 @@ export async function updateLearningProgram(userId, programId, input) {
         );
       }
       modules.forEach(validateModuleCompletionConfiguration);
+      modules.forEach(validateEvaluationModeConfiguration);
+      modules.forEach(assertStrictModuleIsFree);
       for (const module of modules) {
         if (module.status === "PUBLISHED" && module.currentPublishedVersion)
           continue;
@@ -3106,6 +3124,98 @@ function normalizeAccessDurationDays(value) {
   return days;
 }
 
+function normalizeEvaluationMode(value) {
+  const mode = String(value || "SELF_EVALUATION").trim().toUpperCase();
+  if (!["SELF_EVALUATION", "STRICT_EVALUATION"].includes(mode)) {
+    throw requestError(
+      "Module evaluation mode must be SELF_EVALUATION or STRICT_EVALUATION.",
+    );
+  }
+  return mode;
+}
+
+function normalizeScheduleDate(value, label) {
+  if (value === undefined || value === null || value === "") return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    throw requestError(`${label} must be a valid date.`);
+  }
+  return date;
+}
+
+/**
+ * Publishing-time validation for evaluation-mode configuration.
+ * No AI calls: this validates required fields, objective coverage and
+ * blueprint configuration only.
+ */
+function validateEvaluationModeConfiguration(module) {
+  const mode = module.evaluationMode || "SELF_EVALUATION";
+  const topics = (module.topics || []).filter((topic) =>
+    String(topic.title || "").trim(),
+  );
+  for (const topic of topics) {
+    const contentType = topic.contentType === "MCQS" ? "MCQS" : "CONCEPTS";
+    if (contentType === "CONCEPTS" && mode === "SELF_EVALUATION") {
+      // Self concepts rely on objectives; reference content lives in the
+      // topic explanation/coreKnowledge which publishing already validates.
+      continue;
+    }
+    if (contentType === "MCQS" && mode === "SELF_EVALUATION") {
+      if (
+        !topic.selfMcqConfig ||
+        !Number.isInteger(Number(topic.selfMcqConfig.questionsPerSession)) ||
+        Number(topic.selfMcqConfig.questionsPerSession) < 1 ||
+        !(topic.objectives || []).length
+      ) {
+        throw requestError(
+          `Self Evaluation MCQ topic "${topic.title}" needs question coverage and at least one learning objective.`,
+        );
+      }
+      continue;
+    }
+    if (contentType === "CONCEPTS" && mode === "STRICT_EVALUATION") {
+      if (
+        !topic.strictConceptConfig ||
+        !Number.isInteger(Number(topic.strictConceptConfig.questionCount)) ||
+        Number(topic.strictConceptConfig.questionCount) < 1 ||
+        !(topic.strictConceptConfig.evaluationCriteria || []).length ||
+        !String(topic.strictConceptConfig.levelClassificationCriteria || "").trim()
+      ) {
+        throw requestError(
+          `Strict Evaluation concepts topic "${topic.title}" needs expected knowledge indicators, evaluation criteria, level classification criteria and a question count.`,
+        );
+      }
+      continue;
+    }
+    // STRICT MCQ
+    if (
+      !topic.strictMcqConfig ||
+      !Number.isInteger(Number(topic.strictMcqConfig.questionCount)) ||
+      Number(topic.strictMcqConfig.questionCount) < 1 ||
+      !(topic.objectives || []).length
+    ) {
+      throw requestError(
+        `Strict Evaluation MCQ topic "${topic.title}" needs a question count and at least one learning objective.`,
+      );
+    }
+  }
+  if (mode === "SELF_EVALUATION" && Number(module.price || 0) < 0) {
+    throw requestError("Self Evaluation module price cannot be negative.");
+  }
+}
+
+/** Strict Evaluation modules must never be individually purchasable. */
+function assertStrictModuleIsFree(module) {
+  if (
+    (module.evaluationMode || "SELF_EVALUATION") === "STRICT_EVALUATION" &&
+    Number(module.price || 0) !== 0
+  ) {
+    throw requestError(
+      `Strict Evaluation module "${module.title}" must be free. Set its price to 0.`,
+    );
+  }
+}
+
 export async function createLearningModule(programId, input) {
   for (const [field, label, maxLength] of [
     ["title", "Module name", 160],
@@ -3128,9 +3238,13 @@ export async function createLearningModule(programId, input) {
     input.prerequisites || [],
   );
   validateAiConfiguration(input.aiConfiguration);
+  const evaluationMode = normalizeEvaluationMode(input.evaluationMode);
   const accessDurationDays = normalizeAccessDurationDays(
     input.accessDurationDays,
   );
+  if (evaluationMode === "STRICT_EVALUATION" && input.requiredForCompletion === undefined) {
+    // Strict modules default to NOT blocking certification; the admin opts in.
+  }
   const lastModule = await LearningModule.findOne({
     programId,
     deletedAt: null,
@@ -3147,9 +3261,14 @@ export async function createLearningModule(programId, input) {
     ),
     description: input.description,
     objectives: input.objectives,
-    price: input.price,
+    price: evaluationMode === "STRICT_EVALUATION" ? 0 : input.price,
     currency: input.currency,
-    accessDurationDays,
+    evaluationMode,
+    requiredForCompletion: input.requiredForCompletion !== false,
+    scheduleStartAt: normalizeScheduleDate(input.scheduleStartAt, "Module schedule start"),
+    scheduleEndAt: normalizeScheduleDate(input.scheduleEndAt, "Module schedule end"),
+    accessDurationDays:
+      evaluationMode === "STRICT_EVALUATION" ? null : accessDurationDays,
     difficulty: input.difficulty,
     sequence:
       Number.isInteger(requestedSequence) && requestedSequence > 0
@@ -3171,6 +3290,7 @@ export async function createLearningModule(programId, input) {
     currentPublishedVersion: 0,
   });
   await module.save();
+  assertStrictModuleIsFree(module);
   return module;
 }
 
@@ -3204,14 +3324,36 @@ export async function updateLearningModule(moduleId, input) {
     "topics",
     "assessment",
     "completionRequirements",
+    "requiredForCompletion",
+    "scheduleStartAt",
+    "scheduleEndAt",
   ];
   for (const field of fields) {
     if (input[field] !== undefined) {
       module[field] =
         field === "accessDurationDays"
           ? normalizeAccessDurationDays(input[field])
-          : input[field];
+          : field === "scheduleStartAt"
+            ? normalizeScheduleDate(input[field], "Module schedule start")
+            : field === "scheduleEndAt"
+              ? normalizeScheduleDate(input[field], "Module schedule end")
+              : input[field];
     }
+  }
+  if (input.evaluationMode !== undefined) {
+    const requestedMode = normalizeEvaluationMode(input.evaluationMode);
+    const hasActivePurchases = await LearningPurchase.exists({
+      moduleId: module._id,
+      status: { $in: ["PENDING", "ACTIVE"] },
+    });
+    if (hasActivePurchases && requestedMode !== module.evaluationMode) {
+      throw requestError(
+        "The evaluation mode cannot change while students hold active purchases for this module.",
+        409,
+      );
+    }
+    module.evaluationMode = requestedMode;
+    if (requestedMode === "STRICT_EVALUATION") module.price = 0;
   }
   if (input.prerequisites !== undefined) {
     module.prerequisites = await validatePrerequisites(
@@ -3263,6 +3405,8 @@ export async function setLearningModuleStatus(moduleId, status) {
     !module.currentPublishedVersion
   ) {
     validateModuleCompletionConfiguration(module);
+    validateEvaluationModeConfiguration(module);
+    assertStrictModuleIsFree(module);
     module.currentPublishedVersion = 1;
     await module.save();
     await savePublishedModuleVersion(module);
@@ -3271,6 +3415,8 @@ export async function setLearningModuleStatus(moduleId, status) {
   if (module.status !== status) {
     if (status === "PUBLISHED") {
       validateModuleCompletionConfiguration(module);
+      validateEvaluationModeConfiguration(module);
+      assertStrictModuleIsFree(module);
       module.currentPublishedVersion = Math.max(
         1,
         Number(module.currentPublishedVersion) + 1 || 1,
@@ -3344,9 +3490,14 @@ export async function createLearningPurchase(userId, input) {
     status: "PUBLISHED",
     deletedAt: null,
   }).select(
-    "programId title price currency currentPublishedVersion accessDurationDays",
+    "programId title price currency currentPublishedVersion accessDurationDays evaluationMode",
   );
   if (!module) throw requestError("Published module not found.", 404);
+  if ((module.evaluationMode || "SELF_EVALUATION") === "STRICT_EVALUATION") {
+    throw requestError(
+      "Strict Evaluation modules are free assessments and cannot be purchased.",
+    );
+  }
   const program = await LearningProgram.findOne({
     _id: module.programId,
     status: "PUBLISHED",
@@ -3649,10 +3800,18 @@ export async function getStudentModule(userId, programId, moduleId) {
     programId,
     status: "PUBLISHED",
     deletedAt: null,
-  }).select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites evaluationMode price");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
-  await requireModulePurchase(userId, currentModule);
+  if (
+    (currentModule.evaluationMode || "SELF_EVALUATION") === "STRICT_EVALUATION"
+  ) {
+    if (Number(currentModule.price || 0) !== 0) {
+      throw requestError("This module is not available for purchase.", 403);
+    }
+  } else {
+    await requireModulePurchase(userId, currentModule);
+  }
   const progress = await loadProgress(userId, currentModule);
   const module = await getModuleVersion(
     currentModule,
@@ -3685,10 +3844,18 @@ export async function getStudentTopic(userId, programId, moduleId, topicId) {
     programId,
     status: "PUBLISHED",
     deletedAt: null,
-  }).select("_id programId currentPublishedVersion prerequisites");
+  }).select("_id programId currentPublishedVersion prerequisites evaluationMode price");
   if (!currentModule) throw requestError("Learning module not found.", 404);
   await requirePublishedProgram(currentModule.programId);
-  await requireModulePurchase(userId, currentModule);
+  if (
+    (currentModule.evaluationMode || "SELF_EVALUATION") === "STRICT_EVALUATION"
+  ) {
+    if (Number(currentModule.price || 0) !== 0) {
+      throw requestError("This module is not available for purchase.", 403);
+    }
+  } else {
+    await requireModulePurchase(userId, currentModule);
+  }
   const progress = await loadProgress(userId, currentModule);
   const module = await getModuleVersion(
     currentModule,
@@ -4097,7 +4264,31 @@ async function updateProgressAndCertificate(userId, module, progress) {
   const certificateEmailSent = certificate
     ? await dispatchLearningCertificateEmail(certificate._id)
     : false;
-  return { progress, certificate, certificateEmailSent };
+  // Course-level certification: when a required module completes, check
+  // whether the whole course is complete and issue the course certificate.
+  const courseCertificate = await updateCourseCertificateProgress(
+    userId,
+    module._id,
+  ).catch((error) => {
+    console.error(
+      "[LearningService] Course certificate check failed:",
+      error.message,
+    );
+    return null;
+  });
+  let courseCertificateEmailSent = false;
+  if (courseCertificate) {
+    courseCertificateEmailSent = await dispatchLearningCertificateEmail(
+      courseCertificate._id,
+    ).catch(() => false);
+  }
+  return {
+    progress,
+    certificate,
+    certificateEmailSent,
+    courseCertificate,
+    courseCertificateEmailSent,
+  };
 }
 
 export async function completeLearningTopic(userId, moduleId, topicId) {
@@ -5038,6 +5229,8 @@ async function submitLearningExerciseOnce(
     ),
     certificate: completion.certificate,
     certificateEmailSent: completion.certificateEmailSent,
+    courseCertificate: completion.courseCertificate,
+    courseCertificateEmailSent: completion.courseCertificateEmailSent,
   };
 }
 

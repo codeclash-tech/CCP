@@ -36,6 +36,11 @@ router.post(
 );
 router.get("/me", ...student, asyncRoute(learningController.getDashboard));
 router.get(
+  "/certification/:programId/summary",
+  ...student,
+  asyncRoute(learningController.getCertificationSummary),
+);
+router.get(
   "/certificates/:certificateId/pdf",
   ...student,
   asyncRoute(learningController.downloadLearningCertificate),

@@ -100,3 +100,32 @@
 .admin-org-status-used {
   color: var(--color-success, #34d399);
 }
+
+.admin-org-status-revoked {
+  color: #f87171;
+}
+.admin-org-cancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: #f87171;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+  cursor: pointer;
+}
+
+.admin-org-cancel:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.16);
+}
+
+.admin-org-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-org-license-revoked td {
+  opacity: 0.55;
+}

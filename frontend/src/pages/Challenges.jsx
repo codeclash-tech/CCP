@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LockKeyhole, Trophy, Swords, ArrowRight, Timer } from "lucide-react";
+import {
+  LockKeyhole,
+  Trophy,
+  Swords,
+  ArrowRight,
+  Timer,
+  ClipboardCheck,
+} from "lucide-react";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
 import "./Challenges.css";
@@ -9,15 +16,17 @@ export default function Challenges() {
   const navigate = useNavigate();
   const [daily, setDaily] = useState(null);
   const [activeRooms, setActiveRooms] = useState([]);
+  const [strictAssessments, setStrictAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [dailyResult, roomsResult] = await Promise.allSettled([
+      const [dailyResult, roomsResult, strictResult] = await Promise.allSettled([
         api.get("/weekly-assessments/current"),
         api.get("/battle-rooms/joined-rooms"),
+        api.get("/learning-strict/assessments"),
       ]);
       if (
         dailyResult.status === "fulfilled" &&
@@ -39,6 +48,9 @@ export default function Challenges() {
             );
           }),
         );
+      }
+      if (strictResult.status === "fulfilled") {
+        setStrictAssessments(strictResult.value.data.assessments || []);
       }
       setError("");
     } catch (loadError) {
@@ -132,6 +144,53 @@ export default function Challenges() {
             Today&apos;s CodeClash Challenge has not started yet. Check back
             when the next challenge opens.
           </p>
+        </section>
+      )}
+
+      {strictAssessments.length > 0 && (
+        <section className="challenges-strict">
+          <h2>Strict evaluations</h2>
+          <p className="challenges-battles-empty">
+            Free assessments published by administrators. Complete them to
+            receive an individual knowledge report — no payment required.
+          </p>
+          <div className="challenges-battle-grid">
+            {strictAssessments.map((assessment) => (
+              <article
+                key={assessment.id}
+                className="challenges-battle-card challenges-strict-card"
+              >
+                <div className="challenges-battle-head">
+                  <ClipboardCheck size={17} aria-hidden="true" />
+                  <strong>{assessment.title}</strong>
+                </div>
+                <p className="challenges-battle-meta">
+                  {assessment.courseTitle ? `${assessment.courseTitle} · ` : ""}
+                  Strict Evaluation · Free
+                </p>
+                {assessment.scheduleEndAt && (
+                  <p className="challenges-battle-meta">
+                    <Timer size={13} aria-hidden="true" /> Closes{" "}
+                    {new Date(assessment.scheduleEndAt).toLocaleDateString(
+                      "en-IN",
+                      { dateStyle: "medium" },
+                    )}
+                  </p>
+                )}
+                <div className="challenges-battle-join">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() =>
+                      navigate(`/strict-assessment/${assessment.id}`)
+                    }
+                  >
+                    Start assessment <ArrowRight size={15} />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
         </section>
       )}
 

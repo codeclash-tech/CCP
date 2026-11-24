@@ -1,4 +1,5 @@
 import LearningCertificate from "../models/LearningCertificate.js";
+import { getCourseCertificationSummary } from "../services/courseCertificationService.js";
 import { streamCertificatePdf } from "../services/certificatePdfService.js";
 import {
   askLearningTutor,
@@ -208,6 +209,14 @@ export async function getDashboard(req, res) {
   );
 }
 
+export async function getCertificationSummary(req, res) {
+  const summary = await getCourseCertificationSummary(
+    req.userId,
+    req.params.programId,
+  );
+  return res.json(summary);
+}
+
 export async function downloadLearningCertificate(req, res) {
   const certificate = await LearningCertificate.findOne({
     _id: req.params.certificateId,
@@ -221,11 +230,14 @@ export async function downloadLearningCertificate(req, res) {
     error.statusCode = 404;
     throw error;
   }
+  const isCourse = certificate.kind === "COURSE" || !certificate.moduleId;
   streamCertificatePdf(
     {
       participantName: certificate.userId.name,
-      challengeName: certificate.moduleId.title,
-      challengeType: "LEARNING_MODULE",
+      challengeName: isCourse
+        ? certificate.programId.title
+        : certificate.moduleId.title,
+      challengeType: isCourse ? "LEARNING_COURSE" : "LEARNING_MODULE",
       score: 100,
       completedAt: certificate.earnedAt,
       certificateCode: certificate.code,

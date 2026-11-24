@@ -26,7 +26,9 @@ import weeklyAssessmentRoutes from "./routes/weeklyAssessmentRoutes.js";
 import assessmentIntegrityRoutes from "./routes/assessmentIntegrityRoutes.js";
 import learningRoutes from "./routes/learningRoutes.js";
 import licenseRoutes from "./routes/licenseRoutes.js";
+import learningStrictRoutes from "./routes/learningStrictRoutes.js";
 import { initializeEligibilityHistory } from "./services/weeklyAssessmentService.js";
+import { checkLicenseExpiry } from "./services/licenseExpiryService.js";
 
 const app = express();
 app.set("trust proxy", 1);
@@ -83,6 +85,7 @@ app.use("/api/platform", platformRoutes);
 app.use("/api/weekly-assessments", weeklyAssessmentRoutes);
 app.use("/api/assessment-integrity", assessmentIntegrityRoutes);
 app.use("/api/learning", learningRoutes);
+app.use("/api/learning-strict", learningStrictRoutes);
 app.use("/api/licenses", licenseRoutes);
 
 // 404 handler
@@ -107,6 +110,16 @@ export async function start() {
   await initializeSuperAdmin();
   await initializeEligibilityHistory();
   startCleanupJobs();
+  checkLicenseExpiry().catch((error) =>
+    console.error("[LicenseExpiry] initial check failed:", error.message),
+  );
+  setInterval(
+    () =>
+      checkLicenseExpiry().catch((error) =>
+        console.error("[LicenseExpiry] check failed:", error.message),
+      ),
+    60 * 60 * 1000,
+  );
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
