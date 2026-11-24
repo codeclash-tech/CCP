@@ -25,11 +25,14 @@ export function canAccessRoute(user, pathname) {
     return hasAnyAssessmentRole(user, [ASSESSMENT_ROLES.SUPER_ADMIN]);
   }
 
-  if (/^\/assessments\/edit(?:\/|$)/.test(pathname)) {
-    return hasAnyAssessmentRole(user, [
-      ASSESSMENT_ROLES.ORGANIZATION_USER,
-      ASSESSMENT_ROLES.SUPER_ADMIN,
-    ]);
+  // Primary-admin-only pages: create battles, my battles, organisation.
+  if (
+    /^\/organisation(?:\/|$)/.test(pathname) ||
+    /^\/my-battles(?:\/|$)/.test(pathname) ||
+    /^\/battle-room\/create/.test(pathname) ||
+    /^\/battle-room\/[^/]+\/edit/.test(pathname)
+  ) {
+    return hasAnyAssessmentRole(user, [ASSESSMENT_ROLES.ORGANIZATION_USER]);
   }
 
   return true;

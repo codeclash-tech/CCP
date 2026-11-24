@@ -25,6 +25,7 @@ import platformRoutes from "./routes/platformRoutes.js";
 import weeklyAssessmentRoutes from "./routes/weeklyAssessmentRoutes.js";
 import assessmentIntegrityRoutes from "./routes/assessmentIntegrityRoutes.js";
 import learningRoutes from "./routes/learningRoutes.js";
+import licenseRoutes from "./routes/licenseRoutes.js";
 import { initializeEligibilityHistory } from "./services/weeklyAssessmentService.js";
 
 const app = express();
@@ -82,6 +83,7 @@ app.use("/api/platform", platformRoutes);
 app.use("/api/weekly-assessments", weeklyAssessmentRoutes);
 app.use("/api/assessment-integrity", assessmentIntegrityRoutes);
 app.use("/api/learning", learningRoutes);
+app.use("/api/licenses", licenseRoutes);
 
 // 404 handler
 app.use((req, res) => {

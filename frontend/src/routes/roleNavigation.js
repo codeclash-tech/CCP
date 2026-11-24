@@ -1,10 +1,9 @@
 import {
-  BarChart3,
   BookOpen,
+  Building2,
   CalendarDays,
-  FileQuestion,
+  ClipboardList,
   LayoutDashboard,
-  LockKeyhole,
   Swords,
   UserRound,
 } from "lucide-react";
@@ -13,39 +12,30 @@ import { ASSESSMENT_ROLES } from "./roleAccess.js";
 export const ROLE_NAVIGATION = {
   [ASSESSMENT_ROLES.CANDIDATE]: [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
-    { path: "/battle-room", label: "Battle Rooms", icon: Swords },
-    { path: "/weekly-assessment", label: "Daily Challenge", icon: LockKeyhole },
-    { path: "/rankings", label: "Rankings", icon: BarChart3 },
-    { path: "/profile", label: "Profile", icon: UserRound },
+    { path: "/challenges", label: "Challenges", icon: CalendarDays },
     { path: "/learning", label: "Thrive", icon: BookOpen },
+    { path: "/my-challenges", label: "My Challenges", icon: ClipboardList },
   ],
   [ASSESSMENT_ROLES.ORGANIZATION_USER]: [
     { path: "/", label: "Dashboard", icon: LayoutDashboard },
-    { path: "/battle-room", label: "My Battle Rooms", icon: Swords },
-    { path: "/weekly-assessment", label: "Daily Challenge", icon: LockKeyhole },
-    { path: "/rankings", label: "Rankings", icon: BarChart3 },
-    { path: "/profile", label: "Profile", icon: UserRound },
+    { path: "/challenges", label: "Challenges", icon: CalendarDays },
     { path: "/learning", label: "Thrive", icon: BookOpen },
+    { path: "/my-challenges", label: "My Challenges", icon: ClipboardList },
+    { path: "/organisation", label: "Organisation", icon: Building2 },
   ],
   [ASSESSMENT_ROLES.SUPER_ADMIN]: [
     {
-      path: "/admin/weekly-assessment",
-      label: "Global Challenge",
+      path: "/admin",
+      label: "Today Challenge",
       icon: CalendarDays,
     },
-    {
-      path: "/admin/questions",
-      label: "Questions",
-      icon: FileQuestion,
-    },
-    { path: "/admin/rankings", label: "Global Rankings", icon: BarChart3 },
-    { path: "/profile", label: "Profile", icon: UserRound },
+    { path: "/admin/organisations", label: "Organisations", icon: Building2 },
     { path: "/admin/learning", label: "Thrive", icon: BookOpen },
   ],
 };
 
 export const ROLE_LABELS = {
   [ASSESSMENT_ROLES.CANDIDATE]: "Participant",
-  [ASSESSMENT_ROLES.ORGANIZATION_USER]: "Organization User",
-  [ASSESSMENT_ROLES.SUPER_ADMIN]: "Administrator",
+  [ASSESSMENT_ROLES.ORGANIZATION_USER]: "Primary Admin",
+  [ASSESSMENT_ROLES.SUPER_ADMIN]: "Super Admin",
 };

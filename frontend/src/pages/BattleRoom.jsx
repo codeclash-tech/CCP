@@ -331,7 +331,7 @@ export default function BattleRoom() {
           <p className="battle-room-hero-eyebrow">CODECLASH BATTLES</p>
           <h1>
             <Swords size={25} aria-hidden="true" />
-            Battle Room
+            CodeClash Battle
           </h1>
           <p>
             Create a private coding battle, share its key, and put your problem

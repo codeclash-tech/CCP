@@ -1,0 +1,102 @@
+.admin-org-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px var(--page-gutter, 24px) 48px;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.admin-org-generate {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 460px;
+  padding: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+}
+
+.admin-org-generate h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.admin-org-generate p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-org-generate label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+}
+
+.admin-org-generate input {
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  outline: none;
+}
+
+.admin-org-generate input:focus {
+  border-color: var(--accent-blue-bright);
+}
+
+.admin-org-generate .btn-primary {
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-org-table-wrap {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  overflow: auto;
+}
+
+.admin-org-days {
+  padding: 3px 9px;
+  border-radius: 100px;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--color-success, #34d399);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.admin-org-days-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning, #f59e0b);
+}
+
+.admin-org-key {
+  font-family: var(--font-code, monospace);
+  letter-spacing: 1px;
+  font-weight: 600;
+  color: var(--color-warning, #facc15);
+  white-space: nowrap;
+}
+
+.admin-org-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.admin-org-status-used {
+  color: var(--color-success, #34d399);
+}

@@ -1,5 +1,7 @@
 import User from "../models/User.js";
 import Otp from "../models/Otp.js";
+import License from "../models/License.js";
+import { redeemLicenseForKey } from "../controllers/licenseController.js";
 import config from "../config/env.js";
 import { sendOtpEmail, sanitizeEmail } from "./emailDispatchService.js";
 
@@ -66,6 +68,8 @@ export async function requestOtp({
   password,
   termsAccepted,
   ip,
+  accountType = "STUDENT",
+  licenseKey = "",
 }) {
   if (termsAccepted !== true) {
     throw new Error("You must agree to the Terms and Conditions to register.");
@@ -73,6 +77,33 @@ export async function requestOtp({
 
   const cleanEmail = sanitizeEmail(email);
   if (!cleanEmail) throw new Error("Invalid email format.");
+
+  const cleanAccountType = String(accountType || "STUDENT").toUpperCase();
+  if (!["STUDENT", "ORGANISATION"].includes(cleanAccountType)) {
+    throw new Error("Choose whether you are registering as a student or an organisation.");
+  }
+
+  const normalizedLicenseKey = String(licenseKey || "").replace(/\D/g, "");
+  let license = null;
+  if (cleanAccountType === "ORGANISATION") {
+    if (normalizedLicenseKey.length !== 16) {
+      throw new Error("A valid 16-digit organisation license key is required.");
+    }
+    license = await License.findOne({ licenseKey: normalizedLicenseKey });
+    if (!license || license.status === "USED" || license.status === "REVOKED") {
+      throw new Error("This license key is not valid or has already been used.");
+    }
+    if (new Date(license.expiresAt).getTime() <= Date.now()) {
+      throw new Error("This license key has expired.");
+    }
+    if (license.email !== cleanEmail) {
+      throw new Error("This license was issued to a different email address.");
+    }
+    const existingLicenseUser = await User.findOne({ email: cleanEmail });
+    if (existingLicenseUser?.isVerified) {
+      throw new Error("Email is already registered. Sign in with your password.");
+    }
+  }
 
   const displayName = toSentenceCase(name);
   if (displayName.length < 2 || displayName.length > 100) {
@@ -98,9 +129,12 @@ export async function requestOtp({
     user = new User({
       email: cleanEmail,
       name: displayName,
-      organization: "Unspecified",
+      organization: cleanAccountType === "ORGANISATION"
+        ? license.organizationName
+        : "Unspecified",
       password, // hashed via pre-save hook
       role: "USER",
+      creatorType: cleanAccountType === "ORGANISATION" ? "ORGANIZATION" : "INDIVIDUAL",
       isVerified: false,
       termsAcceptedAt: new Date(),
       termsVersion: "2026-10-11",
@@ -112,6 +146,10 @@ export async function requestOtp({
     }
     user.termsAcceptedAt = new Date();
     user.termsVersion = "2026-10-11";
+    if (cleanAccountType === "ORGANISATION") {
+      user.creatorType = "ORGANIZATION";
+      user.organization = license.organizationName;
+    }
     await user.save();
     // A pending registration may request another code, but cannot replace
     // the password or profile details already attached to that account.
@@ -126,7 +164,9 @@ export async function requestOtp({
   const otpDoc = new Otp({
     codeHash,
     email: cleanEmail,
-    organization: "",
+    organization: cleanAccountType === "ORGANISATION"
+      ? normalizedLicenseKey
+      : "",
     purpose: "register",
     userId: user._id,
     attempts: 0,
@@ -279,6 +319,19 @@ export async function verifyOtp({ userId, otp }) {
   user.isVerified = true;
 
   await user.save();
+
+  // Redeem the organisation license if this account registered with one.
+  const pendingLicenseKey = String(otpDoc.organization || "").replace(/\D/g, "");
+  if (user.creatorType === "ORGANIZATION" && pendingLicenseKey.length === 16) {
+    try {
+      await redeemLicenseForKey(pendingLicenseKey, user._id);
+    } catch (redeemError) {
+      console.error(
+        `[AuthService] License redemption failed for ${user.email}: ${redeemError.message}`,
+      );
+    }
+  }
+
   return user;
 }
 

@@ -19,26 +19,26 @@ import { useAuth } from "../context/AuthContext";
 const cards = [
   {
     icon: PlusCircle,
-    title: "Create a Battle Room",
+    title: "Create a CodeClash Battle",
     text: "Add custom Java/DS questions, set time limits, and generate a secure battle key for participants or students.",
-    action: "Create Battle Room",
+    action: "Create Battle",
     to: "/battle-room/create",
-    badge: "For Hosts & Recruiters",
+    badge: "For Primary Admins",
   },
   {
     icon: KeyRound,
     title: "Join with Key",
-    text: "Received an invitation key? Enter your 6-character room code to start solving challenges in real time.",
+    text: "Received an invitation key? Enter your battle code to start solving challenges in real time.",
     action: "Enter Battle",
-    to: "/battle-room",
+    to: "/challenges",
     badge: "For Participants & Coders",
   },
   {
     icon: LockKeyhole,
-    title: "Daily Global Challenge",
+    title: "Today's CodeClash Challenge",
     text: "Solve today’s shared challenge. Individual scores and organization rankings start fresh every day.",
     action: "Attend today",
-    to: "/weekly-assessment",
+    to: "/challenges",
     badge: "New challenge every day",
   },
   {
@@ -89,12 +89,12 @@ export default function Home() {
               skills, and see how you stack up on the daily leaderboard.
             </p>
             <div className="desktop-daily-actions">
-              <Link className="desktop-daily-primary" to="/weekly-assessment">
+              <Link className="desktop-daily-primary" to="/challenges">
                 <LockKeyhole size={16} aria-hidden="true" />
                 Start today&apos;s challenge
               </Link>
-              <Link className="desktop-daily-secondary" to="/rankings">
-                View rankings
+              <Link className="desktop-daily-secondary" to="/my-challenges">
+                My challenges
               </Link>
             </div>
             <span className="desktop-daily-note">
@@ -116,7 +116,7 @@ export default function Home() {
             <Link className="desktop-dashboard-quick-link" to="/battle-room">
               <span className="desktop-dashboard-icon"><Swords size={20} /></span>
               <span>
-                <strong>Battle Rooms</strong>
+                <strong>Battles</strong>
                 <small>Join a private coding competition.</small>
               </span>
               <ArrowRight size={17} aria-hidden="true" />
@@ -124,16 +124,16 @@ export default function Home() {
             <Link className="desktop-dashboard-quick-link" to="/battle-room/create">
               <span className="desktop-dashboard-icon"><PlusCircle size={20} /></span>
               <span>
-                <strong>Create a Battle Room</strong>
+                <strong>Create a Battle</strong>
                 <small>Set up challenges and invite others.</small>
               </span>
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
-            <Link className="desktop-dashboard-quick-link" to="/rankings">
+            <Link className="desktop-dashboard-quick-link" to="/my-challenges">
               <span className="desktop-dashboard-icon"><Trophy size={20} /></span>
               <span>
-                <strong>Rankings</strong>
-                <small>Follow daily and live room standings.</small>
+                <strong>My Challenges</strong>
+                <small>See your attended challenges and leaderboards.</small>
               </span>
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
@@ -690,13 +690,13 @@ export default function Home() {
           <div className="home-actions">
             <Link to="/battle-room/create" className="home-btn primary">
               <PlusCircle size={16} />
-              Create a Room
+              Create a Battle
               <ArrowRight size={15} />
             </Link>
 
-            <Link to="/battle-room" className="home-btn secondary">
+            <Link to="/challenges" className="home-btn secondary">
               <KeyRound size={15} />
-              Join Room Key
+              Join with a Key
             </Link>
           </div>
 

@@ -1,667 +1,196 @@
-# Coding Challenge Platform
+# CodeClash — Coding Challenge & Learning Platform
 
-A high-security, scalable, LeetCode-style **Daily Assessment and College Leaderboard Platform** — codenamed **Amux CCP v2.0**. Built with React 19, Node.js/Express, MongoDB, and Monaco Editor.
-
----
-
-## Table of Contents
-
-1. [Overview & Purpose](#overview--purpose)
-2. [Key Features](#key-features)
-3. [Tech Stack](#tech-stack)
-4. [System Architecture](#system-architecture)
-5. [Security Architecture (Detailed)](#security-architecture-detailed)
-   - [Transport & Network Security](#1-transport--network-security)
-   - [Authentication & Session Security](#2-authentication--session-security)
-   - [Request Security & Anti-Replay](#3-request-security--anti-replay)
-   - [Input Validation & Sanitization](#4-input-validation--sanitization)
-   - [Authorization & RBAC](#5-authorization--rbac)
-   - [Proctoring Engine & Anti-Cheating](#6-proctoring-engine--anti-cheating)
-   - [Editor Analytics & Automation Detection](#7-editor-analytics--automation-detection)
-   - [Audit Logging & Monitoring](#8-audit-logging--monitoring)
-   - [Secure Error Handling](#9-secure-error-handling)
-   - [Database Security](#10-database-security)
-   - [Code Execution Security](#11-code-execution-security)
-   - [Data Cleanup & Retention](#12-data-cleanup--retention)
-6. [Scoring & Ranking System](#scoring--ranking-system)
-7. [API Reference](#api-reference)
-8. [Project Structure](#project-structure)
-9. [Prerequisites & Setup](#prerequisites--setup)
+CodeClash (an Amux product) is a secure coding assessment and adaptive-learning platform for colleges, bootcamps, and hiring teams. It combines **Battle Rooms** (private timed contests), a **Daily Global Challenge** (server-scheduled daily contest with organization rankings), an **Adaptive Learning Center** (AI-tutored, purchase-gated courses), certificates, and an admin/creator back office — all judged server-side on an isolated Java execution engine.
 
 ---
 
-## Related Documentation
+## How the Platform Works (End-to-End Flow)
 
-- [⚔️ Battle Room — Complete System Documentation](BattleRoom.md) — how Battle Rooms are created, how the judge engine works, the full room lifecycle (UPCOMING → ACTIVE → CLOSED), proctoring, scoring, leaderboard, and all `/api/battle-rooms` endpoints.
-
----
-
-## Overview & Purpose
-
-This platform is designed for **academic institutions and coding bootcamps** to run daily coding assessments with enterprise-grade integrity. It ensures fair competition through:
-
-- **Single-submission enforcement** — one attempt per challenge per user
-- **Server-authoritative contest windows** — challenges open for a fixed 24-hour window (6 PM to next day 6 PM)
-- **Hidden test cases** — challenges include both public (visible) and hidden test cases to prevent answer manipulation
-- **Real-time proctoring** — browser-level integrity monitoring with automatic disqualification
-- **Behavioral analytics** — aggregate typing metrics and mouse movement patterns to detect automation
-- **Fair college ranking** — Bayesian statistical ranking that adjusts for college population size
+1. **Account** — a user registers with name/email/password, verifies the email with a 6-digit OTP, and then signs in with the password. Sessions use short-lived access tokens rotated by refresh tokens; sign-out revokes the session.
+2. **Choose an activity** — join a Battle Room with a 6-character key, attend today's Daily Global Challenge, or open the Learning Center.
+3. **Solve** — code is written in a Monaco editor (web) or the Electron desktop app, and every submission is executed and judged on the server; client-reported results are never trusted.
+4. **Score & rank** — results feed per-question scores, room leaderboards, daily/organization rankings, and certificates.
+5. **Deliver results** — participants see verified results, leaderboards, and downloadable PDF certificates; creators/admins get reports (PDF/Excel) and result emails.
 
 ---
 
-## Key Features
+## Battle Rooms (Create → Join → Battle → Results)
 
-| Feature | Description |
-|---------|-------------|
-| **Daily Coding Challenges** | One challenge per day, 24-hour contest window, single-submission rule |
-| **Monaco Code Editor** | Full-featured IDE-grade editor with syntax highlighting, dark theme, bracket matching |
-| **Proctoring Engine** | Fullscreen enforcement, copy/paste lockdown, tab-switch detection, devtools blocking, auto-disqualification after 3 violations |
-| **Authentication** | Verified registration with password login; an email OTP is required only to complete registration |
-| **Bayesian College Leaderboard** | Fair ranking using Top-K Bayesian average adjusted for college population size |
-| **RBAC** | Admin role for challenge creation, User role for solving |
-| **Score Calculation** | Multi-factor formula: pass ratio, solve time, execution time, memory usage |
-| **Editor Analytics** | Aggregate behavioral metrics (NOT keystrokes) for automation/cheating detection |
-| **Suspicion Scoring** | Weighted multi-factor system (0-100) that flags suspicious submissions for review |
-| **LinkedIn Share Module** | One-click share with auto-generated score badge |
-| **Render Cold-Start Handler** | Terminal-style loader with dynamic status messages for server wakeup |
-| **Strategy Pattern Executor** | Pluggable code execution engine (local dev / remote sandbox) |
-| **Comprehensive Audit Logging** | Full audit trail for authentication, submissions, and administrative actions |
-| **Nonce Replay Protection** | Cryptographic one-time tokens preventing duplicate/replay attacks on submissions |
+### Creation (Creator side)
 
----
+1. A creator opens **Create Battle Room**, authors questions (title, description, difficulty, points, structured function signature, starter code, visible + hidden test cases) using the authoring wizard. Wizard helpers can auto-generate signatures, starter code, and expected outputs (reference solutions are executed server-side to compute outputs).
+2. The creator configures the schedule (fixed start/end window or manual start), time limit, max participants, candidate access (`OPEN` or `ALLOWLIST` by email), moderation action (`FLAG` or `DISQUALIFY`), leaderboard visibility, and reuse permission.
+3. Saving creates the room in `UPCOMING` status and generates a unique 6-character room key (e.g. `K7M2XQ`) which the creator shares with participants.
+4. Rooms remain editable only while `UPCOMING` and before anyone joins. A room can also be **reused** — cloning its questions into a fresh battle instance with new scheduling.
+5. If the room has no fixed schedule, the creator manually **starts** it: status flips to `ACTIVE`, the time window is computed from the time limit, and the creator is auto-joined as a participant (with their organization snapshotted).
 
-## Tech Stack
+### Joining (Participant side)
 
-| Layer | Technology | Version |
-|-------|-----------|---------|
-| **Frontend** | React | v19 |
-| **Build Tool** | Vite | Latest |
-| **Code Editor** | Monaco Editor | v0.45 |
-| **Routing** | React Router | v7 |
-| **Backend** | Node.js / Express | v18+/4.x |
-| **ODM** | Mongoose | Latest |
-| **Database** | MongoDB | v6+ (local or Atlas) |
-| **Authentication** | JWT password login + registration OTP via Resend | Access/refresh sessions |
-| **Scheduling** | node-cron + MongoDB TTL indexes | Daily rank recalibration; expiring OTPs are removed by TTL indexes |
-| **Security Headers** | Helmet | CSP, HSTS, X-Frame-Options |
-| **Rate Limiting** | express-rate-limit | Tiered: general, auth, submissions |
-| **Validation** | express-validator | All inputs validated server-side |
+1. A verified, authenticated user enters the room key on the **Join** page.
+2. The server checks: room exists and is active, the schedule window is `ACTIVE` (authoritative — the mutable status field is not trusted), the email is allowlisted when required, and the room is not full.
+3. On first join, an atomic seat reservation increments the participant count (no overbooking) and creates a `BattleRoomSubmission` pre-populated with one `PENDING` result per question, snap-shotting the participant's name and organization.
+4. Participants who already completed or were disqualified cannot re-enter; rejoining mid-battle resumes the existing submission.
+
+### Battling (Solving)
+
+1. Participants work through questions in the room's challenge view with a per-question run and a final submit.
+2. **Run** executes the code against visible test cases only, creates no submission record, and is read-only.
+3. **Submit** validates the request (room code, question ID, Java-only language, code ≤ 50,000 chars, replay-protecting nonce), rejects any client-supplied execution payload, records the code, and marks the question `PENDING_VERIFICATION`.
+4. A background verification worker claims pending question results with a lease, executes the code on the isolated Secure Code Engine against **all** test cases (including hidden ones, which never leave the server), and stores sanitized per-test results (expected outputs and hidden cases are stripped from participant responses).
+5. Integrity events (fullscreen exit, tab switch, window blur, copy/paste attempts, devtools, keyboard shortcuts) are streamed to the backend and converted into a weighted integrity risk score (LOW/MEDIUM/HIGH); depending on the room's moderation action, suspicious activity is flagged or the participant is disqualified with score zeroed.
+6. **End Test** finalizes the participant's submission as `COMPLETED`.
+
+### Results, Leaderboard & Closure
+
+1. Room score per question = `points × passedTestCases / totalTestCases`; the submission total is the sum across questions. Ranked eligibility requires a finalized, non-disqualified submission.
+2. The leaderboard ranks participants by score, then solve time, then execution efficiency. Creators additionally see emails, moderation flags, and disqualification controls; participants see only names/organizations.
+3. When the window ends, a per-minute scheduler auto-closes the room (the creator can also close it early): pending submissions are finalized, certificate snapshots are refreshed, and completion/certificate emails are dispatched to participants.
+4. The creator can download room reports (PDF/Excel, per-participant PDF), inspect result-delivery status, and retry failed email deliveries. Participants download their own certificates by token or from "my certificates".
 
 ---
 
-## System Architecture
+## Daily Global Challenge (formerly Weekly Assessment route)
+
+1. An admin authors a global challenge (question, points, test cases) and **publishes** it; a scheduler derives a 24-hour cycle per day (IST midnight-to-midnight), assigns the published question to the day, and freezes the eligible roster at cycle start.
+2. A candidate opens `/weekly-assessment` (Daily Global Challenge) and sees today's assigned question and their participation state; eligibility is enforced against the frozen roster.
+3. The candidate submits once per day. Submission follows the same server-authoritative path as battle rooms: desktop grant → local/remote execution → finalize, with nonce replay protection, atomic grant lifecycle (5-minute authorization, 10-minute claim lease, 24-hour recovery window), and a background verification worker (wake-up every 5 minutes). Failed or interrupted syncs can be retried within the recovery window without duplicate scoring.
+4. Scoring per day: `points × passed / total` test cases. Rankings are computed per cycle:
+   - **Individuals**: ordered by score, then execution time, then memory.
+   - **Organizations**: mean of member scores compared against the cycle mean, ranked by final score with completion rate and tie-breakers on execution time/memory.
+5. When a cycle ends, admin finalization locks rankings and persists certificates; candidates and organizations can view rankings, history, and download certificates. Admins may disqualify a candidate (with reason) before or after finalization.
+6. Organization profiles are managed by admins (or self-created by organization users), and candidates can be assigned to organizations to feed organization rankings.
+
+---
+
+## Learning Center (Adaptive Learning)
+
+### Student side
+
+1. The student browses published programs, purchases a module (Razorpay order → payment verification / webhook → entitlement), and gets lifetime access to that module version.
+2. The dashboard shows enrolled modules, progress, and certificates. Entering a topic starts a **server-authoritative learning session** pinned to the published content version — later edits create new immutable versions and never alter an in-progress learner's snapshot.
+3. An AI tutor (local Ollama by default) teaches the current objective only, using admin-authored topic knowledge and bounded session history. Topic completion is never granted by the AI: mastery requires evidence that quotes the learner's response and cites an approved mastery criterion, validated server-side against a confidence threshold.
+4. Exercises are of two kinds: **math tasks** (deterministic engine — arithmetic, percentages, ratios, roots, units, tolerances) and **Java tasks** (submitted only through the isolated secure runner; hidden test inputs/outputs never appear in student APIs). Compile errors, timeouts, malformed responses, or runner failures never grant mastery.
+5. Topic completion and objective mastery are recorded in progress documents (with objective profiles and evidence history). A module is complete when all topics, the required number of exercises, and (if configured) the module assessment (70% pass) are satisfied — then a certificate is generated and emailed, and is downloadable as PDF.
+
+### Admin (authoring) side
+
+1. Super Admin authors programs → modules → ordered topics, each with objectives, mastery criteria, prerequisite links, misconceptions, and exercises. AI can **propose** topic drafts, but nothing reaches students until reviewed and published.
+2. Publishing creates an immutable version; editing after publish creates a new version. Archival keeps existing purchases, progress, and certificates intact.
+3. Admin can preview tutor responses, math tasks, and Java tasks (preview never creates learner progress, sessions, certificates, or versions), manage purchases/entitlements, and monitor AI usage (prompt/completion tokens) and completion.
+
+---
+
+## High-Level Design (HLD)
 
 ```mermaid
 flowchart TD
-    A[Browser] --> B[Vite Dev Server :5173]
-    B --> C[React App]
-    C --> D[Monaco Editor]
-    C --> E[ProctorGuard]
-    C --> F[API Client Axios]
-    
-    F --> G[Express Server :5000]
-    
-    subgraph Backend_Middleware
-        H[Request ID Middleware]
-        I[Security Middleware<br/>Helmet + CORS + Rate Limiting]
-        J[Body Parser 1mb]
-        K[Input Sanitization]
+    A[Web App React 19 + Vite] --> B[Express API :5000]
+    D[Electron Desktop App CodeClash] --> B
+
+    B --> C[MongoDB]
+    B --> E[Secure Code Engine :8080<br/>isolated Java execution]
+    B --> F[Resend email service<br/>OTP, results, certificates]
+    B --> G[AI tutor provider<br/>local Ollama by default]
+    B --> H[Razorpay<br/>learning purchases]
+
+    subgraph Schedulers[node-cron jobs]
+        S1[Room auto-close - every minute]
+        S2[Verification workers - room + daily]
+        S3[Organization rank recalibration - daily]
+        S4[TTL cleanup - sessions, nonces, logs]
     end
-    
-    subgraph Routes_Controllers
-        L[Auth Routes]
-        M[Challenge Routes]
-        N[Submission Routes]
-        O[Execute Routes]
-        P[Leaderboard Routes]
-        Q[Analytics Routes]
-    end
-    
-    subgraph Services
-        R[authService]
-        S[tokenService]
-        T[submissionService]
-        U[judgeService]
-        V[leaderboardAlgorithm]
-        W[editorAnalyticsService]
-        X[cleanupJob]
-    end
-    
-    subgraph Data_Layer
-        Y[MongoDB]
-        Z[Collections: User, Challenge,<br/>Submission, College, Session,<br/>AuditLog, Violation, Nonce,<br/>EditorAnalytics, SuspicionScore]
-    end
-    
-    G --> H --> I --> J --> K
-    K --> L & M & N & O & P & Q
-    L --> R --> S --> Y
-    N --> T --> U --> Y
-    O --> U
-    P --> V --> Y
-    Q --> W --> Y
-    X --> Y
+
+    Schedulers --> C
+    B --> Schedulers
 ```
 
-### Middleware Pipeline (Order of Execution)
+- **Client layer**: React SPA (web) and an Electron desktop client. Both talk to the same authenticated REST API; the desktop adds local-execution grants where the client runs code locally but only server-finalized results are trusted.
+- **API layer**: Express with a middleware pipeline — request ID → logging → security (Helmet CSP/HSTS, CORS allowlist, tiered rate limiting) → body parsing (1 MB) → input sanitization → routes (JWT auth, RBAC, validation, nonce checks) → secure error handler.
+- **Execution layer**: every judged submission goes through the Secure Code Engine (a separate, isolated service). The backend composes a wrapper program from the question signature, executes per test case, normalizes responses, and sanitizes everything returned to participants. Hidden test cases and expected outputs exist only server-side.
+- **Data layer**: MongoDB collections for users/sessions, battle rooms + submissions, weekly cycles/rosters/submissions, challenges, organizations, learning programs/modules/versions/progress/sessions/purchases/certificates, certificates, audit logs, nonces, violations, editor analytics, and AI usage.
+- **Integrity layer**: browser proctoring (fullscreen enforcement, clipboard lockdown, tab/devtools detection with auto-disqualification after 3 violations), behavioral editor analytics (aggregate metrics only, never keystrokes), server-side integrity risk scoring, and audit logging with request correlation.
+
+---
+
+## Low-Level Design (LLD) — Core Flows
+
+### Submission verification (battle rooms & daily challenge)
 
 ```
-Incoming Request
+Submit request (code + nonce + questionId)
 │
-├─ 1. requestIdMiddleware    → Assigns UUID X-Request-Id header
-├─ 2. morgan logging         → HTTP request logging
-├─ 3. securityMiddleware     
-│     ├─ Helmet (CSP, HSTS, XFO, etc.)
-│     ├─ Rate Limiter (tiered)
-│     └─ CORS Hardening
-├─ 4. express.json (1mb)     → Body parsing with size limit
-├─ 5. express.urlencoded     → URL-encoded body parsing
-├─ 6. sanitizeInput          → Strip null bytes & control chars, trim
-│
-├─ → Route Handler (with auth/validation/nonce as needed)
-│
-└─ 7. errorHandler           → Secure error response (no stack in prod)
+├─ 1. Authenticate (JWT) + rate limit + validate input (regex IDs, code ≤ 50k chars)
+├─ 2. Consume nonce atomically (replay protection; user + action + resource bound)
+├─ 3. Reject any client-reported execution payload ("localExecution" / raw results)
+├─ 4. Persist code, mark question result PENDING_VERIFICATION
+├─ 5. Background worker claims result with a 10-minute lease (findOneAndUpdate guard)
+├─ 6. Compose wrapper program from question signature → execute per test case
+│      on the Secure Code Engine (visible + hidden cases)
+├─ 7. Normalize engine response → per-test pass/fail, execution time, memory
+├─ 8. Store sanitized results (hidden inputs/expected outputs never returned)
+└─ 9. Score = points × passed / total; aggregate into submission totals
 ```
+
+### Scoring & ranking
+
+| Context | Rule |
+|---|---|
+| Battle room question | `points × passedTestCases / totalTestCases` (rounded to 2 decimals) |
+| Battle room leaderboard | rank by total score → solve time → execution time → memory |
+| Daily challenge question | `points × passed / total`, one attempt per day per candidate |
+| Daily individual ranking | score → execution time → memory → name |
+| Organization ranking | member mean vs. cycle mean, ranked by final score, then mean, then average execution time/memory; completion rate reported |
+| Learning module | all topics completed + required exercises + assessment ≥ 70% (if configured) |
+
+### Integrity & anti-cheat pipeline
+
+1. Client `ProctorGuard` detects violations (fullscreen exit, tab switch, blur, copy/paste/cut, context menu, devtools shortcuts) and auto-disqualifies after 3 high-severity violations.
+2. Events are batched and posted to `/api/assessment-integrity/events` per assessment.
+3. Server computes risk: weighted events (`DEVTOOLS_OPEN` 20, `COPY/PASTE` 15, `FULLSCREEN_EXIT`/`TAB_SWITCH`/`BLUR`/`SHORTCUT` 10, +20 for sequence gaps), capped at 100 → `HIGH ≥ 60`, `MEDIUM ≥ 25`, else `LOW`.
+4. Risk is surfaced on room leaderboards/reports to the creator; `DISQUALIFY` moderation zeroes the score, `FLAG` marks it for review.
+5. Aggregate editor analytics (typing speed, corrections, mouse activity, paste counts) feed suspicion scoring for automation detection.
+
+### Scheduling & lifecycle jobs
+
+| Job | Cadence | Purpose |
+|---|---|---|
+| Battle room auto-close | every minute | close rooms past `endDate`, finalize submissions, refresh certificates, email results |
+| Room verification worker | continuous with leases | execute & verify pending question results |
+| Daily challenge verification worker | every 5 minutes | verify daily submissions within their grant lifecycle |
+| Organization rank recalibration | daily midnight | re-rank organizations by Bayesian score |
+| TTL cleanup | MongoDB TTL indexes | sessions, nonces (24 h), audit logs (90 days), violations/analytics (1 year) |
+
+### Certificates & reports
+
+- **Battle rooms**: participant certificates are generated from verified snapshots when the room closes (completion required); downloadable via token or from "my certificates"; creators get PDF/Excel room reports and per-participant PDFs.
+- **Daily challenge**: certificates persisted at cycle finalization, listed and downloadable by candidates and organizations.
+- **Learning**: certificate generated on verified module completion and emailed; downloadable as PDF.
+
+### API surface (summary)
+
+| Area | Base path | Notable operations |
+|---|---|---|
+| Auth | `/api/auth` | OTP registration/verification, password login, password reset, token refresh/rotation, sessions, profile |
+| Creator verification | `/api/creator-verification` | email OTP to unlock creator abilities |
+| Battle rooms | `/api/battle-rooms` | create/update/start/join/close/reuse/delete, authoring helpers, run/submit/end, desktop-execution grants, leaderboard (room + public), results, reports (PDF/Excel), certificates, share key |
+| Daily challenge | `/api/weekly-assessments` | current cycle, submit/retry, desktop grants, rankings, history, certificates, organization profiles, admin cycles/roster/finalize/disqualification, admin global challenge publish |
+| Learning | `/api/learning` | programs, purchases + Razorpay verification/webhook, sessions/tutor messages, topic completion, exercises, assessments, certificates; admin authoring (programs/modules/topics/versions/preview/purchases) |
+| Execution | `/api/execute` | nonce generation, run (public cases only), submit (all cases, nonce-protected), engine health |
+| Integrity | `/api/assessment-integrity` | record events, per-assessment risk reports |
+| Legacy challenges | `/api/challenges` | challenge CRUD (admin) and today's challenge |
+| Leaderboard | `/api/leaderboard` | global users, user rank, challenge leaderboard |
+| Platform | `/api/platform` | public stats/partners, creator profile |
+| System | `/api/health` | health check (200 only when MongoDB connected) |
 
 ---
 
-## Security Architecture (Detailed)
+## Running Locally (brief)
 
-### 1. Transport & Network Security
+1. Start MongoDB and the Secure Code Engine on port `8080` (separate service in `secure-code-engine/`).
+2. Configure `backend/.env` (`MONGODB_URI`, distinct JWT secrets, `SECURE_CODE_ENGINE_URL` + API key, `RESEND_API_KEY`/`EMAIL_FROM`, and AI/Razorpay settings for learning) and `frontend/.env` (`VITE_API_URL`).
+3. `cd backend && npm ci && npm run dev` and `cd frontend && npm run dev`, then open `http://localhost:5173`. The Electron client lives in `desktop/`.
 
-| Control | Implementation | Configuration |
-|---------|---------------|---------------|
-| **Content Security Policy** | Helmet CSP | `default-src 'self'`, `script-src 'self' 'unsafe-inline' 'unsafe-eval' cdn.jsdelivr.net`, `connect-src 'self' CLIENT_URL code-executor.onrender.com`, `frame-src 'none'`, `object-src 'none'`, `upgrade-insecure-requests` |
-| **HSTS** | Helmet HSTS | `maxAge: 31536000` (1 year), `includeSubDomains: true`, `preload: true` |
-| **CORS** | Custom middleware whitelist | Only `CLIENT_URL`, `localhost:5173`, `localhost:3000` allowed. Dynamic origin check. No wildcard. |
-| **Referrer Policy** | Helmet | `strict-origin-when-cross-origin` |
-| **X-Frame-Options** | Helmet | Denied via CSP `frame-src 'none'` |
-| **Cross-Origin Policies** | Helmet | `crossOriginResourcePolicy: cross-origin` (needed for Monaco CDN) |
-
-### 2. Authentication & Session Security
-
-| Control | Implementation | Details |
-|---------|---------------|---------|
-| **Password Authentication** | Email + password | Passwords are bcrypt-hashed; login requires a verified account. |
-| **Registration Verification** | Email OTP | Six-digit code verifies a new registration; OTP is not a login method. |
-| **Platform Access** | Authenticated account required | Unauthenticated and guest requests cannot use platform APIs. |
-| **Organization** | Requested at room join | Registration does not request organization; the entered value is saved with that room submission. |
-| **OTP Expiry** | 5 minutes by default | Configurable TTL index auto-clears expired registration OTPs |
-| **OTP Max Attempts** | 3 attempts | After 3 failed attempts, OTP is invalidated and a new code is required |
-| **OTP Resend Cooldown** | 30 seconds | Rate-limits OTP resend requests |
-| **JWT Access Token** | Login session | 12 hours expiry, signed with `JWT_SECRET`, contains `userId`, `email`, `role`, `type: "login"` |
-| **JWT Refresh Token** | Rotating | 7 days expiry, cryptographically random 64-byte hex. Single-use rotation. |
-| **Session Management** | MongoDB-backed | Session model tracks device info, IP, user agent. Supports multi-device. |
-| **Password Login** | Rate-limited | A verified account must use its registered email and password to sign in. |
-| **OTP Storage** | SHA-256 digest | The raw verification code is never stored in MongoDB. |
-
-#### Account Flow
-
-1. Register with a name, email, and password; organization is not collected.
-2. Verify the registration email with a six-digit OTP. Only then is a session issued.
-3. Sign in with the registered email and password. OTP codes cannot sign in to existing accounts.
-4. Authenticated requests include the saved bearer token; sign-out revokes the session.
-5. Enter an organization when joining each battle room. A creator who starts and auto-joins a room must also provide an organization; the backend snapshots it on the submission.
-
-#### Token Lifecycle
-
-```
-1. Register (name, email, password)
-   → Server stores a bcrypt-hashed password and creates a pending account
-   → Sends a six-digit email verification OTP through Resend
-   
-2. Verify registration OTP (userId + otp)
-   → Checks expiry, max attempts, and the registration purpose
-   → Marks the account verified and creates a 12-hour login token + 7-day refresh token
-   → Creates session record in DB
-   
-3. Access API (Bearer access_token)
-   → Auth middleware verifies JWT, loads user, attaches to req
-   
-4. Token Expired (401 TOKEN_EXPIRED)
-   → Client sends refresh token to /auth/refresh-token
-   → Server rotates refresh token (old invalidated, new issued)
-   → New access token issued
-   
-5. Logout
-   → Revokes specific session or all user sessions
-```
-
-### 3. Request Security & Anti-Replay
-
-| Control | Implementation | Details |
-|---------|---------------|---------|
-| **Rate Limiting (General)** | `express-rate-limit` | 100 requests per 15-minute window per IP |
-| **Rate Limiting (Auth)** | `express-rate-limit` | Registration OTP: 3/15min; password login: 10/15min; OTP verification: 5/5min. |
-| **Rate Limiting (Submissions)** | `express-rate-limit` | 5 requests per 1-minute window per IP |
-| **Request ID** | UUID v4 middleware | Every request gets unique `X-Request-Id` header, propagated to all logs and responses |
-| **Nonce Replay Protection** | Cryptographic nonce | 32 random bytes → 64-char hex string. One-time use per action per user. Required for `SUBMIT`, `RUN`, `CONTEST_START/END`, `ANALYTICS_FLUSH`. |
-| **Nonce Validation** | Server-side consume | Validates format (`/^[a-f0-9]{64}$/`), action enum, user + resource binding. Atomic consume prevents reuse. |
-| **Desktop submission recovery** | Atomic grant lifecycle | Grants are source-, user-, room-, and question-bound; the initial authorization lasts 5 minutes, claims have a 10-minute lease, and a failed or interrupted synchronization can be retried for up to 24 hours. A saved authoritative result is returned on retry without re-execution or duplicate scoring. |
-| **Nonce Expiry** | 24-hour TTL | Nonces are auto-cleaned by MongoDB TTL index; desktop submission grants retain bounded recovery metadata for up to 24 hours. |
-| **IP Tracking** | All requests | IP logged in AuditLog, Session, and rate limiting key |
-
-### 4. Input Validation & Sanitization
-
-| Control | Implementation | Details |
-|---------|---------------|---------|
-| **Body Size Limit** | `express.json({ limit: "1mb" })` | Rejects payloads over 1MB |
-| **Input Sanitization** | Custom middleware | Strips null bytes (`\x00`), control characters (`\x00-\x08\x0B\x0C\x0E-\x1F`), trims whitespace from all string fields |
-| **Email Validation** | express-validator | `isEmail()`, `normalizeEmail()` |
-| **OTP Validation** | express-validator | Exactly 6 digits, string type |
-| **Code Size Limit** | Application-level | 1 to 50,000 characters. Enforced both client-side and server-side. |
-| **Challenge Validation** | express-validator | Title (3-200 chars), Description (10+ chars), TestCases (min 1), Difficulty (enum EASY/MEDIUM/HARD) |
-| **MongoDB ID Validation** | express-validator | `isMongoId()` for all ID parameters |
-| **Pagination Validation** | express-validator | Page (min 1), Limit (1-100) |
-| **Nonce Format** | Regex validation | `/^[a-f0-9]{64}$/` — rejects malformed nonces |
-
-### 5. Authorization & RBAC
-
-| Control | Implementation | Details |
-|---------|---------------|---------|
-| **Role Enum** | `USER`, `ADMIN` | Stored on User model, indexed |
-| **Auth Middleware** | `authenticate()` | Validates JWT, loads user from DB, rejects if unverified. Returns specific error codes: `NO_TOKEN`, `TOKEN_EXPIRED`, `INVALID_TOKEN`, `USER_NOT_FOUND`, `NOT_VERIFIED`. |
-| **Optional Auth** | `optionalAuth()` | Sets `req.user` if valid token present, continues silently if not |
-| **RBAC Middleware** | `requireRole(...roles)` | Checks `req.user.role` against allowed roles. 403 with required roles listed. |
-| **Admin Guards** | `isAdmin` | Wraps `requireRole("ADMIN")` for challenge CRUD, disqualification |
-| **User Guards** | `isUser` | Wraps `requireRole("USER", "ADMIN")` for standard endpoints |
-| **Self-Service** | Ownership checks | Users can only update their own submissions. Admin can update any. |
-
-### 6. Proctoring Engine & Anti-Cheating
-
-The proctoring system (`useProctorGuard` hook + `ProctorGuard` component) provides browser-level integrity monitoring:
-
-| Violation Type | Detection Method | Severity |
-|---------------|-----------------|----------|
-| **Fullscreen Exit** | `fullscreenchange` event | HIGH |
-| **Tab Switch** | `visibilitychange` → `document.hidden` | HIGH |
-| **Window Blur** | `window.blur` event | MEDIUM |
-| **Copy Blocked** | `copy` event `preventDefault()` | MEDIUM |
-| **Paste Blocked** | `paste` event `preventDefault()` | MEDIUM |
-| **Cut Blocked** | `cut` event `preventDefault()` | LOW |
-| **Context Menu** | `contextmenu` event `preventDefault()` | LOW |
-| **Text Selection** | `selectstart` event `preventDefault()` | LOW |
-| **F12 DevTools** | `keydown` F12 detection | HIGH |
-| **Ctrl+Shift+I/J** | Keyboard shortcut detection | HIGH |
-| **Ctrl+U (View Source)** | Keyboard shortcut detection | HIGH |
-| **Ctrl+C / Cmd+C** | Clipboard shortcut blocked in editor | MEDIUM |
-| **Ctrl+V / Cmd+V** | Paste shortcut blocked in editor | MEDIUM |
-
-**Disqualification Flow:**
-1. Violation counter stored in `sessionStorage` (persists across page reloads within session)
-2. After `MAX_VIOLATIONS = 3`, the user is immediately disqualified
-3. Overlay modal displayed: *"Assessment Disqualified"*
-4. `onDisqualified` callback triggers server-side submission disqualification
-5. Submission status set to `DISQUALIFIED`, score zeroed out
-
-### 7. Editor Analytics & Automation Detection
-
-The platform collects **aggregate behavioral metadata only** — never actual keystrokes or code content.
-
-| Metric | Description | Detection Use |
-|--------|-------------|---------------|
-| `typingDuration` | Total time spent typing (ms) | Pace analysis |
-| `idleDuration` | Total idle time (ms) | Pattern analysis |
-| `cursorMovementCount` | Number of cursor moves | Human interaction |
-| `mouseMoveCount` | Number of mouse moves | **No mouse movement → automation risk** |
-| `mouseClickCount` | Number of mouse clicks | Human interaction |
-| `totalCharactersTyped` | Total characters typed | Scale analysis |
-| `averageTypingSpeed` | Average chars per minute | **>300 CPM → automation risk** |
-| `typingConsistencyScore` | 0-100 consistency metric | **>90 consistency → automation risk** |
-| `correctionCount` | Number of edits/corrections | **Zero corrections on >100 chars → automation risk** |
-| `pasteCount` | Number of paste events | Integrity metric |
-| `copyCount` | Number of copy events | Integrity metric |
-| `fullscreenExits` | Fullscreen exit count | Violation tracking |
-| `windowBlurCount` | Window blur events | Focus tracking |
-| `visibilityChanges` | Tab visibility changes | Tab-switch tracking |
-| `undoCount` / `redoCount` | Editor undo/redo count | Pattern analysis |
-
-**Automation Risk Scoring (0-100):**
-
-| Factor | Weight | Threshold |
-|--------|--------|-----------|
-| No mouse movement | +25 | `mouseMoveCount === 0` |
-| Very regular typing intervals | +20 | `veryRegularIntervals === true` |
-| Zero corrections | +15 | `correctionCount === 0 && totalCharactersTyped > 100` |
-| High typing speed (>300 CPM) | +10 | `averageTypingSpeed > 300 && totalCharactersTyped > 200` |
-| Long inactivity then rapid edits | +20 | `longInactivityThenRapidEdits === true` |
-| Consistent perfect timing | +15 | `typingConsistencyScore > 90 && totalCharactersTyped > 200` |
-
-**Suspicion Levels:**
-- **LOW** (0-19): Normal behavior
-- **MEDIUM** (20-39): Flagged for review
-- **HIGH** (40-69): Auto-flagged, manual review recommended
-- **CRITICAL** (70-100): Strong automation indicators
-
-### 8. Audit Logging & Monitoring
-
-| Feature | Implementation | Details |
-|---------|---------------|---------|
-| **Audit Trail** | `AuditLog` model | Every significant action logged with userId, action, resource, IP, user-agent, requestId |
-| **Logged Actions** | Middleware shortcuts | `USER_LOGIN`, `USER_LOGOUT`, `SUBMISSION_CREATE`, `CHALLENGE_CREATE/UPDATE/DELETE`, `SUBMISSION_DISQUALIFY`, `CODE_RUN` |
-| **Severity Classification** | INFO / WARN / ERROR / CRITICAL | Auto-derived from HTTP status code |
-| **Status Tracking** | SUCCESS / FAILURE / PENDING | Based on response status |
-| **Request Correlation** | requestId | Every audit entry linked to request UUID for full traceability |
-| **TTL Auto-Cleanup** | 90 days | Audit logs auto-delete after 90 days via MongoDB TTL index |
-| **IP & User Agent** | Captured on all logs | Forensic data for investigation |
-
-### 9. Secure Error Handling
-
-| Scenario | Response | Details |
-|----------|----------|---------|
-| **Validation Error** | 400 `{ error, details, requestId }` | Includes field-level validation messages |
-| **Invalid MongoDB ID** | 400 `{ error, requestId }` | Safe message, no ID leaked |
-| **Duplicate Key** | 409 `{ error, requestId }` | Safe duplicate error |
-| **Authentication Error** | 401 `{ error, code, requestId }` | Specific codes: `NO_TOKEN`, `TOKEN_EXPIRED`, `INVALID_TOKEN` |
-| **Authorization Error** | 403 `{ error, requiredRoles, userRole }` | Lists required vs actual role |
-| **Rate Limit Exceeded** | 429 `{ error }` | Standard rate limit response |
-| **Internal Error (Dev)** | 500 `{ error, details, stack, requestId }` | Stack trace exposed only in development |
-| **Internal Error (Prod)** | 500 `{ error, requestId }` | Generic message, no internals leaked |
-| **404 Not Found** | 404 `{ error, path, requestId }` | Path echoed for debugging |
-
-### 10. Database Security
-
-| Control | Implementation |
-|---------|---------------|
-| **ODM Protection** | Mongoose prevents NoSQL injection via schema validation |
-| **Selective Field Exposure** | Every model has `toPublicJSON()` / `toJSON()` methods that control what's exposed |
-| **Sensitive Fields Hidden** | User OTP fields use `select: false` — excluded from all normal queries |
-| **TTL Indexes** | Auto-delete expired data: Sessions (at expiry), Nonces (24h), Violations (1 year), AuditLogs (90 days), EditorAnalytics (1 year) |
-| **Compound Indexes** | Performance-optimized indexes on all query patterns |
-| **Unique Constraints** | Email (unique), Submission per user+challenge (unique compound), Slug (unique), Nonce value (unique), College name (unique) |
-| **Graceful Degradation** | Server starts without DB, logs warning, continues with limited functionality |
-
-### 11. Code Execution Security
-
-| Control | Implementation |
-|---------|---------------|
-| **Strategy Pattern** | Pluggable executor (local dev / remote sandbox) |
-| **Remote Sandbox** | Code executed on `https://code-executor.onrender.com` — isolated environment |
-| **Code Size Limit** | Maximum 50,000 characters enforced |
-| **Hidden Test Cases** | Never sent to client. Only server sees hidden test case inputs/outputs. |
-| **Public Test Case Limit** | Runs limited to 5 public test cases |
-| **Expected Output Hiding** | Expected outputs stripped from all API responses |
-| **CSP Restriction** | `connect-src` only allows the configured executor URL |
-
-### 12. Data Cleanup & Retention
-
-| Job | Schedule | Action |
-|-----|----------|--------|
-| **Creator OTP Expiry** | Automatic (MongoDB TTL) | Creator verification codes are removed at their configured `expiresAt` |
-| **College Rank Recalibration** | Daily at midnight (cron) | Recalculates and reorders college rankings |
-| **Battle Room Results** | Retained until creator deletion | Closed rooms and submissions are not automatically purged |
-| **Session TTL** | Automatic (MongoDB TTL) | Expired sessions auto-deleted at `expiresAt` |
-| **Nonce TTL** | Automatic (MongoDB TTL) | Unused nonces auto-deleted after 24 hours |
-| **Audit Log TTL** | Automatic (MongoDB TTL) | Logs auto-deleted after 90 days |
-| **Violation TTL** | Automatic (MongoDB TTL) | Violations auto-deleted after 1 year |
-| **Editor Analytics TTL** | Automatic (MongoDB TTL) | Analytics auto-deleted after 1 year |
-
----
-
-## Scoring & Ranking System
-
-### Individual Score Formula
-
-```
-Score = (PassRatio × 1000) - (SolveTime × 0.5) - (ExecutionTime × 0.1) - (MemoryUsage × 0.05)
-
-Where:
-  PassRatio      = passedTests / totalTests
-  SolveTime      = time from first edit to submission (seconds)
-  ExecutionTime  = total test execution time (ms)
-  MemoryUsage    = peak memory usage (MB)
-```
-
-Minimum score is 0 (no negative scores).
-
-### Bayesian College Ranking
-
-```
-K = min(participants, 5)
-TopKAvg = sum(highest K scores) / K
-ParticipationMultiplier = 0.85 + 0.15 × ln(participants) / ln(participants + 5)
-BayesianScore = TopKAvg × ParticipationMultiplier
-```
-
-- **Top-K Average**: Only the top 5 performers from each college count, preventing large colleges from dominating purely by volume
-- **Participation Boost**: Colleges with more participants get a small logarithmic boost (max +15%), rewarding engagement without overwhelming the skill signal
-- **Recalibration**: College rankings are auto-recalculated daily at midnight
-
----
-
-## API Reference
-
-### Authentication
-
-| Method | Endpoint | Auth | Rate Limit | Description |
-|--------|----------|------|-----------|-------------|
-| `POST` | `/api/auth/request-otp` | No | 3/15min | Begin registration with name, email, and password |
-| `POST` | `/api/auth/verify-otp` | No | 5/5min | Verify registration email and receive a session |
-| `POST` | `/api/auth/login-password` | No | 10/15min | Sign in with registered email and password |
-| `POST` | `/api/auth/resend-otp` | No | 5/15min | Resend registration OTP (30s cooldown) |
-| `POST` | `/api/auth/refresh-token` | No | 10/15min | Rotate refresh token |
-| `POST` | `/api/auth/logout` | Yes | 100/15min | Revoke session |
-| `POST` | `/api/auth/logout-all` | Yes | 100/15min | Revoke all sessions |
-| `GET` | `/api/auth/sessions` | Yes | 100/15min | List active sessions |
-| `GET` | `/api/auth/profile` | Yes | 100/15min | Get user profile |
-
-### Challenges
-
-| Method | Endpoint | Auth | Role | Description |
-|--------|----------|------|------|-------------|
-| `GET` | `/api/challenges/today` | Yes | USER/ADMIN | Get today's active challenge |
-| `GET` | `/api/challenges` | Yes | USER/ADMIN | List all challenges (paginated) |
-| `GET` | `/api/challenges/:id` | Yes | USER/ADMIN | Get challenge details |
-| `POST` | `/api/challenges` | Yes | ADMIN | Create new challenge |
-| `PUT` | `/api/challenges/:id` | Yes | ADMIN | Update challenge |
-| `DELETE` | `/api/challenges/:id` | Yes | ADMIN | Deactivate challenge |
-
-### Submissions
-
-| Method | Endpoint | Auth | Rate Limit | Description |
-|--------|----------|------|-----------|-------------|
-| `POST` | `/api/submissions` | Yes | 5/1min | Create submission (single per challenge) |
-| `GET` | `/api/submissions/:challengeId` | Yes | 100/15min | Get submission result |
-| `GET` | `/api/submissions/history` | Yes | 100/15min | Get paginated submission history |
-| `PUT` | `/api/submissions/:id/result` | Judge callback key | 100/15min | Update execution result using `X-Judge-Callback-Key` |
-| `PUT` | `/api/submissions/:id/disqualify` | Yes | 5/1min | Admin disqualify submission |
-
-### Code Execution
-
-| Method | Endpoint | Auth | Nonce | Description |
-|--------|----------|------|-------|-------------|
-| `POST` | `/api/execute/run` | Yes | No | Run code against public test cases (unlimited, no submission) |
-| `POST` | `/api/execute/submit` | Yes | **Required** | Final submission against ALL test cases (single use) |
-| `GET` | `/api/execute/health` | No | No | Judge engine health check |
-
-### Leaderboard
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `GET` | `/api/leaderboard/global` | Yes | Global user leaderboard (top 100) |
-| `GET` | `/api/leaderboard/college` | Yes | Bayesian college leaderboard (top 50) |
-
-### Analytics (Admin)
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `GET` | `/api/analytics/suspicious` | Admin | List suspicious submissions (HIGH/CRITICAL) |
-| `POST` | `/api/analytics/flush` | Admin | Flush analytics buffer |
-
-### System
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| `GET` | `/api/health` | No | Health check (DB status, uptime, version) |
-
----
-
-## Project Structure
-
-```
-coding-challenge-platform/
-├── backend/
-│   ├── .env.example
-│   ├── src/
-│   │   ├── server.js              # Express entry point (middleware pipeline, route mounting)
-│   │   ├── config/
-│   │   │   ├── db.js              # MongoDB connection with graceful degradation
-│   │   │   └── env.js             # Environment config with validation
-│   │   ├── models/
-│   │   │   ├── User.js            # OTP auth, RBAC roles, auto name extraction
-│   │   │   ├── Challenge.js       # Test cases (public/hidden), active dates
-│   │   │   ├── Submission.js      # Single-submission enforcement, scoring
-│   │   │   ├── College.js         # Bayesian rank tracking
-│   │   │   ├── Session.js         # Refresh token session management
-│   │   │   ├── AuditLog.js        # Full audit trail (90-day retention)
-│   │   │   ├── Violation.js       # 21 violation types, severity levels
-│   │   │   ├── Nonce.js           # Cryptographic replay protection
-│   │   │   ├── EditorAnalytics.js # Aggregate behavioral metrics (no keystrokes)
-│   │   │   └── SuspicionScore.js  # Weighted multi-factor suspicion scoring
-│   │   ├── middleware/
-│   │   │   ├── requestId.js       # UUID request tracing
-│   │   │   ├── security.js        # Helmet, CORS, rate limiting, sanitization, error handler
-│   │   │   ├── auth.js            # JWT authentication (required + optional)
-│   │   │   ├── rbac.js            # Role-based access control
-│   │   │   ├── validate.js        # express-validator rules for all endpoints
-│   │   │   ├── nonce.js           # Replay protection middleware
-│   │   │   ├── auditLog.js        # Action audit logging middleware
-│   │   │   └── contest.js         # Contest window validation (6PM-6PM)
-│   │   ├── controllers/
-│   │   │   ├── authController.js        # OTP request/verify, session management
-│   │   │   ├── challengeController.js   # CRUD for challenges
-│   │   │   ├── submissionController.js  # Submit, query, disqualify
-│   │   │   ├── executeController.js     # Code run/submit with test case isolation
-│   │   │   ├── leaderboardController.js # User/college rankings
-│   │   │   └── analyticsController.js   # Suspicious submission review
-│   │   ├── services/
-│   │   │   ├── authService.js          # OTP generation, verification, email transport
-│   │   │   ├── tokenService.js         # JWT generation, session CRUD, token rotation
-│   │   │   ├── submissionService.js    # Score calculation, user/challenge stats
-│   │   │   ├── judgeService.js         # Strategy pattern executor (local/remote)
-│   │   │   ├── leaderboardAlgorithm.js # Bayesian ranking, persistence
-│   │   │   ├── editorAnalyticsService.js # Automation detection, violation tracking
-│   │   │   └── cleanupJob.js           # Cron-based stale data cleanup
-│   │   └── routes/
-│   │       ├── authRoutes.js
-│   │       ├── challengeRoutes.js
-│   │       ├── submissionRoutes.js
-│   │       ├── executeRoutes.js
-│   │       ├── leaderboardRoutes.js
-│   │       └── analyticsRoutes.js
-├── frontend/
-│   ├── .env.example
-│   ├── src/
-│   │   ├── App.jsx / main.jsx
-│   │   ├── pages/               # Home, Challenge, Login, Register, Leaderboard, Profile
-│   │   ├── components/
-│   │   │   ├── editor/          # CodeEditor, CodeEditorSandbox, ProctorGuard, Console, RenderAwakeLoader, ShareModal
-│   │   │   ├── leaderboard/     # LeaderboardTable
-│   │   │   ├── layout/          # Navbar, Footer, Sidebar
-│   │   │   ├── problem/         # ProblemDescription, TestCasePanel
-│   │   │   └── common/          # ProtectedRoute
-│   │   ├── hooks/               # useProctorGuard
-│   │   ├── context/             # AuthContext
-│   │   ├── services/            # Axios client with auto-refresh, API services
-│   │   └── utils/               # Constants, helpers
-├── database/
-│   ├── schema.sql               # SQL reference schema
-│   └── schema.prisma            # Prisma schema (optional ORM)
-├── docs/
-│   └── architecture.md          # Architecture documentation
-├── SETUP.md                     # Detailed setup instructions
-└── README.md                    # This file
-```
-
----
-
-## Prerequisites & Setup
-
-### Prerequisites
-
-- **Node.js** v18+ and npm
-- **MongoDB** v6+ (local or cloud Atlas)
-- **Resend API credentials** for outbound email (`RESEND_API_KEY` and `EMAIL_FROM`)
-- **Secure Code Engine** running locally at `http://localhost:8080` for code execution
-
-### Quick Start (5 minutes)
-
-```bash
-# 1. Install dependencies
-cd backend && npm install
-cd ../frontend && npm install
-
-# 2. Configure environment
-#    backend/.env  → Set MONGODB_URI, JWT secrets, and Secure Code Engine settings
-#    frontend/.env → Set VITE_API_URL=http://localhost:5000/api
-#    Start the separate Secure Code Engine at http://localhost:8080
-
-# 3. Start backend (Terminal 1)
-cd backend && npm run dev
-
-# 4. Start frontend (Terminal 2)
-cd frontend && npm run dev
-
-# 5. Open browser
-open http://localhost:5173
-```
-
-### Environment Variables
-
-#### Backend (`backend/.env`)
-
-| Variable | Description | Default | Security Impact |
-|----------|-------------|---------|-----------------|
-| `PORT` | Server port | 5000 | - |
-| `NODE_ENV` | Environment | development | Controls error detail exposure |
-| `CLIENT_URL` | Frontend URL for CORS | http://localhost:5173 | CORS whitelist |
-| `API_PUBLIC_URL` | Public backend API base URL used in emailed certificate links (include `/api`) | `http://localhost:5000/api` in development; production falls back to `${CLIENT_URL}/api` | Certificate downloads must be reachable by recipients |
-| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/coding-challenge-platform | Database access |
-| `JWT_SECRET` | Secret for JWT signing | (required) | **Must be strong random string** |
-| `JWT_REFRESH_SECRET` | Secret for refresh tokens | (required) | **Must be different from JWT_SECRET** |
-| `RESEND_API_KEY` | Resend API key | (required for email delivery) | Backend email delivery |
-| `EMAIL_FROM` | Verified Resend sender address | (required for email delivery) | Backend email delivery |
-| `SECURE_CODE_ENGINE_URL` | Secure Code Engine execute endpoint | `http://localhost:8080/api/v1/execute` in development; hosted endpoint in production | Sandboxed execution |
-| `SECURE_CODE_ENGINE_API_KEY` | API key for the Secure Code Engine | (required by engine configuration) | Authenticates backend-to-engine requests |
-| `SECURE_CODE_ENGINE_TIMEOUT_MS` | Execution engine request timeout | 120000 | Bounds execution requests |
-| `RATE_LIMIT_WINDOW_MS` | Rate limit window | 900000 (15min) | DoS protection |
-| `RATE_LIMIT_MAX` | Max requests per window | 100 | DoS protection |
-| `OTP_EXPIRY_MINUTES` | OTP validity duration | 10 | Auth security |
-| `OTP_TTL_SECONDS` | Creator OTP validity duration | 300 | Creator verification |
-| `OTP_MAX_ATTEMPTS` | Max OTP verification attempts | 5 | Brute force protection |
-| `OTP_RESEND_COOLDOWN_SECONDS` | OTP resend cooldown | 30 | Abuse prevention |
-| `JUDGE_CALLBACK_SECRET` | Secret for judge-result callbacks | (unset; endpoint disabled until configured) | Internal callback authentication |
-| `JWT_EXPIRY` | Access token lifespan | 15m | Session security |
-| `JWT_REFRESH_EXPIRY` | Refresh token lifespan | 7d | Session security |
-| `JWT_ISSUER` | JWT issuer claim | amux-ccp | Token validation |
-
-#### Frontend (`frontend/.env`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | Backend API base URL, including `/api` | `https://ccp-backend-qylz.onrender.com/api` |
-
-When deploying the frontend, set `VITE_API_URL` to the deployed backend URL
-including `/api` in the frontend host's build environment. The backend's
-`CLIENT_URL` must be set to the frontend's HTTPS origin so its CORS policy
-allows browser requests from the deployed site.
-
-## Spring Framework Advisory Remediation
-
-As of 2026-10-19, the local Java execution engine uses Spring Boot `4.0.8`,
-Spring Framework `7.0.9`, and SpringDoc `3.1.1`. The resolved Tomcat and Jackson
-patch versions are `11.0.25`, `2.21.7`, and `3.1.7`. `mvn clean verify`
-completed with 8 tests passing, and a fresh CVE scan over resolved compile,
-runtime, and test dependencies reported no known vulnerabilities. Fresh npm
-audits for the backend, frontend, and Desktop each reported zero vulnerabilities.
-
-These dependency/build results do not establish production readiness. The
-packaged engine has not completed a confirmed startup/API smoke test, and the
-Desktop product still has unimplemented weekly assessment/roster/ranking
-workflows and no verified authenticated end-to-end submission. See
-[`docs/desktop-feature-parity-audit.md`](docs/desktop-feature-parity-audit.md)
-for the current blockers.
-
----
+See `backend/README.md` for backend configuration details and `docs/learning-pilot-readiness.md` for the learning pilot checklist.
 
 ## License
 

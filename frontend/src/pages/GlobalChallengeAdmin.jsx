@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
+import AdminQuestions from "./AdminQuestions.jsx";
 import "./WeeklyAdminAssessment.css";
 
 function toIstDateTimeInput(value) {
@@ -72,7 +73,8 @@ function RankingTable({ rankings = [] }) {
   );
 }
 
-export default function GlobalChallengeAdmin({ view = "setup" }) {
+export default function GlobalChallengeAdmin({ view = "today" }) {
+  const [adminTab, setAdminTab] = useState(view === "rankings" ? "today" : view);
   const [challenge, setChallenge] = useState(null);
   const [cycles, setCycles] = useState([]);
   const [questions, setQuestions] = useState([]);
@@ -102,7 +104,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
           ? current
           : String(loadedCycles[0]?._id || ""),
       );
-      if (view === "rankings") return;
+      if (adminTab === "questions") return;
 
       const [challengeResponse, firstQuestionsResponse] = await Promise.all([
         api.get("/weekly-assessments/admin/global-challenge"),
@@ -148,10 +150,10 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [view]);
+  }, [adminTab]);
 
   const loadRankings = useCallback(async () => {
-    if (view !== "rankings" || !selectedCycleId) {
+    if (adminTab === "questions" || !selectedCycleId) {
       setRankings(null);
       return;
     }
@@ -164,14 +166,14 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
     } catch (requestError) {
       setError(requestError.message || "Could not load global challenge rankings.");
     }
-  }, [selectedCycleId, view]);
+  }, [selectedCycleId, adminTab]);
 
   useEffect(() => {
     loadSetup();
   }, [loadSetup]);
 
   useEffect(() => {
-    if (view !== "rankings") return undefined;
+    if (adminTab === "questions") return undefined;
     loadRankings();
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") loadRankings();
@@ -183,7 +185,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
       window.clearInterval(interval);
       window.clearInterval(cyclesInterval);
     };
-  }, [loadRankings, loadSetup, view]);
+  }, [loadRankings, loadSetup, adminTab]);
 
   const toggleQuestion = (id) => {
     setQuestionIds((selected) =>
@@ -333,7 +335,7 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
         .toLowerCase()
         .includes(questionSearch.trim().toLowerCase()),
   );
-  const title = view === "rankings" ? "Global Challenge Rankings" : "Global Challenge";
+  const title = adminTab === "questions" ? "Today Challenge · Questions" : "Today Challenge";
   const currentCycle = cycles.find((cycle) =>
     cycle.isGlobalChallenge &&
       new Date(cycle.startAt) <= Date.now() &&
@@ -368,15 +370,24 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
           <h1>{title}</h1>
         </div>
         <div className="weekly-super-admin-actions">
-          {view === "rankings" ? (
-            <Link className="btn-secondary" to="/admin">Global Challenge</Link>
-          ) : (
-            <Link className="btn-secondary" to="/admin/rankings">Rankings &amp; history</Link>
-          )}
+          <button
+            type="button"
+            className={`btn-secondary${adminTab === "today" ? " weekly-admin-tab-active" : ""}`}
+            onClick={() => setAdminTab("today")}
+          >
+            Today Challenge
+          </button>
+          <button
+            type="button"
+            className={`btn-secondary${adminTab === "questions" ? " weekly-admin-tab-active" : ""}`}
+            onClick={() => setAdminTab("questions")}
+          >
+            Questions
+          </button>
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => view === "rankings" ? loadRankings() : loadSetup()}
+            onClick={() => (adminTab === "questions" ? loadSetup() : loadRankings())}
             disabled={loading}
           >
             <RefreshCw size={15} /> Refresh
@@ -387,7 +398,9 @@ export default function GlobalChallengeAdmin({ view = "setup" }) {
       {error && <p className="weekly-admin-alert" role="alert">{error}</p>}
       {notice && <p className="weekly-admin-notice" role="status">{notice}</p>}
 
-      {loading ? <PageSkeleton compact label="Loading global challenge" /> : view === "rankings" ? (
+      {adminTab === "questions" ? (
+        <AdminQuestions embedded />
+      ) : loading ? <PageSkeleton compact label="Loading today challenge" /> : view === "rankings" ? (
         <section className="weekly-admin-card">
           <label className="weekly-data-toolbar">
             Daily cycle

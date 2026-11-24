@@ -1,0 +1,144 @@
+.organisation-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px var(--page-gutter, 24px) 48px;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.organisation-header {
+  margin-bottom: 22px;
+}
+
+.organisation-header-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.organisation-badge {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--accent-blue-bright);
+}
+
+.organisation-header h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.4px;
+}
+
+.organisation-expiry {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 100px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--color-success, #34d399);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.organisation-expiry-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: var(--color-warning, #f59e0b);
+}
+
+.organisation-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.organisation-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.organisation-tabs button.selected {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: var(--accent-blue-bright);
+}
+
+.organisation-create-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 24px;
+  padding: 30px 34px;
+  border-radius: 16px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  background:
+    radial-gradient(
+      ellipse at 90% 10%,
+      rgba(59, 130, 246, 0.14),
+      transparent 55%
+    ),
+    var(--bg-elevated);
+  overflow: hidden;
+}
+
+.organisation-create-copy h2 {
+  margin: 0 0 8px;
+  font-size: 21px;
+  letter-spacing: -0.4px;
+}
+
+.organisation-create-copy p {
+  margin: 0 0 18px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.65;
+  max-width: 560px;
+}
+
+.organisation-create-art {
+  color: rgba(59, 130, 246, 0.25);
+  flex-shrink: 0;
+}
+
+.organisation-battle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .organisation-create-card {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .organisation-create-art {
+    display: none;
+  }
+
+  .organisation-expiry {
+    margin-left: 0;
+  }
+}

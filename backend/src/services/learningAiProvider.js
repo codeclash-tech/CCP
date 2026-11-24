@@ -1,6 +1,9 @@
 const MAX_CONTEXT_MESSAGES = 24;
 const MAX_CONTEXT_CONTENT_LENGTH = 16000;
-const PROVIDER_RETRY_LIMIT = 2;
+const PROVIDER_RETRY_LIMIT = Math.max(
+  0,
+  Math.min(5, Number(process.env.AI_MAX_RETRIES) || 2),
+);
 const RETRY_BASE_DELAY_MS = 750;
 
 export class AiProviderError extends Error {

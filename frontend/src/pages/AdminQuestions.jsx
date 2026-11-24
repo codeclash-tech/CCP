@@ -72,7 +72,7 @@ function prepareCases(
   }));
 }
 
-export default function AdminQuestions() {
+export default function AdminQuestions({ embedded = false }) {
   const [form, setForm] = useState(EMPTY_QUESTION);
   const [formVersion, setFormVersion] = useState(0);
   const [formRestored, setFormRestored] = useState(false);
@@ -219,17 +219,19 @@ export default function AdminQuestions() {
 
   return (
     <main className="weekly-admin-page">
-      <header className="weekly-admin-heading">
-        <div>
-          <p className="weekly-eyebrow">SUPER ADMIN</p>
-          <h1><BookOpen size={23} /> Create question</h1>
-        </div>
-        <div className="weekly-question-actions">
-          <Link className="btn-secondary weekly-question-link" to="/admin">
-            Global Challenge <ArrowRight size={14} />
-          </Link>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="weekly-admin-heading">
+          <div>
+            <p className="weekly-eyebrow">SUPER ADMIN</p>
+            <h1><BookOpen size={23} /> Create question</h1>
+          </div>
+          <div className="weekly-question-actions">
+            <Link className="btn-secondary weekly-question-link" to="/admin">
+              Today Challenge <ArrowRight size={14} />
+            </Link>
+          </div>
+        </header>
+      )}
 
       {error && <p className="weekly-admin-alert" role="alert">{error}</p>}
       {notice && <p className="weekly-admin-notice" role="status">{notice}</p>}

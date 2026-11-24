@@ -2514,7 +2514,7 @@ export async function generateLearningTopicProposal(adminId, moduleId, input) {
         topic: { title, authoringProposal: true },
         approvedContent: JSON.stringify({
           originalRequest: authoringRequestContent,
-          previousResponse: reply.content.slice(0, 32000),
+          previousResponse: reply.content.slice(0, 16000),
           validationError: validationError.message,
           repairInstructions:
             "Your previous curriculum response above was rejected by server-side validation with the error shown. Return a corrected complete JSON object in the same schema. Preserve every supplied objective exactly, keep all previously valid fields unchanged, fix only the invalid or missing fields, and never invent source excerpts that are not present verbatim in the original reference content.",

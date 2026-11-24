@@ -33,11 +33,14 @@ const AuthPage = lazy(() => import("../pages/AuthPage"));
 const Profile = lazy(() => import("../pages/Profile"));
 const WeeklyAssessment = lazy(() => import("../pages/WeeklyAssessment"));
 const GlobalChallengeAdmin = lazy(() => import("../pages/GlobalChallengeAdmin"));
-const WeeklyRankings = lazy(() => import("../pages/WeeklyRankings"));
 const LearningCenter = lazy(() => import("../pages/LearningCenter"));
 const About = lazy(() => import("../pages/About"));
 const Terms = lazy(() => import("../pages/Terms"));
 const PublicLanding = lazy(() => import("../pages/PublicLanding"));
+const Challenges = lazy(() => import("../pages/Challenges"));
+const MyChallenges = lazy(() => import("../pages/MyChallenges"));
+const Organisation = lazy(() => import("../pages/Organisation"));
+const AdminOrganisations = lazy(() => import("../pages/AdminOrganisations"));
 
 function AppLayout({ children }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
@@ -321,6 +324,40 @@ export default function AppRouter() {
           <Route path="/assessments" element={<Navigate to="/battle-room" replace />} />
           <Route path="/daily-assessment" element={<Navigate to="/weekly-assessment" replace />} />
           <Route
+            path="/challenges"
+            element={
+              <ProtectedLayout>
+                <Challenges />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/my-challenges"
+            element={
+              <ProtectedLayout>
+                <MyChallenges />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/organisation"
+            element={
+              <ProtectedLayout>
+                <Organisation />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/admin/organisations"
+            element={
+              <ProtectedLayout
+                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
+              >
+                <AdminOrganisations />
+              </ProtectedLayout>
+            }
+          />
+          <Route
             path="/weekly-assessment"
             element={
               <ProtectedLayout>
@@ -332,7 +369,7 @@ export default function AppRouter() {
             path="/rankings"
             element={
               <ProtectedLayout>
-                <WeeklyRankings />
+                <Navigate to="/my-challenges" replace />
               </ProtectedLayout>
             }
           />
@@ -349,7 +386,7 @@ export default function AppRouter() {
               </ProtectedLayout>
             }
           />
-          <Route path="/certificates" element={<Navigate to="/rankings" replace />} />
+          <Route path="/certificates" element={<Navigate to="/my-challenges" replace />} />
           <Route
             path="/settings"
             element={<Navigate to="/" replace />}
@@ -388,7 +425,7 @@ export default function AppRouter() {
               </ProtectedLayout>
             }
           />
-          <Route path="/results" element={<Navigate to="/rankings" replace />} />
+          <Route path="/results" element={<Navigate to="/my-challenges" replace />} />
           <Route
             path="/admin"
             element={
@@ -405,7 +442,17 @@ export default function AppRouter() {
               <ProtectedLayout
                 allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
               >
-                <GlobalChallengeAdmin />
+                <Navigate to="/admin" replace />
+              </ProtectedLayout>
+            }
+          />
+          <Route
+            path="/admin/organisations"
+            element={
+              <ProtectedLayout
+                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
+              >
+                <AdminOrganisations />
               </ProtectedLayout>
             }
           />
@@ -415,7 +462,7 @@ export default function AppRouter() {
               <ProtectedLayout
                 allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
               >
-                <GlobalChallengeAdmin view="rankings" />
+                <Navigate to="/admin" replace />
               </ProtectedLayout>
             }
           />
@@ -425,7 +472,7 @@ export default function AppRouter() {
               <ProtectedLayout
                 allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
               >
-                <AdminQuestions />
+                <Navigate to="/admin" replace />
               </ProtectedLayout>
             }
           />
@@ -441,9 +488,9 @@ export default function AppRouter() {
           />
           <Route path="/admin/weekly-roster" element={<Navigate to="/admin" replace />} />
           <Route path="/admin/participants" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/rankings/individual" element={<Navigate to="/admin/rankings" replace />} />
-          <Route path="/admin/rankings/organizations" element={<Navigate to="/admin/rankings" replace />} />
-          <Route path="/admin/weekly-history" element={<Navigate to="/admin/rankings" replace />} />
+          <Route path="/admin/rankings/individual" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin/rankings/organizations" element={<Navigate to="/admin" replace />} />
+          <Route path="/admin/weekly-history" element={<Navigate to="/admin" replace />} />
           <Route path="/admin/certificates" element={<Navigate to="/admin" replace />} />
           <Route path="/admin/assessments" element={<Navigate to="/admin" replace />} />
           <Route path="/admin/organizations-users" element={<Navigate to="/admin" replace />} />

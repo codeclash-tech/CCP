@@ -647,6 +647,13 @@ export async function createRoom(req, res) {
     } = req.body;
     const userId = req.userId;
 
+    // Only Primary Admins (organisation accounts) may create battles.
+    if (req.user?.role !== "ADMIN" && req.user?.creatorType !== "ORGANIZATION") {
+      return res.status(403).json({
+        error: "Only organisation accounts (primary admins) can create battles.",
+      });
+    }
+
     if (!["OPEN", "ALLOWLIST"].includes(candidateAccess)) {
       return res.status(400).json({ error: "candidateAccess must be OPEN or ALLOWLIST." });
     }

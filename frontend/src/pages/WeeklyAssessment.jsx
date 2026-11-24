@@ -395,7 +395,7 @@ export default function WeeklyAssessment() {
       <section className="weekly-page">
         {completedRecoverySubmissions.length === 0 && (
           <header className="weekly-heading">
-            <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
+            <p className="weekly-eyebrow">TODAY&apos;S CODECLASH CHALLENGE</p>
             <h1>Daily challenge</h1>
             <p>No daily challenge is open right now. Check back tomorrow for the next challenge.</p>
           </header>
@@ -407,7 +407,7 @@ export default function WeeklyAssessment() {
             <h2>Daily challenge completed</h2>
             <p>Your congratulations certificate will be sent to your email. Visit the leaderboard to see the standings.</p>
             <div className="weekly-completion-actions">
-              <Link className="weekly-completion-primary" to="/rankings">See leaderboard</Link>
+              <Link className="weekly-completion-primary" to="/my-challenges">See leaderboard</Link>
             </div>
           </section>
         )}
@@ -511,7 +511,7 @@ export default function WeeklyAssessment() {
             </button>
           )}
           <div className="weekly-completion-actions">
-            <Link className="weekly-completion-primary" to="/rankings">See leaderboard</Link>
+            <Link className="weekly-completion-primary" to="/my-challenges">See leaderboard</Link>
           </div>
         </section>
       </main>
@@ -522,7 +522,7 @@ export default function WeeklyAssessment() {
     showInstructions ? (
       <main className="weekly-instructions-page">
         <section className="weekly-instructions-card" aria-labelledby="weekly-instructions-title">
-          <p className="weekly-eyebrow">CODECLASH GLOBAL CHALLENGE</p>
+          <p className="weekly-eyebrow">TODAY&apos;S CODECLASH CHALLENGE</p>
           <h1 id="weekly-instructions-title">Before you begin</h1>
           <p className="weekly-instructions-intro">
             Solve today&apos;s problem and submit your best solution before time
@@ -552,7 +552,7 @@ export default function WeeklyAssessment() {
       <main className="weekly-coding-page">
         <header className="weekly-coding-header">
           <div className="weekly-coding-title">
-            <span className="weekly-eyebrow">DAILY CHALLENGE</span>
+            <span className="weekly-eyebrow">TODAY&apos;S CODECLASH CHALLENGE</span>
             <strong>{assessment.cycle.name}</strong>
           </div>
           <div className="weekly-coding-meta">
