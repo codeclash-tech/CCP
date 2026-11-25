@@ -38,9 +38,8 @@ test("checkLicenseExpiry demotes expired organization accounts and marks license
     },
   };
 
-  const { default: check } = await import(
-    "../src/services/licenseExpiryService.js"
-  ).catch(() => ({}));
+  const { default: check } =
+    await import("../src/services/licenseExpiryService.js").catch(() => ({}));
 
   if (!check) {
     // Model layer needs a Mongo connection in this environment; the

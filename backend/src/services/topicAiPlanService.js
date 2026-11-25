@@ -108,7 +108,8 @@ export async function ensureTopicAiPlan(topic, module, options = {}) {
         enrichment: {
           keyConcepts: topic.selfConceptConfig?.keyConcepts || [],
           realLifeExamples: topic.selfConceptConfig?.realLifeExamples || [],
-          commonMisconceptions: topic.selfConceptConfig?.commonMisconceptions || [],
+          commonMisconceptions:
+            topic.selfConceptConfig?.commonMisconceptions || [],
           questionCoverage: topic.selfMcqConfig?.questionCoverage || "",
           evaluationCriteria:
             topic.strictConceptConfig?.evaluationCriteria ||
@@ -155,12 +156,9 @@ export async function ensureTopicAiPlan(topic, module, options = {}) {
     ...(() => {
       const usage = reply.usage || {};
       const fields = {};
-      for (const key of [
-        "promptTokens",
-        "completionTokens",
-        "totalTokens",
-      ]) {
-        if (Number.isFinite(Number(usage[key]))) fields[key] = Number(usage[key]);
+      for (const key of ["promptTokens", "completionTokens", "totalTokens"]) {
+        if (Number.isFinite(Number(usage[key])))
+          fields[key] = Number(usage[key]);
       }
       return fields;
     })(),
@@ -176,30 +174,61 @@ export async function ensureTopicAiPlan(topic, module, options = {}) {
       502,
     );
   }
-  const normalizedObjectives = objectives.slice(0, 50).map((objective, index) => ({
-    key: String(objective.key || `objective-${index + 1}`).slice(0, 100),
-    title: String(objective.title || objective.description || `Objective ${index + 1}`).slice(0, 160),
-    description: String(objective.description || objective.title || "").slice(0, 2000),
-    requiredKnowledge: (Array.isArray(objective.requiredKnowledge) ? objective.requiredKnowledge : [])
-      .map((item) => String(item || "").slice(0, 500))
-      .slice(0, 20),
-    expectedOutcome: String(objective.expectedOutcome || objective.description || objective.title || "").slice(0, 2000),
-    masteryCriteria: (Array.isArray(objective.masteryCriteria) ? objective.masteryCriteria : [])
-      .slice(0, 10)
-      .map((criterion, criterionIndex) => ({
-        key: String(criterion?.key || `criterion-${criterionIndex + 1}`).slice(0, 100),
-        description: String(criterion?.description || "").slice(0, 1000),
-        evaluationMethod: String(criterion?.evaluationMethod || "EXPLANATION").toUpperCase(),
-        requiredEvidenceCount: Math.max(1, Math.min(5, Number(criterion?.requiredEvidenceCount) || 1)),
-      })),
-    expectedAnswerPoints: (Array.isArray(objective.expectedAnswerPoints) ? objective.expectedAnswerPoints : [])
-      .map((point) => String(point || "").slice(0, 500))
-      .slice(0, 10),
-    commonMisconceptions: (Array.isArray(objective.commonMisconceptions) ? objective.commonMisconceptions : [])
-      .map((item) => String(item || "").slice(0, 500))
-      .slice(0, 20),
-    prerequisites: [],
-  }));
+  const normalizedObjectives = objectives
+    .slice(0, 50)
+    .map((objective, index) => ({
+      key: String(objective.key || `objective-${index + 1}`).slice(0, 100),
+      title: String(
+        objective.title || objective.description || `Objective ${index + 1}`,
+      ).slice(0, 160),
+      description: String(objective.description || objective.title || "").slice(
+        0,
+        2000,
+      ),
+      requiredKnowledge: (Array.isArray(objective.requiredKnowledge)
+        ? objective.requiredKnowledge
+        : []
+      )
+        .map((item) => String(item || "").slice(0, 500))
+        .slice(0, 20),
+      expectedOutcome: String(
+        objective.expectedOutcome ||
+          objective.description ||
+          objective.title ||
+          "",
+      ).slice(0, 2000),
+      masteryCriteria: (Array.isArray(objective.masteryCriteria)
+        ? objective.masteryCriteria
+        : []
+      )
+        .slice(0, 10)
+        .map((criterion, criterionIndex) => ({
+          key: String(
+            criterion?.key || `criterion-${criterionIndex + 1}`,
+          ).slice(0, 100),
+          description: String(criterion?.description || "").slice(0, 1000),
+          evaluationMethod: String(
+            criterion?.evaluationMethod || "EXPLANATION",
+          ).toUpperCase(),
+          requiredEvidenceCount: Math.max(
+            1,
+            Math.min(5, Number(criterion?.requiredEvidenceCount) || 1),
+          ),
+        })),
+      expectedAnswerPoints: (Array.isArray(objective.expectedAnswerPoints)
+        ? objective.expectedAnswerPoints
+        : []
+      )
+        .map((point) => String(point || "").slice(0, 500))
+        .slice(0, 10),
+      commonMisconceptions: (Array.isArray(objective.commonMisconceptions)
+        ? objective.commonMisconceptions
+        : []
+      )
+        .map((item) => String(item || "").slice(0, 500))
+        .slice(0, 20),
+      prerequisites: [],
+    }));
 
   const plan = {
     source: "AI",
@@ -264,7 +293,14 @@ export function attachAiPlanToTopic(topic, plan) {
 }
 
 export function planObjectiveList(plan) {
-  return plan?.objectives || getTopicObjectives(plan?.source === "AI" ? { objectiveDefinitions: plan.objectiveDefinitions } : {});
+  return (
+    plan?.objectives ||
+    getTopicObjectives(
+      plan?.source === "AI"
+        ? { objectiveDefinitions: plan.objectiveDefinitions }
+        : {},
+    )
+  );
 }
 
 export { LEVELS };

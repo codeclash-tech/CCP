@@ -702,11 +702,8 @@ function AdminLearning() {
           prerequisites: [],
         })));
     }
-    if (
-      Number(topicDraft.estimatedDurationMinutes) < 1 ||
-      (topicDraft.estimatedDurationMinutes &&
-        !Number.isInteger(Number(topicDraft.estimatedDurationMinutes)))
-    ) {
+    const rawDuration = String(topicDraft.estimatedDurationMinutes ?? "").trim();
+    if (rawDuration && (!Number.isInteger(Number(rawDuration)) || Number(rawDuration) < 1)) {
       setTopicError("Estimated duration must be a positive whole number of minutes.");
       return;
     }
