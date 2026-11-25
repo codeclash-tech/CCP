@@ -299,9 +299,19 @@ export function errorHandler(err, req, res, next) {
   });
 
   if (err.name === "ValidationError") {
+    // Surface the individual failing paths so authors can fix the exact field.
+    const fieldErrors = err.errors
+      ? Object.entries(err.errors).map(([path, detail]) => ({
+          field: path,
+          message: detail?.message || String(detail),
+        }))
+      : [{ field: "_", message: err.message }];
+    const summary = fieldErrors
+      .map((e) => `${e.field}: ${e.message}`)
+      .join(" | ");
     return res.status(400).json({
-      error: "Validation failed",
-      details: err.message,
+      error: `Validation failed (${summary})`,
+      details: fieldErrors,
       requestId,
     });
   }
