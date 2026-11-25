@@ -4227,10 +4227,17 @@ export async function askLearningTutor(
     session.language = language;
     if (prompt) session.messages.push({ role: "user", content: prompt });
     session.messages.push({ role: "assistant", content: reply.content });
+    // Teaching must not trap a student in endless questions: advance to the
+    // independent verification task when the tutor signals completion, or
+    // once teaching has exchanged a reasonable number of turns for this
+    // objective (the task, not the chat, decides mastery).
+    const teachingTurns = session.messages.filter(
+      (item) => item.role === "user",
+    ).length;
     if (
       !beginLesson &&
       learningStage === "TEACHING" &&
-      reply.teachingComplete === true
+      (reply.teachingComplete === true || teachingTurns >= 4)
     ) {
       session.learningStage = "OBJECTIVE_VERIFICATION";
     } else if (
@@ -4257,6 +4264,7 @@ export async function askLearningTutor(
       session,
       reply: reply.content,
       replyLanguage: "en",
+      objectiveCompleted: session.learningStage !== learningStage,
       evaluation: {
         correctness: "ambiguous",
         feedback:

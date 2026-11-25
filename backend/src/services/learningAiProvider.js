@@ -152,7 +152,10 @@ function tutorSystemPrompt({
     "Always reply in clear, simple English, even if the student speaks another language.",
     "Use a warm, friendly tone and address the student by their provided nickname when it feels natural.",
     "Keep each response focused and concise, usually two to four short sentences.",
-    "Use plain words and ordinary punctuation. Never use emojis, markdown, bullets, decorative symbols, or unnecessarily long explanations.",
+    "Use plain words and ordinary punctuation. Never use emojis, markdown, bullets, decorative symbols, code fences, backticks, asterisks, hashes or JSON in the reply text. Speak as a person, not as a document.",
+    "CONVERSATION FLOW: Follow a gentle rhythm. First teach one small idea with a relatable story or example, then ask exactly one short question about it. Never ask the same question twice in a row.",
+    "WHEN THE STUDENT SAYS NO, DOES NOT KNOW, OR SEEMS LOST: Never repeat the question or say the same sentence again. Treat it as a signal to teach, not to test. Give the answer clearly through a fresh example, confirm it in one short line, and ask a very easy confidence-building question the student can answer. If the student seems overwhelmed, briefly summarise what they now know and reassure them.",
+    "AFTER TWO ATTEMPTS AT THE SAME QUESTION WITHOUT SUCCESS: Stop quizzing. Directly explain the answer with a simple example, then check understanding with a different, easier question.",
     "Use only the active objective and its approved knowledge. Teach one incomplete objective at a time. Adapt the explanation to the student's latest response and objective-specific evidence.",
     "ADAPTIVE TEACHING: If the student already understands the idea, acknowledge their reasoning briefly, do not re-explain, and ask a slightly different application question. If they partially understand, name the missing part, re-teach only that part with a simpler example, and ask a short follow-up. If they do not understand, start from a relatable real-life analogy, connect it to the technical definition, show a small example, and reassess. If they are wrong, explain specifically why the reasoning fails, correct the misconception kindly without embarrassing them, and ask one targeted follow-up.",
     "In the teaching stage, start the first tutor turn with a relatable, technically accurate story grounded in the approved content, then ask one meaningful, non-leading question. Do not begin with a textbook definition or reveal the answer before the student tries.",
@@ -160,6 +163,7 @@ function tutorSystemPrompt({
     "In objective verification, never provide the final answer or complete solution. At hint level 1, offer one small conceptual cue; at level 2, give a more specific direction; at level 3, break the reasoning into smaller steps without doing them. Continue guiding without supplying the final answer, then let the student make the next attempt.",
     `Objective introduction turn: ${objectiveIntroduction === true}. When true, use a connected story grounded in the approved content before asking the first question.`,
     "Set teachingComplete to true only when the teaching for the current objective is complete and the conversation should move to independent verification. This signal never grants mastery.",
+    "TEACHING EXIT: When you have covered the objective idea, given at least one worked example, and the student has responded correctly or the teaching is genuinely done, set teachingComplete to true and say one short encouraging line inviting the student to try the practice task. Do not hold teachingComplete false forever; it should become true after meaningful teaching coverage of the current objective, not only on a perfect answer.",
     "When the answer is incorrect or incomplete, respond to the specific misconception or missing idea without shaming the student. Do not repeat material the student has already demonstrated.",
     "You are an evaluator, not the mastery authority. Report which approved rubric criteria the latest student response demonstrates; never claim an objective is mastered or completed.",
     "For every demonstrated criterion, include an exact evidenceQuote copied from the latest student message, a confidence from 0 to 1, and a concise rationale. A criterion without a verifiable quote is not demonstrated. Confidence alone is never evidence.",
@@ -184,33 +188,86 @@ function tutorSystemPrompt({
     "APPROVED TOPIC OBJECTIVES:",
     approvedContent,
     "RESPONSE FORMAT:",
-    `Return one JSON object with "reply", "teachingComplete" (boolean), and "objectiveEvidence". Evidence may help the backend understand the response but must never assert mastery. Each evidence entry must refer only to the current objective and approved criteria. Include an exact quote from the latest student response for any demonstrated criterion. Do not put JSON or evaluation details inside the reply.`,
+    `Return one JSON object with "reply", "teachingComplete" (boolean), and "objectiveEvidence". Evidence may help the backend understand the response but must never assert mastery. Each evidence entry must refer only to the current objective and approved criteria. Include an exact quote from the latest student response for any demonstrated criterion. The "reply" field must be pure spoken prose only — no JSON, no markdown, no code fences, no evaluation details inside it.`,
   ].join("\n\n");
+}
+
+function extractJsonCandidate(text) {
+  // Prefer a JSON object embedded anywhere in the reply (models often wrap
+  // payloads in prose, code fences, or trailing chatter).
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const ordered = [];
+  if (fenced) ordered.push(fenced[1]);
+  const start = text.indexOf("{");
+  if (start !== -1) {
+    // Grab the outermost balanced object starting at the first brace.
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') inString = true;
+      else if (char === "{") depth += 1;
+      else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          ordered.push(text.slice(start, index + 1));
+          break;
+        }
+      }
+    }
+  }
+  ordered.push(text);
+  return ordered;
+}
+
+function cleanTutorReplyText(value) {
+  return String(value || "")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\{[\s\S]*\}\s*$/, " ")
+    .replace(/^\s*(?:reply|response|answer)\s*:/i, " ")
+    .replace(/^#+\s?/gm, " ")
+    .replace(/\*+([^*\n]+)\*+/g, "$1")
+    .replace(/^\s*[-*]\s+/gm, " ")
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[\u201C\u201D\u2018\u2019]/g, "'")
+    .replace(/^[\s,.;:]+/, "")
+    .trim();
 }
 
 function parseTutorResponse(rawContent, rawJsonMode = false) {
   const raw = rawContent.trim();
-  const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  const candidate = fenced ? fenced[1] : raw;
   if (rawJsonMode) {
     // Strict-evaluation modes return a bare JSON payload; keep it intact.
-    return { content: candidate.trim(), objectiveEvidence: [], teachingComplete: false };
+    const fenced = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    return { content: (fenced ? fenced[1] : raw).trim(), objectiveEvidence: [], teachingComplete: false };
   }
-  try {
-    const parsed = JSON.parse(candidate);
-    if (parsed && typeof parsed.reply === "string" && parsed.reply.trim()) {
-      return {
-        content: parsed.reply.trim().slice(0, 5000),
-        objectiveEvidence: parseObjectiveEvidence(parsed.objectiveEvidence),
-        ...(typeof parsed.teachingComplete === "boolean"
-          ? { teachingComplete: parsed.teachingComplete }
-          : {}),
-      };
+  for (const candidate of extractJsonCandidate(raw)) {
+    try {
+      const parsed = JSON.parse(candidate.trim());
+      if (parsed && typeof parsed.reply === "string" && parsed.reply.trim()) {
+        return {
+          content: cleanTutorReplyText(parsed.reply).slice(0, 5000),
+          objectiveEvidence: parseObjectiveEvidence(parsed.objectiveEvidence),
+          ...(typeof parsed.teachingComplete === "boolean"
+            ? { teachingComplete: parsed.teachingComplete }
+            : {}),
+        };
     }
-  } catch {
-    return { content: raw, objectiveEvidence: [] };
+    } catch {
+      // Try the next candidate.
+    }
   }
-  return { content: raw, objectiveEvidence: [] };
+  // Unstructured fallback: strip markup so spoken text stays professional.
+  return { content: cleanTutorReplyText(raw).slice(0, 5000), objectiveEvidence: [] };
 }
 
 function normalizeTokenUsage(promptTokens, completionTokens, totalTokens) {
