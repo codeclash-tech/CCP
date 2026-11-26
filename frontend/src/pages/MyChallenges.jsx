@@ -6,7 +6,7 @@ import {
   Trophy,
   Swords,
   ArrowRight,
-  Code2,
+  Brain,
   BookOpen,
   ListChecks,
   Download,
@@ -159,7 +159,7 @@ export default function MyChallenges() {
         </button>
         <header className="my-challenge-detail-header">
           <p className="challenges-eyebrow">
-            {isDaily ? "DAILY CHALLENGE" : "COGNICLASH BATTLE"}
+            {isDaily ? "DAILY CHALLENGE" : "CogniClash BATTLE"}
           </p>
           <h1>
             {isDaily
@@ -228,12 +228,8 @@ export default function MyChallenges() {
   return (
     <main className="my-challenges-page">
       <header className="challenges-header">
-        <p className="challenges-eyebrow">COGNICLASH</p>
         <h1>My Challenges</h1>
-        <p>
-          Every challenge you have attended — with its result. Completed
-          challenges are removed automatically.
-        </p>
+        <p>Every challenge you have attended, with its result.</p>
       </header>
 
       {error && (
@@ -247,7 +243,7 @@ export default function MyChallenges() {
           <ClipboardList size={30} aria-hidden="true" />
           <h2>Nothing here yet</h2>
           <p>
-            Attend today&apos;s COGNICLASH Challenge or join a battle — your
+            Attend today&apos;s challenge or join a battle — your
             attended challenges and results will appear here.
           </p>
           <button
@@ -267,7 +263,7 @@ export default function MyChallenges() {
               type === "MCQ"
                 ? ListChecks
                 : type === "Coding"
-                  ? Code2
+                  ? Brain
                   : BookOpen;
             return (
               <article key={`strict-${attempt.id}`} className="cc-card">

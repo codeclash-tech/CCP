@@ -328,7 +328,7 @@ export default function BattleRoom() {
       </blockquote>
       <header className="battle-room-hero">
         <div className="battle-room-hero-copy">
-          <p className="battle-room-hero-eyebrow">COGNICLASH · CODING EVALUATION</p>
+          <p className="battle-room-hero-eyebrow">CogniClash · CODING EVALUATION</p>
           <h1>
             <Swords size={25} aria-hidden="true" />
             CogniClash Battle
@@ -428,7 +428,7 @@ export default function BattleRoom() {
               Join Battle
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 12 }}>
-              Enter the room key shared by the creator. Any verified COGNICLASH account can join.
+              Enter the room key shared by the creator. Any verified CogniClash account can join.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>

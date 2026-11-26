@@ -205,7 +205,7 @@ export async function submitQuestionLocally({
     throw new TypeError("A question and source code are required for local submission.");
   }
   if (typeof window.codeClashDesktop?.assessment?.submit !== "function") {
-    throw new Error("The COGNICLASH desktop submission service is not available.");
+    throw new Error("The CogniClash desktop submission service is not available.");
   }
 
   const executionCode = question.signature?.name
@@ -254,7 +254,7 @@ export async function submitDailyChallengeLocally({
     throw new TypeError("A question and source code are required for local submission.");
   }
   if (typeof window.codeClashDesktop?.assessment?.submitDaily !== "function") {
-    throw new Error("The COGNICLASH desktop submission service is not available.");
+    throw new Error("The CogniClash desktop submission service is not available.");
   }
   const testCases = (
     Array.isArray(question.testCases)

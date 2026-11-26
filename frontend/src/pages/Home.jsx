@@ -54,12 +54,18 @@ export default function Home() {
       <main className="product-page desktop-dashboard">
         <header className="desktop-dashboard-intro">
           <div>
-            <p className="home-welcome">Welcome, {user?.name || "there"}</p>
-            <p className="product-eyebrow">COGNICLASH · AN AMUX PRODUCT</p>
+            <p className="home-welcome home-welcome-bubble">
+              Welcome,
+              {" "}
+              {user?.organization && user.organization !== "Unspecified"
+                ? user.organization
+                : user?.name || "there"}
+            </p>
+            <p className="product-eyebrow">CogniClash · SKILL EVALUATION</p>
             <h1>Prove skill. Beat the clock.</h1>
             <p>
               A precision evaluation system for daily assessment, head-to-head
-              coding battles, and measurable, report-backed progress.
+              battles, and measurable, report-backed progress.
             </p>
           </div>
           <span className="desktop-dashboard-tag">SKILL EVALUATION</span>
@@ -69,11 +75,11 @@ export default function Home() {
           <div className="desktop-daily-content">
             <span className="desktop-daily-badge">
               <LockKeyhole size={15} aria-hidden="true" />
-              DAILY CHALLENGE
+              TODAY&apos;S CHALLENGE
             </span>
             <h2 id="desktop-daily-title">A new problem.<br />A sharper you.</h2>
             <p>
-              Take on a fresh coding challenge, sharpen your problem-solving
+              Take on a fresh challenge, sharpen your problem-solving
               skills, and see how you stack up on the daily leaderboard.
             </p>
             <div className="desktop-daily-actions">
@@ -85,10 +91,6 @@ export default function Home() {
                 My challenges
               </Link>
             </div>
-            <span className="desktop-daily-note">
-              <Trophy size={15} aria-hidden="true" />
-              Your daily progress, recognized.
-            </span>
           </div>
         </section>
 
@@ -133,13 +135,31 @@ export default function Home() {
   }
   return (
     <main className="home-page">
-      <p className="home-welcome">Welcome, {user?.name || "there"}</p>
+        <p className="home-welcome home-welcome-bubble">
+          Welcome,
+          {" "}
+          {user?.organization && user.organization !== "Unspecified"
+            ? user.organization
+            : user?.name || "there"}
+        </p>
       <style>{`
         .home-welcome {
           margin: 0 0 14px;
           color: var(--text-muted);
           font-size: 13px;
           font-weight: 600;
+        }
+
+        .home-welcome-bubble {
+          display: inline-flex;
+          align-items: center;
+          padding: 8px 18px;
+          border-radius: 100px;
+          border: 1px solid rgba(56, 189, 248, 0.35);
+          background: rgba(56, 189, 248, 0.1);
+          color: #7dd3fc;
+          font-size: 13px;
+          font-weight: 700;
         }
 
         .home-page {
@@ -660,7 +680,7 @@ export default function Home() {
         <div className="home-hero-content">
           <div className="home-eyebrow">
             <Swords size={15} />
-            <span>COGNICLASH · CODING EVALUATION · AN AMUX PRODUCT</span>
+            <span>CogniClash · CODING EVALUATION · AN AMUX PRODUCT</span>
           </div>
 
           <h1>

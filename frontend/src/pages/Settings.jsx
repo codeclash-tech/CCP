@@ -152,7 +152,7 @@ export default function Settings() {
           </div>
           {engineStatus === "unavailable" && (
             <p className="product-help">
-              Restart COGNICLASH and try again. If this continues, contact
+              Restart CogniClash and try again. If this continues, contact
               support.
             </p>
           )}

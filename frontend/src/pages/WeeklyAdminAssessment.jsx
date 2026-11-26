@@ -417,7 +417,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
                                 {entry.securityReport.riskLevel || "LOW"} risk · {entry.securityReport.riskScore || 0}/100
                               </summary>
                               <div>
-                                <p>Mode: {entry.securityReport.executionMode === "DESKTOP_LOCAL" ? "Desktop app" : entry.securityReport.executionMode || (entry.securityReport.submissionId ? "COGNICLASH service" : "Integrity events")}</p>
+                                <p>Mode: {entry.securityReport.executionMode === "DESKTOP_LOCAL" ? "Desktop app" : entry.securityReport.executionMode || (entry.securityReport.submissionId ? "CogniClash service" : "Integrity events")}</p>
                                 <p>Result: {entry.securityReport.resultStatus || entry.securityReport.status} · {entry.securityReport.passed ?? 0}/{entry.securityReport.total ?? 0} tests</p>
                                 <p>Client / runtime: {entry.securityReport.clientVersion || "—"} / {entry.securityReport.engineVersion || "—"}</p>
                                 <p>Protocol: {entry.securityReport.executionProtocolVersion || "—"}</p>

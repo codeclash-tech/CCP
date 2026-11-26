@@ -63,11 +63,16 @@
   color: var(--color-warning, #f59e0b);
 }
 
+.organisation-divider {
+  margin: 18px 0 22px;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+
 .organisation-tabs {
   display: flex;
   gap: 8px;
   margin-bottom: 20px;
-  border-bottom: 1px solid var(--border-color);
   padding-bottom: 12px;
 }
 

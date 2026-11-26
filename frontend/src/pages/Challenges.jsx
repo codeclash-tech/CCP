@@ -4,7 +4,7 @@ import {
   Bookmark,
   BookmarkCheck,
   CheckCircle2,
-  Code2,
+  Brain,
   BookOpen,
   ListChecks,
   LockKeyhole,
@@ -49,7 +49,7 @@ export function PremiumChallengeCard({
   const type = challengeTypeLabel(assessment);
   const deadline = formatDeadline(assessment.scheduleEndAt);
   const TypeIcon =
-    type === "MCQ" ? ListChecks : type === "Coding" ? Code2 : BookOpen;
+    type === "MCQ" ? ListChecks : type === "Coding" ? Brain : BookOpen;
   return (
     <article className="cc-card">
       <div className="cc-card-head">
@@ -185,7 +185,7 @@ export default function Challenges() {
   return (
     <main className="challenges-page">
       <header className="challenges-header">
-        <p className="challenges-eyebrow">COGNICLASH</p>
+        <p className="challenges-eyebrow">CogniClash</p>
         <h1>Challenges</h1>
       </header>
 
@@ -213,7 +213,7 @@ export default function Challenges() {
           <div className="challenges-gold-content">
             <span className="challenges-gold-badge">
               <LockKeyhole size={15} aria-hidden="true" />
-              TODAY&apos;S COGNICLASH CHALLENGE
+              TODAY&apos;S CogniClash CHALLENGE
             </span>
             <h2>{daily.cycle?.name || "Today's CogniClash Challenge"}</h2>
             <p>
@@ -249,7 +249,7 @@ export default function Challenges() {
           <LockKeyhole size={26} aria-hidden="true" />
           <h2>No challenge open right now</h2>
           <p>
-            Today&apos;s COGNICLASH Challenge has not started yet. Check back
+            Today&apos;s CogniClash Challenge has not started yet. Check back
             when the next challenge opens.
           </p>
         </section>

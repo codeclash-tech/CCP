@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Code2,
+  Brain,
   Eye,
   EyeOff,
   LoaderCircle,
@@ -242,8 +242,8 @@ export default function AuthPage({ mode }) {
       {isDesktop && (
         <aside className="desktop-auth-intro">
           <div className="desktop-auth-brand">
-            <Code2 size={23} aria-hidden="true" />
-            <span>COGNICLASH</span>
+            <Brain size={23} aria-hidden="true" />
+            <span>CogniClash</span>
           </div>
           <div className="desktop-auth-message">
             <span className="desktop-auth-icon">
@@ -258,7 +258,7 @@ export default function AuthPage({ mode }) {
           </div>
           <div className="desktop-auth-assurance">
             <ShieldCheck size={17} aria-hidden="true" />
-            <span>Your account and submissions are protected by COGNICLASH.</span>
+            <span>Your account and submissions are protected by CogniClash.</span>
           </div>
         </aside>
       )}
@@ -275,16 +275,16 @@ export default function AuthPage({ mode }) {
       >
         {isDesktop && (
           <div className="desktop-auth-card-brand">
-            <Code2 size={19} aria-hidden="true" />
-            <span>COGNICLASH</span>
+            <Brain size={19} aria-hidden="true" />
+            <span>CogniClash</span>
           </div>
         )}
         <h1 style={{ color: "var(--text-primary)", fontSize: 21, margin: "0 0 6px" }}>
           {isRegistration
-            ? "Create your COGNICLASH account"
+            ? "Create your CogniClash account"
             : resetMode
               ? "Reset your password"
-              : "Sign in to COGNICLASH"}
+              : "Sign in to CogniClash"}
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: 13, margin: "0 0 22px" }}>
           {isRegistration
@@ -521,7 +521,7 @@ export default function AuthPage({ mode }) {
         </form>
 
         <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "20px 0 0" }}>
-          {isRegistration ? "Already registered? " : resetMode ? "" : "New to COGNICLASH? "}
+          {isRegistration ? "Already registered? " : resetMode ? "" : "New to CogniClash? "}
           {resetMode ? null : (
             <Link
               to={isRegistration ? "/login" : "/register"}

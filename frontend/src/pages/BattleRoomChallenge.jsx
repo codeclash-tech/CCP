@@ -1913,7 +1913,7 @@ export default function BattleRoomChallenge() {
               ) : verificationFailed ? (
                 <>
                   <strong>Evaluation failed.</strong>{" "}
-                  COGNICLASH could not complete this submission. Retry to try
+                  CogniClash could not complete this submission. Retry to try
                   again.
                 </>
               ) : (

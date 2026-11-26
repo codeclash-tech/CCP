@@ -7,14 +7,14 @@ const TERMS = [
   {
     title: "1. About these terms",
     paragraphs: [
-      "COGNICLASH is a skill-evaluation product of AMUX. It is an assessment system — not a code-hosting or code-only platform. Through COGNICLASH, organizations and the AMUX team publish coding challenges, MCQ assessments, and concept evaluations, and every attempt is scored, ranked, and reported. CogniClash's coding evaluation feature is used for coding battles and daily challenges; additional assessment formats are offered by AMUX over time.",
-      "These terms are a binding agreement between you (the user) and AMUX for the use of COGNICLASH. If you use COGNICLASH on behalf of an organization, you confirm that you are authorized to accept these terms for that organization.",
+      "CogniClash is a skill-evaluation product of AMUX. It is an assessment system — not a code-hosting or code-only platform. Through CogniClash, organizations and the AMUX team publish coding challenges, MCQ assessments, and concept evaluations, and every attempt is scored, ranked, and reported. CogniClash's coding evaluation feature is used for coding battles and daily challenges; additional assessment formats are offered by AMUX over time.",
+      "These terms are a binding agreement between you (the user) and AMUX for the use of CogniClash. If you use CogniClash on behalf of an organization, you confirm that you are authorized to accept these terms for that organization.",
     ],
   },
   {
-    title: "2. Who may use COGNICLASH",
+    title: "2. Who may use CogniClash",
     paragraphs: [
-      "You must be legally able to accept these terms and provide accurate account information. If you use COGNICLASH for an organization, you confirm that you are authorized to act for it. Do not create an account or participate if doing so would violate a law or restriction that applies to you.",
+      "You must be legally able to accept these terms and provide accurate account information. If you use CogniClash for an organization, you confirm that you are authorized to act for it. Do not create an account or participate if doing so would violate a law or restriction that applies to you.",
       "You are responsible for keeping your sign-in credentials private and for activity carried out through your account. Tell us promptly through AMUX if you believe your account has been accessed without permission.",
     ],
   },
@@ -26,9 +26,9 @@ const TERMS = [
     ],
   },
   {
-    title: "4. What COGNICLASH provides",
+    title: "4. What CogniClash provides",
     paragraphs: [
-      "COGNICLASH provides: (a) a daily global coding challenge with a platform-wide leaderboard that resets each day; (b) private battle rooms created by organizations, joined with a secure key, with timed question solving, automated code execution, scoring, leaderboards, and result emails; (c) MCQ and concept evaluations published as strict, assessment-only challenges; and (d) AI-generated individual evaluation reports, which may be emailed to you and downloaded as a PDF from your results.",
+      "CogniClash provides: (a) a daily global coding challenge with a platform-wide leaderboard that resets each day; (b) private battle rooms created by organizations, joined with a secure key, with timed question solving, automated code execution, scoring, leaderboards, and result emails; (c) MCQ and concept evaluations published as strict, assessment-only challenges; and (d) AI-generated individual evaluation reports, which may be emailed to you and downloaded as a PDF from your results.",
       "Participants can save a challenge to keep it at the top of their Challenges page until it closes. Completed challenges remain visible in your results until the challenge's end date passes, after which the challenge and its room data are deleted from the platform and results are no longer available through the app. Keep your own copy of any report or certificate you need.",
       "Features can change as the product develops; we will not describe a feature as available unless it is offered in the platform.",
     ],
@@ -37,7 +37,7 @@ const TERMS = [
     title: "5. Challenge creators and participants",
     paragraphs: [
       "Creators (organizations and AMUX administrators) are responsible for the questions, instructions, schedules, access settings, and permissions for each challenge they publish. When a creator sets an end date and time for a challenge in strict mode, the challenge is shown to participants until that time and is deleted after it passes. Do not include confidential information, personal data, harmful material, or content you do not have the right to use. Creators must explain any rules that are specific to their challenge and must not misrepresent how results are evaluated.",
-      "Participants must follow the challenge rules and use the platform honestly. Do not attempt to bypass time limits, access another participant's account or work, interfere with the judge or service, or use unauthorized assistance where a challenge prohibits it. Creators may apply disclosed moderation rules, and COGNICLASH may review or restrict activity to protect the service.",
+      "Participants must follow the challenge rules and use the platform honestly. Do not attempt to bypass time limits, access another participant's account or work, interfere with the judge or service, or use unauthorized assistance where a challenge prohibits it. Creators may apply disclosed moderation rules, and CogniClash may review or restrict activity to protect the service.",
     ],
   },
   {
@@ -50,8 +50,8 @@ const TERMS = [
   {
     title: "7. AI evaluation and automated results",
     paragraphs: [
-      "COGNICLASH uses automated evaluation, including AI-generated questions, scoring, and individual reports. AI evaluation is provided as an assessment aid: results are generated from the information available to the platform and may be affected by test-case coverage, question design, runtime conditions, or technical interruptions.",
-      "Do not rely on a score, report, or certificate as a formal qualification, hiring decision, or guarantee of skill. Organizations that use COGNICLASH results for academic or employment decisions remain responsible for those decisions and for complying with applicable law.",
+      "CogniClash uses automated evaluation, including AI-generated questions, scoring, and individual reports. AI evaluation is provided as an assessment aid: results are generated from the information available to the platform and may be affected by test-case coverage, question design, runtime conditions, or technical interruptions.",
+      "Do not rely on a score, report, or certificate as a formal qualification, hiring decision, or guarantee of skill. Organizations that use CogniClash results for academic or employment decisions remain responsible for those decisions and for complying with applicable law.",
     ],
   },
   {
@@ -72,7 +72,7 @@ const TERMS = [
   {
     title: "10. Acceptable use",
     paragraphs: [
-      "Do not use COGNICLASH to break laws, infringe intellectual-property or privacy rights, distribute malware, harass or threaten others, manipulate results, disrupt availability, probe or exploit vulnerabilities without authorization, or evade platform safeguards, including the integrity safeguards applied during strict evaluations. Do not scrape, resell, or make the service available to others except as permitted by law and by AMUX.",
+      "Do not use CogniClash to break laws, infringe intellectual-property or privacy rights, distribute malware, harass or threaten others, manipulate results, disrupt availability, probe or exploit vulnerabilities without authorization, or evade platform safeguards, including the integrity safeguards applied during strict evaluations. Do not scrape, resell, or make the service available to others except as permitted by law and by AMUX.",
       "We may remove content, restrict a room, or suspend an account when reasonably necessary to enforce these rules, respond to a security or legal concern, or protect users and the service. Where practical, we will explain the action and provide a way to contact AMUX about it.",
     ],
   },
@@ -80,33 +80,33 @@ const TERMS = [
     title: "11. Fees, licenses, and the partner program",
     paragraphs: [
       "Challenges, daily challenges, and strict evaluations published for participants are free unless a price is displayed before you start. Paid Thrive modules are clearly priced before checkout. Where a license fee applies to an organization, it is charged on the terms communicated at issuance.",
-      "An organization creator confirms they may represent the organization and use its name and logo. By opting into the partner program, they authorize AMUX to display the submitted organization name and logo in COGNICLASH's partner area and to identify the organization as a COGNICLASH partner.",
-      "The partner program is intended to provide priority access to upcoming COGNICLASH features, reduced pricing for eligible future platform features, access to partner discounts on AMUX products, and priority handling for AMUX service requests. These benefits apply to future releases and offers and are subject to their published eligibility and availability; they do not guarantee that a particular feature, product, discount, or service will be offered. A partner may contact AMUX to request removal from the public partner listing.",
+      "An organization creator confirms they may represent the organization and use its name and logo. By opting into the partner program, they authorize AMUX to display the submitted organization name and logo in CogniClash's partner area and to identify the organization as a CogniClash partner.",
+      "The partner program is intended to provide priority access to upcoming CogniClash features, reduced pricing for eligible future platform features, access to partner discounts on AMUX products, and priority handling for AMUX service requests. These benefits apply to future releases and offers and are subject to their published eligibility and availability; they do not guarantee that a particular feature, product, discount, or service will be offered. A partner may contact AMUX to request removal from the public partner listing.",
     ],
   },
   {
     title: "12. Intellectual property and feedback",
     paragraphs: [
-      "COGNICLASH, its software, branding, and platform materials are owned by AMUX or its licensors. These terms give you permission to use the platform for its intended purpose; they do not transfer ownership of the platform or grant rights to AMUX branding beyond that use. If you send suggestions, you allow AMUX to use them without restriction or payment, provided this does not transfer ownership of your submitted content.",
+      "CogniClash, its software, branding, and platform materials are owned by AMUX or its licensors. These terms give you permission to use the platform for its intended purpose; they do not transfer ownership of the platform or grant rights to AMUX branding beyond that use. If you send suggestions, you allow AMUX to use them without restriction or payment, provided this does not transfer ownership of your submitted content.",
     ],
   },
   {
     title: "13. Availability and service changes",
     paragraphs: [
-      "We work to keep COGNICLASH useful and available but do not promise uninterrupted access, error-free operation, or permanent storage. Maintenance, outages, third-party services, security events, or product changes can affect access. We may add, change, pause, or retire features, and may provide notice when a change materially affects how you use the platform.",
+      "We work to keep CogniClash useful and available but do not promise uninterrupted access, error-free operation, or permanent storage. Maintenance, outages, third-party services, security events, or product changes can affect access. We may add, change, pause, or retire features, and may provide notice when a change materially affects how you use the platform.",
     ],
   },
   {
     title: "14. Disclaimers and limitation of liability",
     paragraphs: [
-      "To the extent permitted by applicable law, COGNICLASH is provided on an \u201cas is\u201d and \u201cas available\u201d basis without warranties that the service will meet every user's needs or that every result will be accurate. Nothing in these terms excludes a right or remedy that cannot legally be excluded.",
-      "You are responsible for your content, your use of the platform, and your compliance with these terms. To the extent permitted by law, AMUX is not responsible for indirect or consequential loss arising from your use of COGNICLASH. Any liability that cannot be excluded is limited only to the extent applicable law permits.",
+      "To the extent permitted by applicable law, CogniClash is provided on an \u201cas is\u201d and \u201cas available\u201d basis without warranties that the service will meet every user's needs or that every result will be accurate. Nothing in these terms excludes a right or remedy that cannot legally be excluded.",
+      "You are responsible for your content, your use of the platform, and your compliance with these terms. To the extent permitted by law, AMUX is not responsible for indirect or consequential loss arising from your use of CogniClash. Any liability that cannot be excluded is limited only to the extent applicable law permits.",
     ],
   },
   {
     title: "15. Suspension and account closure",
     paragraphs: [
-      "You may stop using COGNICLASH at any time. AMUX may suspend or close access for a serious or repeated breach, a security risk, a legal requirement, or when needed to protect the service. Where practical, we will give notice and an opportunity to address the issue. Provisions that by their nature should continue, including content permissions needed for previously generated results and limitations permitted by law, survive closure.",
+      "You may stop using CogniClash at any time. AMUX may suspend or close access for a serious or repeated breach, a security risk, a legal requirement, or when needed to protect the service. Where practical, we will give notice and an opportunity to address the issue. Provisions that by their nature should continue, including content permissions needed for previously generated results and limitations permitted by law, survive closure.",
     ],
   },
   {
@@ -119,13 +119,13 @@ const TERMS = [
   {
     title: "17. Changes to these terms",
     paragraphs: [
-      "We may update these terms as the service changes or to meet legal requirements. We will update the date below when we do. If a change materially affects users, we will take reasonable steps to make the change visible. Continued use after updated terms take effect means you accept the revised terms; if you do not agree, stop using COGNICLASH.",
+      "We may update these terms as the service changes or to meet legal requirements. We will update the date below when we do. If a change materially affects users, we will take reasonable steps to make the change visible. Continued use after updated terms take effect means you accept the revised terms; if you do not agree, stop using CogniClash.",
     ],
   },
   {
     title: "18. Contact",
     paragraphs: [
-      "For questions or concerns about COGNICLASH or these terms, contact AMUX through amux.in.",
+      "For questions or concerns about CogniClash or these terms, contact AMUX through amux.in.",
     ],
   },
 ];
@@ -141,12 +141,12 @@ export default function Terms() {
       </Link>
       <header className="terms-header">
         <span className="about-eyebrow">
-          <FileText size={15} /> COGNICLASH · AN AMUX PRODUCT
+          <FileText size={15} /> CogniClash · AN AMUX PRODUCT
         </span>
         <h1>Terms and Conditions</h1>
         <p>Effective date: October 11, 2026</p>
         <p className="terms-intro">
-          These terms explain the rules for using COGNICLASH — a skill
+          These terms explain the rules for using CogniClash — a skill
           evaluation system provided by AMUX. Please read them before creating
           an account.
         </p>
@@ -171,7 +171,7 @@ export default function Terms() {
             onChange={(event) => setAgreed(event.target.checked)}
           />
           <span>
-            I have read and agree to the COGNICLASH Terms and Conditions.
+            I have read and agree to the CogniClash Terms and Conditions.
           </span>
         </label>
         <button

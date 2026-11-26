@@ -119,6 +119,9 @@ export default function Profile() {
           margin: 0 auto;
           min-height: calc(100vh - 64px);
           padding: 20px var(--page-gutter) 48px;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
           color: var(--text-primary);
         }
 

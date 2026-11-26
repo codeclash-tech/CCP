@@ -3,7 +3,7 @@ import {
   ArrowRight,
   BarChart3,
   CheckCircle2,
-  Code2,
+  Brain,
   ExternalLink,
   Lightbulb,
   Swords,
@@ -82,16 +82,15 @@ export default function About() {
       <section className="about-hero">
         <div className="about-hero-copy">
           <span className="about-eyebrow">
-            <Code2 size={15} /> A product by AMUX
+            <Brain size={15} /> A product by AMUX
           </span>
           <h1>Measure skill, not just practice.</h1>
           <p>
-            COGNICLASH is AMUX's skill-evaluation product. Organizations and
-            learners use it to run coding battles, daily challenges, and
-            concept evaluations — every attempt scored, ranked, and reported.
-            Whether you're a creator looking to host an evaluation or a
-            participant ready to prove your ability, COGNICLASH has you
-            covered.
+            CogniClash is AMUX's skill-evaluation product. Organizations and
+            learners use it to run coding battles, daily challenges, and concept
+            evaluations — every attempt scored, ranked, and reported. Whether
+            you're a creator looking to host an evaluation or a participant
+            ready to prove your ability, CogniClash has you covered.
           </p>
           <p></p>
           <div className="about-hero-actions">
@@ -110,7 +109,7 @@ export default function About() {
         </div>
         <aside
           className="about-hero-stats"
-          aria-label="COGNICLASH community"
+          aria-label="CogniClash community"
           aria-busy={statsLoading}
         >
           <div className="about-stat-card">
@@ -144,13 +143,18 @@ export default function About() {
             </div>
           </div>
           <p className="about-stats-note" aria-live="polite">
-            {statsError
-              ? statsError
-              : stats
-                ? "Join the battle now!"
-                : statsLoading
-                  ? <span className="loading-skeleton about-stats-note-skeleton" aria-label="Loading community totals" />
-                  : ""}
+            {statsError ? (
+              statsError
+            ) : stats ? (
+              "Join the battle now!"
+            ) : statsLoading ? (
+              <span
+                className="loading-skeleton about-stats-note-skeleton"
+                aria-label="Loading community totals"
+              />
+            ) : (
+              ""
+            )}
           </p>
         </aside>
       </section>
@@ -224,7 +228,7 @@ export default function About() {
           <span className="about-eyebrow">Built for practical practice</span>
           <h2>Focused evaluations, with clear outcomes.</h2>
           <p>
-            COGNICLASH brings challenge authoring, timed problem solving, code
+            CogniClash brings challenge authoring, timed problem solving, code
             execution, and result tracking together. It gives creators a
             straightforward way to run an evaluation and gives participants a
             clear place to prove what they can do.
@@ -238,11 +242,11 @@ export default function About() {
           <p>Create an account to host a battle or take part in one.</p>
         </div>
         <Link className="btn-primary" to="/register">
-          Join COGNICLASH <ArrowRight size={16} />
+          Join CogniClash <ArrowRight size={16} />
         </Link>
       </section>
       <p className="about-byline">
-        COGNICLASH is a product of{" "}
+        CogniClash is a product of{" "}
         <a href="https://amux.in" target="_blank" rel="noreferrer">
           AMUX
         </a>

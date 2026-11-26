@@ -5,6 +5,7 @@ import {
   Bookmark,
   BookmarkCheck,
   Check,
+  ChevronLeft,
   ChevronRight,
   Download,
   Pencil,
@@ -5668,7 +5669,7 @@ function StudentLearning() {
         amount: data.checkout.amount,
         currency: data.checkout.currency,
         order_id: data.checkout.orderId,
-        name: "COGNICLASH",
+        name: "CogniClash",
         description: data.checkout.moduleTitle,
         handler: async (paymentResponse) => {
           try {
@@ -5752,32 +5753,14 @@ function StudentLearning() {
       : 0;
     return (
       <div className="learning-center learning-workspace">
-        <div className="learning-workspace-top">
-          <button
-            className="learning-back-button"
-            onClick={closeModule}
-            type="button"
-            aria-label="Back to all modules"
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <header className="learning-heading learning-workspace-heading">
-            <div>
-              <p className="learning-eyebrow">
-                {moduleData.program?.title || "Learning program"} ·{" "}
-                {module.title}
-              </p>
-              <h1>{selectedTopic?.title || "Choose a topic"}</h1>
-            </div>
-            <div className="learning-progress-summary">
-              <span>Module progress</span>
-              <strong>{moduleProgress}%</strong>
-              <div className="learning-progress-track">
-                <span style={{ width: `${moduleProgress}%` }} />
-              </div>
-            </div>
-          </header>
-        </div>
+        <button
+          className="learning-back-button"
+          onClick={closeModule}
+          type="button"
+          aria-label="Back to all modules"
+        >
+          <ArrowLeft size={16} />
+        </button>
         {error && (
           <p className="learning-alert learning-alert-error" role="alert">
             {error}
@@ -5804,19 +5787,6 @@ function StudentLearning() {
               </div>
             ) : (
               <>
-                <div className="learning-panel-title">
-                  <div>
-                    <h2>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</h2>
-                  </div>
-                </div>
-                <div className="learning-tutor-controls">
-                  {!voiceChoices[voiceProfile] && (
-                    <p className="learning-help" role="status">
-                      The selected English voice is not installed. Add an
-                      English voice in your device language settings.
-                    </p>
-                  )}
-                </div>
                 {!nickname ? (
                   <form
                     className="learning-nickname-form"
@@ -5873,12 +5843,6 @@ function StudentLearning() {
                       <p className="learning-muted" role="status">
                         {voiceProfile === "boy" ? "Rishi" : "Daisy"} is
                         thinking…
-                      </p>
-                    )}
-                    {nickname && currentObjective && isVerificationStage && (
-                      <p className="learning-muted" role="status">
-                        The tutor will now check your understanding of this
-                        objective through the conversation.
                       </p>
                     )}
                   </div>
@@ -5978,24 +5942,36 @@ function StudentLearning() {
               </>
             )}
           </section>
-          <aside className="learning-panel learning-topic-panel">
+          <aside
+            className={`learning-topic-sheet${topicsExpanded ? " is-open" : ""}`}
+            onMouseEnter={() => setTopicsExpanded(true)}
+            onMouseLeave={() => setTopicsExpanded(false)}
+          >
             <button
               type="button"
               className="learning-topic-panel-trigger"
               aria-expanded={topicsExpanded}
               onClick={() => setTopicsExpanded((value) => !value)}
+              aria-label="Show topics"
             >
-              <span className="learning-topic-panel-pill">Topics</span>
-              <ChevronRight
-                size={14}
-                style={{
-                  transform: topicsExpanded ? "rotate(90deg)" : "none",
-                }}
-              />
+              <ChevronLeft size={16} />
             </button>
             <div
-              className={`learning-topic-list${topicsExpanded ? " is-open" : ""}`}
+              className={`learning-topic-sheet-inner${topicsExpanded ? " is-open" : ""}`}
             >
+              <div className="learning-topic-sheet-header">
+                <p className="learning-eyebrow">
+                  {moduleData.program?.title || "Learning program"}
+                </p>
+                <h2>{module.title}</h2>
+                <div className="learning-progress-summary learning-topic-sheet-progress">
+                  <span>{moduleProgress}% complete</span>
+                  <div className="learning-progress-track">
+                    <span style={{ width: `${moduleProgress}%` }} />
+                  </div>
+                </div>
+              </div>
+              <div className="learning-topic-sheet-list">
               {module.topics.map((topic, index) => {
                 const isComplete = completedTopics.some(
                   (id) => String(id) === String(topic._id),
@@ -6033,6 +6009,7 @@ function StudentLearning() {
                   </button>
                 );
               })}
+              </div>
             </div>
           </aside>
         </div>
@@ -6153,13 +6130,6 @@ function StudentLearning() {
 
   return (
     <div className="learning-center">
-      <header className="learning-heading">
-        <div>
-          <p className="learning-eyebrow">Thrive learning</p>
-          <h1>Thrive</h1>
-          <p>Choose a course and learn at your own pace.</p>
-        </div>
-      </header>
       {error && (
         <p className="learning-alert learning-alert-error" role="alert">
           {error}
@@ -6241,7 +6211,7 @@ export default function LearningCenter({ adminView = false }) {
         This learning area is not available to your account.
       </p>
       <Link to="/" className="learning-link-button">
-        Return to COGNICLASH
+        Return to CogniClash
       </Link>
     </div>
   );

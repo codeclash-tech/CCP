@@ -33,7 +33,13 @@ export default function RoleNavigation({ open = false, onNavigate, onToggle }) {
       className={`role-navigation${open ? " is-open" : ""}`}
     >
       <div className="role-navigation-header">
-        <p className="role-navigation-welcome">Welcome, {user.name || "there"}</p>
+        <p className="role-navigation-welcome">
+          Welcome,
+          {" "}
+          {user?.organization && user.organization !== "Unspecified"
+            ? user.organization
+            : user.name || "there"}
+        </p>
         <button
           type="button"
           className="role-navigation-mobile-toggle"

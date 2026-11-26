@@ -12,7 +12,7 @@ import {
   Pencil,
   Trash2,
   Activity,
-  Code2,
+  Brain,
 } from "lucide-react";
 import api from "../services/api";
 import {
@@ -213,12 +213,10 @@ export default function Organisation() {
       <header className="organisation-header">
         <div className="organisation-header-main">
           <div className="organisation-badge">
-            <Building2 size={30} aria-hidden="true" />
+            <Building2 size={34} aria-hidden="true" />
           </div>
           <div>
-            <p className="challenges-eyebrow">
-              {profile?.name || user?.organization || "YOUR ORGANISATION"}
-            </p>
+            <p className="challenges-eyebrow">ORGANISATION</p>
             <h1 className="organisation-welcome">
               Welcome, {user?.name || "there"}
             </h1>
@@ -233,6 +231,8 @@ export default function Organisation() {
           )}
         </div>
       </header>
+
+      <hr className="organisation-divider" />
 
       {error && (
         <p className="weekly-error" role="alert">
@@ -249,6 +249,7 @@ export default function Organisation() {
         className="organisation-tabs"
         role="tablist"
         aria-label="Organisation sections"
+        style={{ borderBottom: "none", paddingBottom: 0 }}
       >
         <button
           type="button"
@@ -275,7 +276,7 @@ export default function Organisation() {
           <div className="organisation-create-copy">
             <h2>Create a new battle</h2>
             <p>
-              Build a private COGNICLASH battle with your own questions, test
+              Build a private CogniClash battle with your own questions, test
               cases, and schedule. Once created, the battle is published and
               every participant can join with its key.
             </p>
@@ -294,7 +295,7 @@ export default function Organisation() {
             aria-hidden="true"
           />
           <span className="organisation-create-brand">
-            <Code2 size={14} aria-hidden="true" />
+            <Brain size={14} aria-hidden="true" />
             CogniClash
           </span>
         </section>

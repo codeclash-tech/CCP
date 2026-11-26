@@ -31,7 +31,7 @@ export default function DesktopTitleBar() {
     try {
       await window.codeClashDesktop.window.control(action);
     } catch (error) {
-      console.error("Unable to control the COGNICLASH window:", error);
+      console.error("Unable to control the CogniClash window:", error);
     }
   };
 
@@ -41,11 +41,11 @@ export default function DesktopTitleBar() {
     <header
       className="desktop-titlebar"
       onDoubleClick={toggleMaximize}
-      aria-label="COGNICLASH window controls"
+      aria-label="CogniClash window controls"
     >
       <div className="desktop-titlebar-brand">
         <img className="desktop-titlebar-mark" src={codeclashLogo} alt="" />
-        <strong>COGNICLASH</strong>
+        <strong>CogniClash</strong>
       </div>
       <div className="desktop-titlebar-actions">
         <button
@@ -75,7 +75,7 @@ export default function DesktopTitleBar() {
         <button
           type="button"
           className="desktop-titlebar-button desktop-titlebar-close"
-          aria-label="Close COGNICLASH"
+          aria-label="Close CogniClash"
           title="Close"
           onClick={() => controlWindow("close")}
           onDoubleClick={(event) => event.stopPropagation()}

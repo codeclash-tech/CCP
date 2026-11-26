@@ -149,7 +149,7 @@ function AccessDeniedPage() {
     <section className="development-route-page" role="alert">
       <h1>Access denied</h1>
       <p>
-        This section is available only to the authorized COGNICLASH role for
+        This section is available only to the authorized CogniClash role for
         this account.
       </p>
     </section>

@@ -189,7 +189,7 @@ export default function useProctorGuard({
             if (!isFocused) {
               recordIntegrityEvent(
                 "WINDOW_BLUR",
-                "COGNICLASH desktop app moved to the background",
+                "CogniClash desktop app moved to the background",
               );
             }
           })
