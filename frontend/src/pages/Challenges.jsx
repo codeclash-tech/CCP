@@ -185,7 +185,6 @@ export default function Challenges() {
   return (
     <main className="challenges-page">
       <header className="challenges-header">
-        <p className="challenges-eyebrow">CogniClash</p>
         <h1>Challenges</h1>
       </header>
 

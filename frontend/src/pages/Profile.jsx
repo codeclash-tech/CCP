@@ -115,7 +115,6 @@ export default function Profile() {
       <style>{`
         .profile-page {
           width: 100%;
-          max-width: 1600px;
           margin: 0 auto;
           min-height: calc(100vh - 64px);
           padding: 20px var(--page-gutter) 48px;
@@ -123,11 +122,11 @@ export default function Profile() {
           align-items: flex-start;
           justify-content: center;
           color: var(--text-primary);
+          box-sizing: border-box;
         }
 
         .profile-container {
-          width: 100%;
-          max-width: 900px;
+          width: min(100%, 720px);
           margin: 0 auto;
         }
 

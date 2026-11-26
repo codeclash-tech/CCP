@@ -858,38 +858,64 @@
 
 .learning-center.learning-workspace {
   display: flex;
+  position: relative;
   width: 100%;
   max-width: none;
   height: calc(100dvh - var(--app-shell-topbar-height, 68px));
   min-height: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   overflow: hidden;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 10px;
+  padding-bottom: 12px;
 }
 
-.learning-workspace-top {
+/* Small topbar inside the workspace: back arrow + topic name */
+.learning-workspace-topbar {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
 }
 
-.learning-workspace-top .learning-back-button {
-  margin-bottom: 9px;
+.learning-workspace .learning-back-button {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
-.learning-workspace .learning-heading {
-  margin-bottom: 0;
+.learning-workspace-topic-name {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.learning-workspace .learning-alert {
+/* Conversation fills the remaining height (full screen minus topbar) */
+.learning-workspace-grid {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.learning-workspace .learning-tutor-panel,
+.learning-workspace .learning-conversation {
+  height: 100%;
+}
+
+.learning-workspace .learning-chat-form {
   flex: 0 0 auto;
-  margin: 0;
 }
 
 .learning-progress-summary {
   display: grid;
   gap: 5px;
-  width: min(230px, 30%);
+  width: 100%;
   color: var(--text-muted);
   font-size: 11px;
 }
@@ -914,9 +940,9 @@
 }
 
 .learning-workspace-grid {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(320px, 1.55fr) minmax(220px, 0.8fr);
-  gap: 15px;
+  grid-template-columns: minmax(0, 1fr);
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
@@ -1391,12 +1417,11 @@
   }
 
   .learning-tutor-panel {
-    min-height: 420px;
+    min-height: 70vh;
   }
 
   .learning-conversation {
-    min-height: 220px;
-    max-height: 45vh;
+    min-height: 60vh;
   }
 
   .learning-module-admin-panel {
@@ -2021,6 +2046,9 @@
   background: transparent;
   box-shadow: none;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .learning-workspace .learning-conversation {
@@ -2046,12 +2074,13 @@
 }
 
 /* Topic sheet: hidden by default, slides from the right edge on hover,
-   overlapping the conversation (about 30% of the screen), full height. */
+   overlapping the conversation (about 30% of the screen), full height.
+   The handle is a small rounded semicircle tucked behind the screen edge. */
 .learning-topic-sheet {
   position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
+  top: 6px;
+  right: -14px; /* handle peeks in; sheet slides fully inside */
+  bottom: 6px;
   z-index: 30;
   width: 30vw;
   min-width: 260px;
@@ -2059,6 +2088,11 @@
   flex-direction: row-reverse;
   align-items: stretch;
   pointer-events: none;
+  transition: right 0.25s ease;
+}
+
+.learning-topic-sheet.is-open {
+  right: 0;
 }
 
 .learning-topic-sheet-trigger,
@@ -2068,10 +2102,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 20px;
+  margin: auto 0;
+  height: 56px;
   border: 1px solid var(--border-color);
   border-right: 0;
-  border-radius: 10px 0 0 10px;
+  border-radius: 999px 0 0 999px;
   background: var(--bg-elevated);
   color: var(--text-muted);
   cursor: pointer;
@@ -2154,17 +2190,25 @@
 
 .learning-topic-sheet-header {
   flex: 0 0 auto;
-  padding: 16px 16px 12px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .learning-topic-sheet-header h2 {
-  margin: 4px 0 12px;
-  font-size: 15px;
+  margin: 3px 0 10px;
+  font-size: 14px;
+}
+
+.learning-topic-sheet-progress {
+  width: 100%;
 }
 
 .learning-topic-sheet-progress span {
   font-size: 11px;
+}
+
+.learning-topic-sheet-progress .learning-progress-track {
+  width: 100%;
 }
 
 .learning-topic-sheet-list {

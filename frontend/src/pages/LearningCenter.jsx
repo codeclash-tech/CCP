@@ -5753,14 +5753,19 @@ function StudentLearning() {
       : 0;
     return (
       <div className="learning-center learning-workspace">
-        <button
-          className="learning-back-button"
-          onClick={closeModule}
-          type="button"
-          aria-label="Back to all modules"
-        >
-          <ArrowLeft size={16} />
-        </button>
+        <div className="learning-workspace-topbar">
+          <button
+            className="learning-back-button"
+            onClick={closeModule}
+            type="button"
+            aria-label="Back to all modules"
+          >
+            <ArrowLeft size={14} />
+          </button>
+          <span className="learning-workspace-topic-name">
+            {selectedTopic?.title || "Choose a topic"}
+          </span>
+        </div>
         {error && (
           <p className="learning-alert learning-alert-error" role="alert">
             {error}
@@ -5954,7 +5959,7 @@ function StudentLearning() {
               onClick={() => setTopicsExpanded((value) => !value)}
               aria-label="Show topics"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={15} />
             </button>
             <div
               className={`learning-topic-sheet-inner${topicsExpanded ? " is-open" : ""}`}
@@ -6130,6 +6135,15 @@ function StudentLearning() {
 
   return (
     <div className="learning-center">
+      <header className="learning-heading">
+        <div>
+          <h1>Thrive</h1>
+          <p>
+            Learn any concept with an AI tutor — conversation first, progress
+            tracked as you master each objective.
+          </p>
+        </div>
+      </header>
       {error && (
         <p className="learning-alert learning-alert-error" role="alert">
           {error}

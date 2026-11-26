@@ -61,7 +61,6 @@ export default function Home() {
                 ? user.organization
                 : user?.name || "there"}
             </p>
-            <p className="product-eyebrow">CogniClash · SKILL EVALUATION</p>
             <h1>Prove skill. Beat the clock.</h1>
             <p>
               A precision evaluation system for daily assessment, head-to-head
@@ -143,16 +142,10 @@ export default function Home() {
             : user?.name || "there"}
         </p>
       <style>{`
-        .home-welcome {
-          margin: 0 0 14px;
-          color: var(--text-muted);
-          font-size: 13px;
-          font-weight: 600;
-        }
-
         .home-welcome-bubble {
           display: inline-flex;
           align-items: center;
+          margin: 0 0 18px;
           padding: 8px 18px;
           border-radius: 100px;
           border: 1px solid rgba(56, 189, 248, 0.35);
