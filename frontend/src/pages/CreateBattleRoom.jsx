@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+﻿import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createRoom, getRoomForEdit, updateRoom } from "../services/battleRoomService";
 import { saveCreatorProfile } from "../services/platformService";
@@ -551,9 +551,9 @@ export default function CreateBattleRoom() {
                 />
               )}
               <div style={{ padding: 16, background: "var(--bg-card)", border: "1px solid var(--border-color)", borderRadius: 8 }}>
-                <h2 style={{ color: "var(--text-primary)", fontSize: 14 }}>Benefits of becoming a CodeClash partner</h2>
+                <h2 style={{ color: "var(--text-primary)", fontSize: 14 }}>Benefits of becoming a COGNICLASH partner</h2>
                 <ul style={{ display: "grid", gap: 8, margin: "12px 0 0 18px", color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.6 }}>
-                  <li>Priority access to upcoming CodeClash features.</li>
+                  <li>Priority access to upcoming COGNICLASH features.</li>
                   <li>Reduced pricing on eligible future platform features.</li>
                   <li>Access to partner discounts on AMUX products when available.</li>
                   <li>Priority handling for AMUX service requests.</li>
@@ -573,7 +573,7 @@ export default function CreateBattleRoom() {
                 <span>
                   I am authorized to represent this organization, agree to the
                   partner program, and allow AMUX to display its name and logo
-                  on the CodeClash About page.
+                  on the COGNICLASH About page.
                 </span>
               </label>
             </div>
@@ -953,7 +953,7 @@ export default function CreateBattleRoom() {
               Room owner
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "0 0 14px" }}>
-              This room will be owned by your authenticated CodeClash account. You do not need to verify again to create another room.
+              This room will be owned by your authenticated COGNICLASH account. You do not need to verify again to create another room.
             </p>
             <div style={{ color: "var(--text-primary)", fontSize: 13 }}>
               {user?.name} <span style={{ color: "var(--text-muted)" }}>· {user?.email}</span>

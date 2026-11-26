@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { FlaskConical, Loader2, CheckCircle2, AlertTriangle } from "lucide-react";
 import { AUTHORING_LANGUAGES } from "../../../utils/constants";
 import { generateExpectedOutputs } from "../../../services/battleRoomService";
@@ -103,7 +103,7 @@ export default function ReferenceSolutionEditor({
           Reference Solution (correct answer)
         </label>
         <p style={{ color: "var(--text-muted)", fontSize: 11, fontFamily: "var(--font-ui)", margin: "0 0 6px" }}>
-          Provide a correct Java solution. CodeClash checks it against all test cases; only the generated outputs are saved.
+          Provide a correct Java solution. COGNICLASH checks it against all test cases; only the generated outputs are saved.
         </p>
 
         <textarea

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+﻿import { useRef, useEffect, useState } from "react";
 import { getEditorPreferences } from "../../utils/editorPreferences";
 
 export default function CodeEditorSandbox({
@@ -193,10 +193,10 @@ export default function CodeEditorSandbox({
         wordWrap: preferences.wordWrap ? "on" : "off",
       });
     };
-    window.addEventListener("codeclash-editor-preferences", updatePreferences);
+    window.addEventListener("COGNICLASH-editor-preferences", updatePreferences);
     return () =>
       window.removeEventListener(
-        "codeclash-editor-preferences",
+        "COGNICLASH-editor-preferences",
         updatePreferences,
       );
   }, []);

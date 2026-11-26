@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, BookOpen, Save } from "lucide-react";
 import api from "../services/api";
@@ -143,7 +143,7 @@ export default function AdminQuestions({ embedded = false }) {
 
       const localEngineAvailable =
         typeof window !== "undefined" &&
-        typeof window.codeClashDesktop?.engine?.execute === "function";
+        typeof window.COGNICLASHDesktop?.engine?.execute === "function";
       let testCases = prepareCases(
         form.testCases,
         form.signature,

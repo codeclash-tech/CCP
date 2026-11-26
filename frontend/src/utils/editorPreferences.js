@@ -1,4 +1,4 @@
-export const EDITOR_PREFERENCES_KEY = "codeclash-editor-preferences";
+﻿export const EDITOR_PREFERENCES_KEY = "COGNICLASH-editor-preferences";
 export const DEFAULT_EDITOR_PREFERENCES = Object.freeze({
   fontSize: 14,
   tabSize: 2,
@@ -46,7 +46,7 @@ export function saveEditorPreferences(preferences) {
   };
   window.localStorage.setItem(EDITOR_PREFERENCES_KEY, JSON.stringify(next));
   window.dispatchEvent(
-    new CustomEvent("codeclash-editor-preferences", { detail: next }),
+    new CustomEvent("COGNICLASH-editor-preferences", { detail: next }),
   );
   return next;
 }

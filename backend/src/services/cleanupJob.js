@@ -2,6 +2,7 @@ import cron from "node-cron";
 import Organization from "../models/Organization.js";
 import BattleRoom from "../models/BattleRoom.js";
 import BattleRoomSubmission from "../models/BattleRoomSubmission.js";
+import LearningModule from "../models/LearningModule.js";
 import User from "../models/User.js";
 import WeeklyCycle from "../models/WeeklyCycle.js";
 import {
@@ -171,6 +172,25 @@ export function startCleanupJobs() {
       }
     } catch (error) {
       console.error("[WeeklyAssessment] Lifecycle job failed:", error.message);
+    }
+  }, { timezone: "Asia/Kolkata" });
+
+  cron.schedule("* * * * *", async () => {
+    try {
+      // Hard-delete expired STRICT_EVALUATION challenge modules so the
+      // Challenges page only ever shows live challenges.
+      const now = new Date();
+      const result = await LearningModule.deleteMany({
+        evaluationMode: "STRICT_EVALUATION",
+        scheduleEndAt: { $ne: null, $lte: now },
+      });
+      if (result.deletedCount > 0) {
+        console.log(
+          `[CleanupJob] Deleted ${result.deletedCount} expired strict challenge module(s).`,
+        );
+      }
+    } catch (error) {
+      console.error("[CleanupJob] Strict module cleanup failed:", error.message);
     }
   }, { timezone: "Asia/Kolkata" });
 

@@ -1,4 +1,4 @@
-import { composeProgram } from "../../../backend/src/services/wrapperGenerator.js";
+﻿import { composeProgram } from "../../../backend/src/services/wrapperGenerator.js";
 import { convertParameterValuesToInput } from "../../../backend/src/services/parameterConverter.js";
 
 const REFERENCE_OUTPUT_SENTINEL = "__REFERENCE_OUTPUT_SENTINEL__";
@@ -67,7 +67,7 @@ function validateReferenceResults(results, question) {
 export async function generateExpectedOutputsLocally(
   question,
   desktopBridge =
-    typeof window !== "undefined" ? window.codeClashDesktop : undefined,
+    typeof window !== "undefined" ? window.COGNICLASHDesktop : undefined,
 ) {
   if (!question || typeof question !== "object") {
     throw new TypeError("A question is required to generate expected outputs.");
@@ -132,7 +132,7 @@ export async function executeQuestionTestCasesLocally({ question, code, language
   if (!question || typeof code !== "string") {
     throw new TypeError("A question and source code are required for code execution.");
   }
-  if (!window.codeClashDesktop?.engine?.execute) {
+  if (!window.COGNICLASHDesktop?.engine?.execute) {
     throw new Error("Code execution is currently unavailable.");
   }
 
@@ -163,7 +163,7 @@ export async function executeQuestionTestCasesLocally({ question, code, language
     ? composeProgram(question, code, language)
     : code;
   try {
-    const execution = await window.codeClashDesktop.engine.execute({
+    const execution = await window.COGNICLASHDesktop.engine.execute({
       code: program,
       language,
       testCases,
@@ -204,8 +204,8 @@ export async function submitQuestionLocally({
   if (!question || typeof code !== "string") {
     throw new TypeError("A question and source code are required for local submission.");
   }
-  if (typeof window.codeClashDesktop?.assessment?.submit !== "function") {
-    throw new Error("The CodeClash desktop submission service is not available.");
+  if (typeof window.COGNICLASHDesktop?.assessment?.submit !== "function") {
+    throw new Error("The COGNICLASH desktop submission service is not available.");
   }
 
   const executionCode = question.signature?.name
@@ -231,7 +231,7 @@ export async function submitQuestionLocally({
       input: getExecutionInput(testCase, question.signature),
       expectedOutput: String(testCase.expectedOutput ?? ""),
     }));
-  return window.codeClashDesktop.assessment.submit({
+  return window.COGNICLASHDesktop.assessment.submit({
     apiBaseUrl,
     accessToken,
     roomCode,
@@ -253,8 +253,8 @@ export async function submitDailyChallengeLocally({
   if (!question || typeof code !== "string") {
     throw new TypeError("A question and source code are required for local submission.");
   }
-  if (typeof window.codeClashDesktop?.assessment?.submitDaily !== "function") {
-    throw new Error("The CodeClash desktop submission service is not available.");
+  if (typeof window.COGNICLASHDesktop?.assessment?.submitDaily !== "function") {
+    throw new Error("The COGNICLASH desktop submission service is not available.");
   }
   const testCases = (
     Array.isArray(question.testCases)
@@ -280,7 +280,7 @@ export async function submitDailyChallengeLocally({
     throw new Error("No test cases are available for this question.");
   }
 
-  return window.codeClashDesktop.assessment.submitDaily({
+  return window.COGNICLASHDesktop.assessment.submitDaily({
     apiBaseUrl,
     accessToken,
     cycleId,

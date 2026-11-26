@@ -1,33 +1,127 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  Bookmark,
+  BookmarkCheck,
+  CheckCircle2,
+  Code2,
+  BookOpen,
+  ListChecks,
   LockKeyhole,
   Trophy,
-  Swords,
   ArrowRight,
   Timer,
-  ClipboardCheck,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
+import {
+  challengeTypeLabel,
+  savedChallengeIds,
+  toggleSavedChallenge,
+} from "../utils/challengeCards";
 import "./Challenges.css";
+
+function formatDeadline(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : date.toLocaleString("en-IN", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+}
+
+export function PremiumChallengeCard({
+  assessment,
+  saved,
+  onToggleSave,
+  onOpen,
+  enterLabel = "Start challenge",
+}) {
+  const type = challengeTypeLabel(assessment);
+  const deadline = formatDeadline(assessment.scheduleEndAt);
+  const TypeIcon =
+    type === "MCQ" ? ListChecks : type === "Coding" ? Code2 : BookOpen;
+  return (
+    <article className="cc-card">
+      <div className="cc-card-head">
+        <span className="cc-card-kind">
+          <TypeIcon size={13} aria-hidden="true" />
+          {type}
+        </span>
+        <button
+          type="button"
+          aria-pressed={Boolean(saved)}
+          aria-label={saved ? "Remove from saved" : "Save challenge to top"}
+          className={`cc-card-save${saved ? " is-saved" : ""}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleSave(assessment.id);
+          }}
+        >
+          {saved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+          {saved ? "Saved" : "Save"}
+        </button>
+      </div>
+      <h3 className="cc-card-title">{assessment.title}</h3>
+      <p className="cc-card-desc">
+        {assessment.description ||
+          assessment.courseTitle ||
+          "Sharpen your skills with this timed evaluation."}
+      </p>
+      <div className="cc-card-meta">
+        {deadline && (
+          <span className="cc-card-chip">
+            <Timer size={12} aria-hidden="true" />
+            Ends {deadline}
+          </span>
+        )}
+        <span className="cc-card-chip">
+          <CheckCircle2 size={12} aria-hidden="true" />
+          Free
+        </span>
+        <button
+          type="button"
+          className="cc-card-enter"
+          onClick={() => onOpen(assessment)}
+        >
+          {enterLabel}
+          <ArrowRight size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </article>
+  );
+}
 
 export default function Challenges() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userKey = user?.id || user?._id || user?.email || "user";
   const [daily, setDaily] = useState(null);
   const [activeRooms, setActiveRooms] = useState([]);
   const [strictAssessments, setStrictAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [savedIds, setSavedIds] = useState(() => savedChallengeIds(userKey));
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [dailyResult, roomsResult, strictResult] = await Promise.allSettled([
-        api.get("/weekly-assessments/current"),
-        api.get("/battle-rooms/joined-rooms"),
-        api.get("/learning-strict/assessments"),
-      ]);
+      const [dailyResult, roomsResult, strictResult] = await Promise.allSettled(
+        [
+          api.get("/weekly-assessments/current"),
+          api.get("/battle-rooms/joined-rooms"),
+          api.get("/learning-strict/assessments"),
+        ],
+      );
       if (
         dailyResult.status === "fulfilled" &&
         dailyResult.value.data?.cycle &&
@@ -66,6 +160,24 @@ export default function Challenges() {
     return () => window.clearInterval(interval);
   }, [load]);
 
+  const toggleSave = (id) => {
+    setSavedIds(toggleSavedChallenge(userKey, id, savedIds));
+  };
+
+  const orderedAssessments = useMemo(() => {
+    const list = [...strictAssessments];
+    list.sort((left, right) => {
+      const savedDiff =
+        Number(savedIds.has(String(right.id))) -
+        Number(savedIds.has(String(left.id)));
+      if (savedDiff) return savedDiff;
+      const leftEnd = left.scheduleEndAt ? new Date(left.scheduleEndAt) : 0;
+      const rightEnd = right.scheduleEndAt ? new Date(right.scheduleEndAt) : 0;
+      return leftEnd - rightEnd;
+    });
+    return list;
+  }, [strictAssessments, savedIds]);
+
   if (loading) {
     return <PageSkeleton label="Loading challenges" />;
   }
@@ -73,12 +185,8 @@ export default function Challenges() {
   return (
     <main className="challenges-page">
       <header className="challenges-header">
-        <p className="challenges-eyebrow">CODECLASH CHALLENGES</p>
+        <p className="challenges-eyebrow">COGNICLASH</p>
         <h1>Challenges</h1>
-        <p>
-          Take on today&apos;s CodeClash Challenge or join a live battle with a
-          key from your organisation.
-        </p>
       </header>
 
       {error && (
@@ -92,7 +200,7 @@ export default function Challenges() {
           className="challenges-gold-card"
           role="button"
           tabIndex={0}
-          aria-label="Start today's CodeClash Challenge"
+          aria-label="Start Today's CogniClash Challenge"
           onClick={() => navigate("/weekly-assessment")}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -105,9 +213,9 @@ export default function Challenges() {
           <div className="challenges-gold-content">
             <span className="challenges-gold-badge">
               <LockKeyhole size={15} aria-hidden="true" />
-              TODAY&apos;S CODECLASH CHALLENGE
+              TODAY&apos;S COGNICLASH CHALLENGE
             </span>
-            <h2>{daily.cycle?.name || "Today's CodeClash Challenge"}</h2>
+            <h2>{daily.cycle?.name || "Today's CogniClash Challenge"}</h2>
             <p>
               One challenge. One day. Compete against every organisation and
               coder on the platform — the leaderboard resets at midnight.
@@ -141,112 +249,29 @@ export default function Challenges() {
           <LockKeyhole size={26} aria-hidden="true" />
           <h2>No challenge open right now</h2>
           <p>
-            Today&apos;s CodeClash Challenge has not started yet. Check back
+            Today&apos;s COGNICLASH Challenge has not started yet. Check back
             when the next challenge opens.
           </p>
         </section>
       )}
 
-      {strictAssessments.length > 0 && (
-        <section className="challenges-strict">
-          <h2>Strict evaluations</h2>
+      <section className="challenges-battles" style={{ marginTop: 34 }}>
+        <h2>All challenges</h2>
+        {orderedAssessments.length === 0 ? (
           <p className="challenges-battles-empty">
-            Free assessments published by administrators. Complete them to
-            receive an individual knowledge report — no payment required.
-          </p>
-          <div className="challenges-battle-grid">
-            {strictAssessments.map((assessment) => (
-              <article
-                key={assessment.id}
-                className="challenges-battle-card challenges-strict-card"
-              >
-                <div className="challenges-battle-head">
-                  <ClipboardCheck size={17} aria-hidden="true" />
-                  <strong>{assessment.title}</strong>
-                </div>
-                <p className="challenges-battle-meta">
-                  {assessment.courseTitle ? `${assessment.courseTitle} · ` : ""}
-                  Strict Evaluation · Free
-                </p>
-                {assessment.scheduleEndAt && (
-                  <p className="challenges-battle-meta">
-                    <Timer size={13} aria-hidden="true" /> Closes{" "}
-                    {new Date(assessment.scheduleEndAt).toLocaleDateString(
-                      "en-IN",
-                      { dateStyle: "medium" },
-                    )}
-                  </p>
-                )}
-                <div className="challenges-battle-join">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() =>
-                      navigate(`/strict-assessment/${assessment.id}`)
-                    }
-                  >
-                    Start assessment <ArrowRight size={15} />
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="challenges-battles">
-        <h2>Live battles</h2>
-        {activeRooms.length === 0 ? (
-          <p className="challenges-battles-empty">
-            No battles are live right now. When a primary admin publishes a
-            battle, it appears here — join with the key shared by your
-            organisation.
+            No challenges are open right now. When your organisation or the AMUX
+            team publishes a challenge, it appears here.
           </p>
         ) : (
           <div className="challenges-battle-grid">
-            {activeRooms.map((room) => (
-              <article
-                key={room.id || room.roomCode}
-                className="challenges-battle-card"
-              >
-                <div className="challenges-battle-head">
-                  <Swords size={17} aria-hidden="true" />
-                  <strong>{room.title}</strong>
-                </div>
-                <p className="challenges-battle-meta">
-                  {room.questionCount || 0} question
-                  {room.questionCount === 1 ? "" : "s"} · {room.timeLimit}{" "}
-                  {room.timeLimitUnit || "minutes"}
-                </p>
-                <div className="challenges-battle-join">
-                  <input
-                    aria-label={`Battle key for ${room.title}`}
-                    placeholder="Battle key"
-                    maxLength={6}
-                    onChange={(event) => {
-                      event.target.dataset.key =
-                        event.target.value.toUpperCase();
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={(event) => {
-                      const input = event.target
-                        .closest(".challenges-battle-join")
-                        .querySelector("input");
-                      const key = (input?.dataset.key || input?.value || "")
-                        .trim()
-                        .toUpperCase();
-                      if (key) {
-                        navigate(`/battle-room/${key}/challenge`);
-                      }
-                    }}
-                  >
-                    Join
-                  </button>
-                </div>
-              </article>
+            {orderedAssessments.map((assessment) => (
+              <PremiumChallengeCard
+                key={assessment.id}
+                assessment={assessment}
+                saved={savedIds.has(String(assessment.id))}
+                onToggleSave={toggleSave}
+                onOpen={() => navigate(`/strict-assessment/${assessment.id}`)}
+              />
             ))}
           </div>
         )}

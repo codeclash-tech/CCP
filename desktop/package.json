@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Windows desktop shell for CodeClash",
+  "description": "Windows desktop shell for CogniClash",
   "main": "src/main/index.js",
   "scripts": {
     "dev": "node scripts/dev.mjs",
@@ -21,7 +21,7 @@
   },
   "build": {
     "appId": "com.codeclash.desktop",
-    "productName": "CodeClash",
+    "productName": "CogniClash",
     "directories": {
       "output": "release"
     },

@@ -285,3 +285,192 @@
     display: none;
   }
 }
+
+/* ===== PREMIUM CHALLENGE CARD (shared) ===== */
+.cc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  background:
+    radial-gradient(ellipse at 88% -10%, rgba(56, 189, 248, 0.14), transparent 55%),
+    linear-gradient(160deg, rgba(15, 30, 58, 0.55), rgba(9, 16, 34, 0.85));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  text-align: left;
+  width: 100%;
+}
+
+.cc-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+  opacity: 0.6;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cc-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 16px 34px rgba(0, 0, 0, 0.45), 0 0 30px rgba(56, 189, 248, 0.12);
+  }
+}
+
+.cc-card:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 3px;
+}
+
+.cc-card-gold {
+  border-color: rgba(250, 204, 21, 0.4);
+  background:
+    radial-gradient(ellipse at 88% -10%, rgba(250, 204, 21, 0.16), transparent 55%),
+    linear-gradient(160deg, rgba(60, 44, 6, 0.55), rgba(26, 20, 3, 0.85));
+}
+
+.cc-card-gold::before {
+  background: linear-gradient(90deg, transparent, #facc15, transparent);
+}
+
+.cc-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cc-card-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.1);
+  color: #7dd3fc;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cc-card-kind-gold {
+  border-color: rgba(250, 204, 21, 0.45);
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde68a;
+}
+
+.cc-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.cc-card-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.cc-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.cc-card-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cc-card-chip svg {
+  color: var(--accent-blue-bright, #38bdf8);
+}
+
+.cc-card-save {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.cc-card-save:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  color: var(--text-primary);
+}
+
+.cc-card-save.is-saved {
+  border-color: rgba(250, 204, 21, 0.5);
+  background: rgba(250, 204, 21, 0.1);
+  color: #fde68a;
+}
+
+.cc-card-enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: 0;
+  background: linear-gradient(135deg, #2563eb, #38bdf8);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+
+.cc-card-enter:hover {
+  filter: brightness(1.08);
+}
+
+.cc-card-enter:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-card,
+  .cc-card-enter,
+  .cc-card-save {
+    transition: none !important;
+  }
+}

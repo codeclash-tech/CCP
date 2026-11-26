@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   getRoomByCode,
@@ -160,7 +160,7 @@ export default function BattleRoomChallenge() {
   const [isMobile, setIsMobile] = useState(isMobileDevice);
   const isDesktop =
     typeof window !== "undefined" &&
-    typeof window.codeClashDesktop?.engine?.execute === "function";
+    typeof window.COGNICLASHDesktop?.engine?.execute === "function";
 
   const [room, setRoom] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -1801,7 +1801,7 @@ export default function BattleRoomChallenge() {
                   fontFamily: "var(--font-code)",
                 }}
               >
-                {currentLangDef.label} {currentLangDef.extension} • Question{" "}
+                {currentLangDef.label} {currentLangDef.extension} â€¢ Question{" "}
                 {currentQuestionIndex + 1}
               </span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1913,7 +1913,7 @@ export default function BattleRoomChallenge() {
               ) : verificationFailed ? (
                 <>
                   <strong>Evaluation failed.</strong>{" "}
-                  CodeClash could not complete this submission. Retry to try
+                  COGNICLASH could not complete this submission. Retry to try
                   again.
                 </>
               ) : (

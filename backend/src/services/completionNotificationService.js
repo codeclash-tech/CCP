@@ -235,7 +235,7 @@ export function dispatchBattleRoomCompletionEmail(submissionId, options = {}) {
         email: candidate.email,
         userName: submission.participantName || candidate.name,
         challengeName: snapshot.roomTitle,
-        certificateFilename: `codeclash-${String(snapshot.roomCode)
+        certificateFilename: `COGNICLASH-${String(snapshot.roomCode)
           .toLowerCase()
           .replace(/[^a-z0-9_-]/g, "-")}-certificate.pdf`,
         certificatePdf,

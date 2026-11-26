@@ -74,7 +74,7 @@ export async function buildStrictResultsWorkbook(moduleId) {
   }
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeClash";
+  workbook.creator = "COGNICLASH";
   workbook.created = new Date();
 
   const overview = workbook.addWorksheet("Overview");

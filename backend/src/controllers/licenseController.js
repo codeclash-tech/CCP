@@ -183,24 +183,24 @@ export async function generateLicense(req, res) {
     const sendResult = await client.resend.emails.send({
       from: client.from,
       to: [cleanEmail],
-      subject: "Your CodeClash organisation license",
+      subject: "Your COGNICLASH organisation license",
       text:
         existingAccountPromoted
-          ? `An organisation license for ${organizationName.trim()} has been activated on your existing CodeClash account. ` +
+          ? `An organisation license for ${organizationName.trim()} has been activated on your existing COGNICLASH account. ` +
             `You are now the primary admin of this organisation. ` +
             `This license expires on ${expiry.toDateString()}, after which your account returns to a normal user account.\n`
-          : `Your CodeClash license key is: ${licenseKey}\n\n` +
+          : `Your COGNICLASH license key is: ${licenseKey}\n\n` +
             `Organisation: ${organizationName.trim()}\n` +
             `This license expires on ${expiry.toDateString()}.\n\n` +
             "Use this key once during registration to create your organisation account.\n",
       html: existingAccountPromoted
         ? '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">' +
-          '<h2 style="color:#2563eb;">CodeClash Organisation License Activated</h2>' +
+          '<h2 style="color:#2563eb;">COGNICLASH Organisation License Activated</h2>' +
           `<p>Your existing account <strong>${cleanEmail}</strong> has been promoted to the primary admin of <strong>${organizationName.trim()}</strong>.</p>` +
           `<p>This license expires on <strong>${expiry.toDateString()}</strong>. After expiry or cancellation your account returns to a normal user account.</p>` +
           "</div>"
         : '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;">' +
-          '<h2 style="color:#2563eb;">CodeClash Organisation License</h2>' +
+          '<h2 style="color:#2563eb;">COGNICLASH Organisation License</h2>' +
           `<p>Your 16-digit license key is:</p>` +
           `<div style="background:#eff6ff;color:#1d4ed8;font-size:22px;font-weight:700;letter-spacing:4px;padding:16px;text-align:center;border-radius:10px;">${licenseKey}</div>` +
           `<p>Organisation: <strong>${organizationName.trim()}</strong></p>` +

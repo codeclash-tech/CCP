@@ -101,7 +101,7 @@ export function createCorsMiddleware(allowedOrigins) {
     } else if (!origin) {
       res.setHeader(
         "Access-Control-Allow-Origin",
-        allowedOrigins[0] || "https://codeclash.amux.in",
+        allowedOrigins[0] || "https://COGNICLASH.amux.in",
       );
     }
 
@@ -137,11 +137,11 @@ export function securityMiddleware(app) {
   // break exact CORS origin matching.
   const clientUrl = config.CLIENT_URL?.replace(/\/+$/, "");
 
-  // CodeClash production frontend.
+  // COGNICLASH production frontend.
   // Keeping this explicit ensures the custom domain works even if
   // CLIENT_URL is temporarily missing or misconfigured.
-  const productionFrontendUrl = "https://codeclash.amux.in";
-  const desktopAppOrigin = "codeclash://app";
+  const productionFrontendUrl = "https://COGNICLASH.amux.in";
+  const desktopAppOrigin = "COGNICLASH://app";
 
   // Helmet with strict CSP
   app.use(
@@ -244,14 +244,14 @@ export function securityMiddleware(app) {
   // CORS hardening
   //
   // Production:
-  //   https://codeclash.amux.in
+  //   https://COGNICLASH.amux.in
   //
   // CLIENT_URL is also retained so existing configured environments
   // continue to work.
   const allowedOrigins = [
     clientUrl,
 
-    // Explicit production CodeClash domain.
+    // Explicit production COGNICLASH domain.
     productionFrontendUrl,
     desktopAppOrigin,
 

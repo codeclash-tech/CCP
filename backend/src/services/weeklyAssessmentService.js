@@ -41,8 +41,8 @@ import {
 } from "./completionNotificationService.js";
 
 const RETRY_LEASE_MS = 6 * 60 * 1000;
-const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
-const DESKTOP_ENGINE_VERSION = process.env.CODECLASH_ENGINE_VERSION || "1.0.0";
+const DESKTOP_CLIENT_VERSION = process.env.COGNICLASH_DESKTOP_VERSION || "1.0.0";
+const DESKTOP_ENGINE_VERSION = process.env.COGNICLASH_ENGINE_VERSION || "1.0.0";
 let weeklyVerificationWorkerStarted = false;
 
 function logWeeklyVerification(event, details = {}) {
@@ -61,7 +61,7 @@ function weeklySubmissionAcknowledgement(submission) {
   return {
     submissionId: String(submission._id),
     status: submission.status,
-    message: "Submission received. CodeClash is verifying your solution.",
+    message: "Submission received. COGNICLASH is verifying your solution.",
   };
 }
 

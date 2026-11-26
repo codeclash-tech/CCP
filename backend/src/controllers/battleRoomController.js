@@ -59,8 +59,8 @@ import {
 } from "../services/battleRoomVerificationService.js";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-const DESKTOP_CLIENT_VERSION = process.env.CODECLASH_DESKTOP_VERSION || "1.0.0";
-const DESKTOP_ENGINE_VERSION = process.env.CODECLASH_ENGINE_VERSION || "1.0.0";
+const DESKTOP_CLIENT_VERSION = process.env.COGNICLASH_DESKTOP_VERSION || "1.0.0";
+const DESKTOP_ENGINE_VERSION = process.env.COGNICLASH_ENGINE_VERSION || "1.0.0";
 
 function getLeaderboardOrganization(submission) {
   const currentOrganization = submission.userId?.organization;
@@ -1824,7 +1824,7 @@ export async function prepareDesktopSubmission(req, res) {
       executionProtocolVersion !== LOCAL_EXECUTION_PROTOCOL_VERSION
     ) {
       return res.status(400).json({
-        error: "This CodeClash Desktop or execution protocol version is not supported.",
+        error: "This COGNICLASH Desktop or execution protocol version is not supported.",
         code: "DESKTOP_VERSION_UNSUPPORTED",
       });
     }

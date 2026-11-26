@@ -1,4 +1,4 @@
-const SPEECH_SAMPLE_RATE = 16000;
+﻿const SPEECH_SAMPLE_RATE = 16000;
 
 const LANGUAGE_LOCALES = {
   auto: "en-IN",
@@ -60,7 +60,7 @@ function microphoneError(error) {
   switch (error?.name) {
     case "NotAllowedError":
     case "PermissionDeniedError":
-      return new Error("Microphone access was denied. Allow microphone access for CodeClash in Windows settings and try again.");
+      return new Error("Microphone access was denied. Allow microphone access for COGNICLASH in Windows settings and try again.");
     case "NotFoundError":
     case "DevicesNotFoundError":
       return new Error("No microphone was found. Connect a microphone and try again.");
@@ -169,7 +169,7 @@ function createDesktopSpeechInputProvider(browser, speech) {
 }
 
 export function createSpeechInputProvider(browser = globalThis) {
-  const desktopSpeech = browser.codeClashDesktop?.speech;
+  const desktopSpeech = browser.COGNICLASHDesktop?.speech;
   if (desktopSpeech && typeof desktopSpeech.transcribe === "function") {
     return createDesktopSpeechInputProvider(browser, desktopSpeech);
   }
@@ -206,7 +206,7 @@ export function createSpeechInputProvider(browser = globalThis) {
         const messages = {
           "not-allowed": "Microphone access was denied. Allow microphone access in device settings and try again.",
           "no-speech": "No speech was recognized. Please try again or type your question.",
-          network: "The browser speech service is unavailable. Try the CodeClash desktop app's offline speech input.",
+          network: "The browser speech service is unavailable. Try the COGNICLASH desktop app's offline speech input.",
         };
         onError(messages[event.error] || "Speech input was unavailable. Check microphone permission or type your question.");
         onStateChange("idle");

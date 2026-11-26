@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Code2,
@@ -32,7 +32,7 @@ const fieldStyle = {
 export default function AuthPage({ mode }) {
   const isRegistration = mode === "register";
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
+    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn } = useAuth();
@@ -243,7 +243,7 @@ export default function AuthPage({ mode }) {
         <aside className="desktop-auth-intro">
           <div className="desktop-auth-brand">
             <Code2 size={23} aria-hidden="true" />
-            <span>CodeClash</span>
+            <span>COGNICLASH</span>
           </div>
           <div className="desktop-auth-message">
             <span className="desktop-auth-icon">
@@ -258,7 +258,7 @@ export default function AuthPage({ mode }) {
           </div>
           <div className="desktop-auth-assurance">
             <ShieldCheck size={17} aria-hidden="true" />
-            <span>Your account and submissions are protected by CodeClash.</span>
+            <span>Your account and submissions are protected by COGNICLASH.</span>
           </div>
         </aside>
       )}
@@ -276,15 +276,15 @@ export default function AuthPage({ mode }) {
         {isDesktop && (
           <div className="desktop-auth-card-brand">
             <Code2 size={19} aria-hidden="true" />
-            <span>CodeClash</span>
+            <span>COGNICLASH</span>
           </div>
         )}
         <h1 style={{ color: "var(--text-primary)", fontSize: 21, margin: "0 0 6px" }}>
           {isRegistration
-            ? "Create your CodeClash account"
+            ? "Create your COGNICLASH account"
             : resetMode
               ? "Reset your password"
-              : "Sign in to CodeClash"}
+              : "Sign in to COGNICLASH"}
         </h1>
         <p style={{ color: "var(--text-muted)", fontSize: 13, margin: "0 0 22px" }}>
           {isRegistration
@@ -521,7 +521,7 @@ export default function AuthPage({ mode }) {
         </form>
 
         <p style={{ color: "var(--text-muted)", fontSize: 12, margin: "20px 0 0" }}>
-          {isRegistration ? "Already registered? " : resetMode ? "" : "New to CodeClash? "}
+          {isRegistration ? "Already registered? " : resetMode ? "" : "New to COGNICLASH? "}
           {resetMode ? null : (
             <Link
               to={isRegistration ? "/login" : "/register"}

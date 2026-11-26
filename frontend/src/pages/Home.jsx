@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import {
   ArrowRight,
   KeyRound,
@@ -16,38 +16,26 @@ import {
 import "../styles/productPages.css";
 import { useAuth } from "../context/AuthContext";
 
-const cards = [
+const capabilities = [
   {
     icon: PlusCircle,
-    title: "Create a CodeClash Battle",
-    text: "Add custom Java/DS questions, set time limits, and generate a secure battle key for participants or students.",
-    action: "Create Battle",
-    to: "/battle-room/create",
-    badge: "For Primary Admins",
+    title: "Author your own evaluations",
+    text: "Write questions, set test cases, and schedule timed rooms with a secure key — your rules, your participants.",
   },
   {
     icon: KeyRound,
-    title: "Join with Key",
-    text: "Received an invitation key? Enter your battle code to start solving challenges in real time.",
-    action: "Enter Battle",
-    to: "/challenges",
-    badge: "For Participants & Coders",
+    title: "Join with a single key",
+    text: "Participants enter a private battle with a 6-character key and compete on the same clock.",
   },
   {
     icon: LockKeyhole,
-    title: "Today's CodeClash Challenge",
-    text: "Solve today’s shared challenge. Individual scores and organization rankings start fresh every day.",
-    action: "Attend today",
-    to: "/challenges",
-    badge: "New challenge every day",
+    title: "Daily global challenge",
+    text: "One new problem every day for the whole platform. One leaderboard. Results reset at midnight.",
   },
   {
     icon: Mail,
-    title: "Enterprise & Support",
-    text: "Looking for custom platform integration for your startup, university, or academy? Get in touch with our team.",
-    action: "Contact Support",
-    to: "mailto:helloamux@gmail.com?subject=CodeClash%20Enquiry",
-    badge: "Partnerships",
+    title: "Enterprise & partnerships",
+    text: "Custom integrations for startups, universities, and academies. Talk to the AMUX team.",
   },
 ];
 
@@ -60,21 +48,21 @@ const targetAudiences = [
 export default function Home() {
   const { user } = useAuth();
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
+    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
   if (isDesktop) {
     return (
       <main className="product-page desktop-dashboard">
         <header className="desktop-dashboard-intro">
           <div>
             <p className="home-welcome">Welcome, {user?.name || "there"}</p>
-            <p className="product-eyebrow">CODECLASH · AN AMUX PRODUCT</p>
-            <h1>Build skill. Beat the clock.</h1>
+            <p className="product-eyebrow">COGNICLASH · AN AMUX PRODUCT</p>
+            <h1>Prove skill. Beat the clock.</h1>
             <p>
-              A focused coding platform for daily practice, head-to-head battles,
-              and measurable progress.
+              A precision evaluation system for daily assessment, head-to-head
+              coding battles, and measurable, report-backed progress.
             </p>
           </div>
-          <span className="desktop-dashboard-tag">CODING BATTLES</span>
+          <span className="desktop-dashboard-tag">SKILL EVALUATION</span>
         </header>
 
         <section className="desktop-daily-challenge" aria-labelledby="desktop-daily-title">
@@ -108,7 +96,7 @@ export default function Home() {
           <div className="desktop-dashboard-section-heading">
             <div>
               <p className="product-eyebrow">CHOOSE YOUR NEXT MOVE</p>
-              <h2 id="desktop-battle-title">Choose your next battle</h2>
+              <h2 id="desktop-battle-title">Choose your next evaluation</h2>
             </div>
             <p>Practice solo or bring your team into the competition.</p>
           </div>
@@ -117,7 +105,7 @@ export default function Home() {
               <span className="desktop-dashboard-icon"><Swords size={20} /></span>
               <span>
                 <strong>Battles</strong>
-                <small>Join a private coding competition.</small>
+                <small>Join a private coding evaluation.</small>
               </span>
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
@@ -672,31 +660,31 @@ export default function Home() {
         <div className="home-hero-content">
           <div className="home-eyebrow">
             <Swords size={15} />
-            <span>Java Coding Battles</span>
+            <span>COGNICLASH · CODING EVALUATION · AN AMUX PRODUCT</span>
           </div>
 
           <h1>
-            Create Custom Battles.
+            Where skill is measured,
             <br />
-            <span>Assess Java Talent.</span>
+            <span>not just practiced.</span>
           </h1>
 
           <p className="home-hero-description">
-            Host custom Java coding challenges, share secure 6-character room
-            keys, and evaluate solutions instantly. Built for technical
-            interviews, tech startups, colleges, and training academies.
+            CogniClash is the evaluation engine of AMUX. Host coding battles,
+            run daily assessments, and rank talent on verifiable leaderboards —
+            built for technical hiring, colleges, and training academies.
           </p>
 
           <div className="home-actions">
-            <Link to="/battle-room/create" className="home-btn primary">
-              <PlusCircle size={16} />
-              Create a Battle
+            <Link to="/challenges" className="home-btn primary">
+              <LockKeyhole size={16} />
+              Browse challenges
               <ArrowRight size={15} />
             </Link>
 
-            <Link to="/challenges" className="home-btn secondary">
-              <KeyRound size={15} />
-              Join with a Key
+            <Link to="/my-challenges" className="home-btn secondary">
+              <Trophy size={15} />
+              My results
             </Link>
           </div>
 
@@ -777,40 +765,26 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MAIN ACTIONS */}
+      {/* WHAT YOU CAN DO — marketing section */}
       <section>
         <div className="home-section-heading">
           <div>
-            <h2>Get Started with CodeClash</h2>
+            <h2>What you can do with CogniClash</h2>
             <p>
-              Launch custom Java challenges or step into an active battle room.
+              One system to author, run, and evaluate skill challenges — and
+              turn every attempt into a result you can trust.
             </p>
           </div>
         </div>
 
         <div className="home-cards">
-          {cards.map(({ icon: Icon, title, text, action, to, badge }) => (
+          {capabilities.map(({ icon: Icon, title, text }) => (
             <article className="home-card" key={title}>
-              <span className="home-card-badge">{badge}</span>
-
-              <div className={`home-card-icon${title === "Daily Global Challenge" ? " home-card-icon-daily" : ""}`}>
+              <div className="home-card-icon">
                 <Icon size={22} />
               </div>
-
               <h3>{title}</h3>
               <p>{text}</p>
-
-              {to.startsWith("mailto:") ? (
-                <a href={to} className="home-card-link">
-                  {action}
-                  <ArrowRight size={14} />
-                </a>
-              ) : (
-                <Link to={to} className="home-card-link">
-                  {action}
-                  <ArrowRight size={14} />
-                </Link>
-              )}
             </article>
           ))}
         </div>

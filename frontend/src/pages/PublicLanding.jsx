@@ -4,7 +4,7 @@ import brandIcon from "../../../desktop/assets/codeclash.ico";
 import "./PublicLanding.css";
 
 const DOWNLOAD_URL =
-  "https://github.com/codeclash-tech/CCP/releases/download/v1.0.0/CodeClash.Setup.exe";
+  "https://github.com/codeclash-tech/CCP/releases/download/v1.0.0/CogniClash.Setup.exe";
 const MOBILE_DEVICE_PATTERN =
   /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i;
 
@@ -47,7 +47,7 @@ const audiences = [
 ];
 
 const steps = [
-  ["Get the app", "Download CodeClash for Windows and sign in."],
+  ["Get the app", "Download CogniClash for Windows and sign in."],
   ["Choose a challenge", "Try the daily challenge or join a Battle Room."],
   ["Solve and compare", "Submit your work and see the standings when judging finishes."],
 ];
@@ -59,7 +59,7 @@ export default function PublicLanding() {
     if (!isDesktopDevice()) {
       event.preventDefault();
       setDownloadNotice(
-        "CodeClash is available for desktop devices only. Open this page on a desktop computer to download the Windows app.",
+        "CogniClash is available for desktop devices only. Open this page on a desktop computer to download the Windows app.",
       );
       return;
     }
@@ -70,9 +70,9 @@ export default function PublicLanding() {
   return (
     <main className="public-landing" id="home">
       <nav className="public-landing-nav" aria-label="Main navigation">
-        <a className="public-landing-brand" href="#home" aria-label="CodeClash home">
+        <a className="public-landing-brand" href="#home" aria-label="CogniClash home">
           <img src={brandIcon} alt="" />
-          <span>CodeClash</span>
+          <span>CogniClash</span>
         </a>
         <div className="public-landing-nav-links">
           <a href="#experience">Experience</a>
@@ -103,7 +103,7 @@ export default function PublicLanding() {
           <p className="public-landing-description">
             Turn coding practice into a challenge worth showing up for. Take on
             a daily problem, compete in a Battle Room, or host one for your
-            community — all in the CodeClash Windows app.
+            community — all in the CogniClash Windows app.
           </p>
           <div className="public-landing-actions">
             <a
@@ -111,10 +111,10 @@ export default function PublicLanding() {
               href={DOWNLOAD_URL}
               onClick={handleDownloadClick}
             >
-              Download for Windows <span aria-hidden="true">↗</span>
+              Download for Windows <span aria-hidden="true">â†—</span>
             </a>
             <a className="public-landing-secondary-link" href="#experience">
-              Explore CodeClash <span aria-hidden="true">↓</span>
+              Explore CogniClash <span aria-hidden="true">â†“</span>
             </a>
           </div>
           <p className="public-landing-version">
@@ -123,11 +123,11 @@ export default function PublicLanding() {
           </p>
         </div>
 
-        <div className="public-landing-preview" aria-label="CodeClash app preview">
+        <div className="public-landing-preview" aria-label="CogniClash app preview">
           <div className="public-landing-preview-topbar">
             <div className="public-landing-preview-brand">
               <img src={brandIcon} alt="" />
-              <span>CodeClash</span>
+              <span>CogniClash</span>
             </div>
             <span className="public-landing-preview-status">
               <i /> READY TO CLASH
@@ -143,22 +143,22 @@ export default function PublicLanding() {
                 <strong>Daily Challenge</strong>
                 <small>A fresh challenge awaits</small>
               </span>
-              <span className="public-landing-preview-arrow">↗</span>
+              <span className="public-landing-preview-arrow">â†—</span>
             </div>
             <div className="public-landing-preview-challenge secondary">
-              <span className="public-landing-preview-icon crossed">⚔</span>
+              <span className="public-landing-preview-icon crossed">âš”</span>
               <span>
                 <strong>Battle Rooms</strong>
                 <small>Join in or host your own</small>
               </span>
-              <span className="public-landing-preview-arrow">↗</span>
+              <span className="public-landing-preview-arrow">â†—</span>
             </div>
             <div className="public-landing-preview-code" aria-hidden="true">
               <span>public class</span> Solution {"{"}
               <br />
               &nbsp;&nbsp;<span>void</span> makeYourMove() {"{"}
               <br />
-              &nbsp;&nbsp;&nbsp;&nbsp;solve(); <b>▌</b>
+              &nbsp;&nbsp;&nbsp;&nbsp;solve(); <b>â–Œ</b>
               <br />
               &nbsp;&nbsp;{"}"}
               <br />
@@ -185,7 +185,7 @@ export default function PublicLanding() {
           <p className="public-landing-eyebrow">Built around the moment you solve</p>
           <h2>Practice alone.<br /><span>Make it a competition.</span></h2>
           <p>
-            CodeClash gives individual practice and group challenges a shared,
+            CogniClash gives individual practice and group challenges a shared,
             focused desktop experience.
           </p>
         </div>
@@ -194,7 +194,7 @@ export default function PublicLanding() {
             <article className="public-landing-pillar" key={pillar.number}>
               <span className="public-landing-pillar-number">{pillar.number}</span>
               <div className="public-landing-pillar-mark" aria-hidden="true">
-                {pillar.number === "01" ? "</>" : pillar.number === "02" ? "⚔" : "+"}
+                {pillar.number === "01" ? "</>" : pillar.number === "02" ? "âš”" : "+"}
               </div>
               <h3>{pillar.title}</h3>
               <p>{pillar.description}</p>
@@ -229,7 +229,7 @@ export default function PublicLanding() {
         <div className="public-landing-audience-list">
           {audiences.map(([title, description]) => (
             <article key={title}>
-              <span aria-hidden="true">↗</span>
+              <span aria-hidden="true">â†—</span>
               <div>
                 <h3>{title}</h3>
                 <p>{description}</p>
@@ -242,7 +242,7 @@ export default function PublicLanding() {
       <section className="public-landing-final-cta" id="download">
         <div className="public-landing-final-glow" aria-hidden="true" />
         <p className="public-landing-eyebrow">Your next move starts here</p>
-        <h2>Ready to make it<br /><span>a CodeClash?</span></h2>
+        <h2>Ready to make it<br /><span>a CogniClash?</span></h2>
         <p>
           Download the Windows app and bring a little more purpose to your next
           coding session.
@@ -252,7 +252,7 @@ export default function PublicLanding() {
           href={DOWNLOAD_URL}
           onClick={handleDownloadClick}
         >
-          Get CodeClash for Windows <span aria-hidden="true">↗</span>
+          Get CogniClash for Windows <span aria-hidden="true">â†—</span>
         </a>
         <span className="public-landing-final-version">
           Version {desktopPackage.version} <span aria-hidden="true">·</span> Windows desktop app
@@ -262,7 +262,7 @@ export default function PublicLanding() {
       <footer className="public-landing-footer">
         <a className="public-landing-footer-brand" href="#home">
           <img src={brandIcon} alt="" />
-          <span>CodeClash <small>by AMUX</small></span>
+          <span>CogniClash <small>by AMUX</small></span>
         </a>
         <span>Practice with purpose. Compete with confidence.</span>
         <a href="mailto:helloamux@gmail.com">Contact support</a>

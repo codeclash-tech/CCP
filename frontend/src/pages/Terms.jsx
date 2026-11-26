@@ -5,101 +5,127 @@ import "./Terms.css";
 
 const TERMS = [
   {
-    title: "1. Who may use CodeClash",
+    title: "1. About these terms",
     paragraphs: [
-      "You must be legally able to accept these terms and provide accurate account information. If you use CodeClash for an organization, you confirm that you are authorized to act for it. Do not create an account or participate if doing so would violate a law or restriction that applies to you.",
+      "COGNICLASH is a skill-evaluation product of AMUX. It is an assessment system — not a code-hosting or code-only platform. Through COGNICLASH, organizations and the AMUX team publish coding challenges, MCQ assessments, and concept evaluations, and every attempt is scored, ranked, and reported. CogniClash's coding evaluation feature is used for coding battles and daily challenges; additional assessment formats are offered by AMUX over time.",
+      "These terms are a binding agreement between you (the user) and AMUX for the use of COGNICLASH. If you use COGNICLASH on behalf of an organization, you confirm that you are authorized to accept these terms for that organization.",
+    ],
+  },
+  {
+    title: "2. Who may use COGNICLASH",
+    paragraphs: [
+      "You must be legally able to accept these terms and provide accurate account information. If you use COGNICLASH for an organization, you confirm that you are authorized to act for it. Do not create an account or participate if doing so would violate a law or restriction that applies to you.",
       "You are responsible for keeping your sign-in credentials private and for activity carried out through your account. Tell us promptly through AMUX if you believe your account has been accessed without permission.",
     ],
   },
   {
-    title: "2. Accounts and email",
+    title: "3. Accounts and email verification",
     paragraphs: [
       "An account requires a working email address and email verification. Keep your profile information current, use one account for yourself, and do not impersonate another person or organization. We may suspend access when an account appears compromised, fraudulent, or in breach of these terms.",
+      "Organizations register using a license key issued by AMUX. A license key grants one organization registration and expires on the date communicated at issuance. AMUX may cancel a license for breach of these terms or for security reasons.",
     ],
   },
   {
-    title: "3. What CodeClash provides",
+    title: "4. What COGNICLASH provides",
     paragraphs: [
-      "CodeClash is an AMUX platform for creating and taking part in coding battles. Features may include question authoring, scheduled or timed rooms, code execution, submissions, scores, leaderboards, result reporting, and certificates. Features can change as the product develops; we will not describe a feature as available unless it is offered in the platform.",
-      "Code execution and automated evaluation are provided for learning and challenge purposes. Results may be affected by test-case coverage, runtime conditions, or technical interruptions. Do not rely on a score or certificate as a formal qualification, hiring decision, or guarantee of skill.",
+      "COGNICLASH provides: (a) a daily global coding challenge with a platform-wide leaderboard that resets each day; (b) private battle rooms created by organizations, joined with a secure key, with timed question solving, automated code execution, scoring, leaderboards, and result emails; (c) MCQ and concept evaluations published as strict, assessment-only challenges; and (d) AI-generated individual evaluation reports, which may be emailed to you and downloaded as a PDF from your results.",
+      "Participants can save a challenge to keep it at the top of their Challenges page until it closes. Completed challenges remain visible in your results until the challenge's end date passes, after which the challenge and its room data are deleted from the platform and results are no longer available through the app. Keep your own copy of any report or certificate you need.",
+      "Features can change as the product develops; we will not describe a feature as available unless it is offered in the platform.",
     ],
   },
   {
-    title: "4. Battle creators and participants",
+    title: "5. Challenge creators and participants",
     paragraphs: [
-      "Creators are responsible for the questions, instructions, schedules, access settings, and permissions for each battle they publish. Do not include confidential information, personal data, harmful material, or content you do not have the right to use. Creators must explain any rules that are specific to their battle and must not misrepresent how results are evaluated.",
-      "Participants must follow the battle rules and use the platform honestly. Do not attempt to bypass time limits, access another participant's account or work, interfere with the judge or service, or use unauthorized assistance where a battle prohibits it. Creators may apply disclosed moderation rules, and CodeClash may review or restrict activity to protect the service.",
+      "Creators (organizations and AMUX administrators) are responsible for the questions, instructions, schedules, access settings, and permissions for each challenge they publish. When a creator sets an end date and time for a challenge in strict mode, the challenge is shown to participants until that time and is deleted after it passes. Do not include confidential information, personal data, harmful material, or content you do not have the right to use. Creators must explain any rules that are specific to their challenge and must not misrepresent how results are evaluated.",
+      "Participants must follow the challenge rules and use the platform honestly. Do not attempt to bypass time limits, access another participant's account or work, interfere with the judge or service, or use unauthorized assistance where a challenge prohibits it. Creators may apply disclosed moderation rules, and COGNICLASH may review or restrict activity to protect the service.",
     ],
   },
   {
-    title: "5. Your content and permissions",
+    title: "6. Your content and permissions",
     paragraphs: [
       "You retain ownership of content you submit, including questions, descriptions, code, organization names, and logos, subject to rights held by others. You grant AMUX a limited, non-exclusive permission to host, process, display, execute where applicable, and transmit that content as needed to operate and improve the features you use.",
       "You confirm that you have the rights and permissions needed to submit content and grant this permission. You are responsible for maintaining your own copies of content you need. Do not submit passwords, private keys, payment details, or other secrets as challenge content or code.",
     ],
   },
   {
-    title: "6. Code execution, data, and privacy",
+    title: "7. AI evaluation and automated results",
     paragraphs: [
-      "Code and inputs submitted for execution are processed to run and evaluate your solution. Do not use the execution environment to attack systems, access data that is not yours, mine cryptocurrency, or run code unrelated to the battle. We may collect account, usage, submission, and diagnostic information to provide the service, calculate results, prevent abuse, and troubleshoot problems.",
-      "Use of personal information is also subject to the privacy information made available by AMUX. Do not include personal or sensitive information about another person in battle content unless you have a lawful basis and the necessary permission.",
+      "COGNICLASH uses automated evaluation, including AI-generated questions, scoring, and individual reports. AI evaluation is provided as an assessment aid: results are generated from the information available to the platform and may be affected by test-case coverage, question design, runtime conditions, or technical interruptions.",
+      "Do not rely on a score, report, or certificate as a formal qualification, hiring decision, or guarantee of skill. Organizations that use COGNICLASH results for academic or employment decisions remain responsible for those decisions and for complying with applicable law.",
     ],
   },
   {
-    title: "7. Organizations and partner program",
+    title: "8. Learning and Thrive",
     paragraphs: [
-      "An organization creator confirms they may represent the organization and use its name and logo. By opting into the partner program, they authorize AMUX to display the submitted organization name and logo in CodeClash's partner area and to identify the organization as a CodeClash partner.",
-      "The partner program is intended to provide priority access to upcoming CodeClash features, reduced pricing for eligible future platform features, access to partner discounts on AMUX products, and priority handling for AMUX service requests. These benefits apply to future releases and offers and are subject to their published eligibility and availability; they do not guarantee that a particular feature, product, discount, or service will be offered. Any future offer may have separate duration and terms. A partner may contact AMUX to request removal from the public partner listing.",
+      "The Thrive learning experience offers guided modules and topics taught by AI tutors with voice output. Thrive conversation content, module purchases, and access periods are governed by the pricing and access duration displayed before purchase. Where a module is paid, payment is processed through the payment provider displayed at checkout and access begins after payment confirmation.",
+      "Module certificates are issued when the published completion requirements are met. Certificate availability follows the retention rules in section 9.",
     ],
   },
   {
-    title: "8. Acceptable use",
+    title: "9. Results, reports, certificates, and data retention",
     paragraphs: [
-      "Do not use CodeClash to break laws, infringe intellectual-property or privacy rights, distribute malware, harass or threaten others, manipulate results, disrupt availability, probe or exploit vulnerabilities without authorization, or evade platform safeguards. Do not scrape, resell, or make the service available to others except as permitted by law and by AMUX.",
+      "Scores, rankings, evaluation reports, and certificates are generated from the information available to the platform and are not guaranteed to be error-free or permanently available. Evaluation reports are sent to the email address associated with your account and can be downloaded from your results while the attempt data remains available.",
+      "After a challenge's end date and time pass, the challenge, its room, and associated room data are deleted from the platform. Evaluation attempts and their reports may also be removed as part of routine data retention. Keep your own copy of any report or certificate you need.",
+      "Use of personal information is also subject to the privacy information made available by AMUX. Do not include personal or sensitive information about another person in challenge content unless you have a lawful basis and the necessary permission.",
+    ],
+  },
+  {
+    title: "10. Acceptable use",
+    paragraphs: [
+      "Do not use COGNICLASH to break laws, infringe intellectual-property or privacy rights, distribute malware, harass or threaten others, manipulate results, disrupt availability, probe or exploit vulnerabilities without authorization, or evade platform safeguards, including the integrity safeguards applied during strict evaluations. Do not scrape, resell, or make the service available to others except as permitted by law and by AMUX.",
       "We may remove content, restrict a room, or suspend an account when reasonably necessary to enforce these rules, respond to a security or legal concern, or protect users and the service. Where practical, we will explain the action and provide a way to contact AMUX about it.",
     ],
   },
   {
-    title: "9. Results, certificates, and room retention",
+    title: "11. Fees, licenses, and the partner program",
     paragraphs: [
-      "Scores, rankings, and certificates are generated from the information available to the platform and are not guaranteed to be error-free or permanently available. Certificates are sent to the email address associated with your account. After a battle ends, its room and associated room data may be deleted after the retention period shown in the platform or in the result email. Keep your own copy of any certificate or result you need.",
+      "Challenges, daily challenges, and strict evaluations published for participants are free unless a price is displayed before you start. Paid Thrive modules are clearly priced before checkout. Where a license fee applies to an organization, it is charged on the terms communicated at issuance.",
+      "An organization creator confirms they may represent the organization and use its name and logo. By opting into the partner program, they authorize AMUX to display the submitted organization name and logo in COGNICLASH's partner area and to identify the organization as a COGNICLASH partner.",
+      "The partner program is intended to provide priority access to upcoming COGNICLASH features, reduced pricing for eligible future platform features, access to partner discounts on AMUX products, and priority handling for AMUX service requests. These benefits apply to future releases and offers and are subject to their published eligibility and availability; they do not guarantee that a particular feature, product, discount, or service will be offered. A partner may contact AMUX to request removal from the public partner listing.",
     ],
   },
   {
-    title: "10. Intellectual property and feedback",
+    title: "12. Intellectual property and feedback",
     paragraphs: [
-      "CodeClash, its software, branding, and platform materials are owned by AMUX or its licensors. These terms give you permission to use the platform for its intended purpose; they do not transfer ownership of the platform or grant rights to AMUX branding beyond that use. If you send suggestions, you allow AMUX to use them without restriction or payment, provided this does not transfer ownership of your submitted content.",
+      "COGNICLASH, its software, branding, and platform materials are owned by AMUX or its licensors. These terms give you permission to use the platform for its intended purpose; they do not transfer ownership of the platform or grant rights to AMUX branding beyond that use. If you send suggestions, you allow AMUX to use them without restriction or payment, provided this does not transfer ownership of your submitted content.",
     ],
   },
   {
-    title: "11. Availability and service changes",
+    title: "13. Availability and service changes",
     paragraphs: [
-      "We work to keep CodeClash useful and available but do not promise uninterrupted access, error-free operation, or permanent storage. Maintenance, outages, third-party services, security events, or product changes can affect access. We may add, change, pause, or retire features, and may provide notice when a change materially affects how you use the platform.",
+      "We work to keep COGNICLASH useful and available but do not promise uninterrupted access, error-free operation, or permanent storage. Maintenance, outages, third-party services, security events, or product changes can affect access. We may add, change, pause, or retire features, and may provide notice when a change materially affects how you use the platform.",
     ],
   },
   {
-    title: "12. Disclaimers and responsibility",
+    title: "14. Disclaimers and limitation of liability",
     paragraphs: [
-      "To the extent permitted by applicable law, CodeClash is provided on an “as available” basis without warranties that the service will meet every user's needs or that every result will be accurate. Nothing in these terms excludes a right or remedy that cannot legally be excluded.",
-      "You are responsible for your content, your use of the platform, and your compliance with these terms. To the extent permitted by law, AMUX is not responsible for indirect or consequential loss arising from your use of CodeClash. Any liability that cannot be excluded is limited only to the extent applicable law permits.",
+      "To the extent permitted by applicable law, COGNICLASH is provided on an \u201cas is\u201d and \u201cas available\u201d basis without warranties that the service will meet every user's needs or that every result will be accurate. Nothing in these terms excludes a right or remedy that cannot legally be excluded.",
+      "You are responsible for your content, your use of the platform, and your compliance with these terms. To the extent permitted by law, AMUX is not responsible for indirect or consequential loss arising from your use of COGNICLASH. Any liability that cannot be excluded is limited only to the extent applicable law permits.",
     ],
   },
   {
-    title: "13. Suspension and account closure",
+    title: "15. Suspension and account closure",
     paragraphs: [
-      "You may stop using CodeClash at any time. AMUX may suspend or close access for a serious or repeated breach, a security risk, a legal requirement, or when needed to protect the service. Where practical, we will give notice and an opportunity to address the issue. Provisions that by their nature should continue, including content permissions needed for previously generated results and limitations permitted by law, survive closure.",
+      "You may stop using COGNICLASH at any time. AMUX may suspend or close access for a serious or repeated breach, a security risk, a legal requirement, or when needed to protect the service. Where practical, we will give notice and an opportunity to address the issue. Provisions that by their nature should continue, including content permissions needed for previously generated results and limitations permitted by law, survive closure.",
     ],
   },
   {
-    title: "14. Changes to these terms",
+    title: "16. Governing law and jurisdiction",
     paragraphs: [
-      "We may update these terms as the service changes or to meet legal requirements. We will update the date below when we do. If a change materially affects users, we will take reasonable steps to make the change visible. Continued use after updated terms take effect means you accept the revised terms; if you do not agree, stop using CodeClash.",
+      "These terms, and any dispute arising out of or in connection with them or the service, are governed by the laws of India, without regard to conflict-of-law rules. Subject to applicable law, the courts having jurisdiction over the place of business of AMUX have exclusive jurisdiction over any such dispute.",
+      "Nothing in these terms removes mandatory consumer protections that cannot be excluded under applicable law, including under the Consumer Protection Act, 2019, to the extent they apply to you.",
     ],
   },
   {
-    title: "15. Governing law and contact",
+    title: "17. Changes to these terms",
     paragraphs: [
-      "These terms are governed by the laws that apply to AMUX and the user, without removing any mandatory consumer protections. If a provision is unenforceable, the remaining provisions continue to apply to the extent permitted by law. For questions or concerns about CodeClash or these terms, contact AMUX through amux.in.",
+      "We may update these terms as the service changes or to meet legal requirements. We will update the date below when we do. If a change materially affects users, we will take reasonable steps to make the change visible. Continued use after updated terms take effect means you accept the revised terms; if you do not agree, stop using COGNICLASH.",
+    ],
+  },
+  {
+    title: "18. Contact",
+    paragraphs: [
+      "For questions or concerns about COGNICLASH or these terms, contact AMUX through amux.in.",
     ],
   },
 ];
@@ -114,13 +140,15 @@ export default function Terms() {
         <ArrowLeft size={15} /> Back to registration
       </Link>
       <header className="terms-header">
-        <span className="about-eyebrow"><FileText size={15} /> CodeClash</span>
+        <span className="about-eyebrow">
+          <FileText size={15} /> COGNICLASH · AN AMUX PRODUCT
+        </span>
         <h1>Terms and Conditions</h1>
         <p>Effective date: October 11, 2026</p>
         <p className="terms-intro">
-          These terms explain the rules for using CodeClash, a coding challenge
-          platform provided by AMUX. Please read them before creating an
-          account.
+          These terms explain the rules for using COGNICLASH — a skill
+          evaluation system provided by AMUX. Please read them before creating
+          an account.
         </p>
       </header>
 
@@ -142,7 +170,9 @@ export default function Terms() {
             checked={agreed}
             onChange={(event) => setAgreed(event.target.checked)}
           />
-          <span>I have read and agree to the CodeClash Terms and Conditions.</span>
+          <span>
+            I have read and agree to the COGNICLASH Terms and Conditions.
+          </span>
         </label>
         <button
           className="btn-primary"

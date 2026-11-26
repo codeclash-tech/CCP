@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+﻿import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { joinRoom, getMyRooms, getJoinedRooms } from "../services/battleRoomService";
 import { formatDate } from "../utils/helpers";
@@ -323,19 +323,19 @@ export default function BattleRoom() {
   return (
     <div className="battle-room-page" style={{ padding: "24px 32px", margin: "0 auto", width: "100%", boxSizing: "border-box", fontFamily: "var(--font-ui)" }}>
       <blockquote className="battle-room-quote">
-        <p>Every great solution begins with one bold move.</p>
-        <cite>CodeClash</cite>
+        <p>Every great evaluation begins with one bold challenge.</p>
+        <cite>CogniClash</cite>
       </blockquote>
       <header className="battle-room-hero">
         <div className="battle-room-hero-copy">
-          <p className="battle-room-hero-eyebrow">CODECLASH BATTLES</p>
+          <p className="battle-room-hero-eyebrow">COGNICLASH · CODING EVALUATION</p>
           <h1>
             <Swords size={25} aria-hidden="true" />
-            CodeClash Battle
+            CogniClash Battle
           </h1>
           <p>
-            Create a private coding battle, share its key, and put your problem
-            solving to the test with friends or teammates.
+            Create a private coding evaluation, share its key, and measure
+            problem solving under real time pressure.
           </p>
           <span className="battle-room-hero-flow">CREATE <i /> INVITE <i /> COMPETE</span>
         </div>
@@ -428,7 +428,7 @@ export default function BattleRoom() {
               Join Battle
             </h2>
             <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 12 }}>
-              Enter the room key shared by the creator. Any verified CodeClash account can join.
+              Enter the room key shared by the creator. Any verified COGNICLASH account can join.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ color: "var(--text-secondary)", fontSize: 12 }}>

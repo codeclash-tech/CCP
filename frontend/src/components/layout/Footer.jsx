@@ -1,4 +1,4 @@
-import { Code2, ShieldCheck } from "lucide-react";
+﻿import { Code2, ShieldCheck } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -18,7 +18,7 @@ export default function Footer() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
 <Code2 size={14} />
-        CodeClash &copy; {new Date().getFullYear()}
+        <span>CogniClash · an AMUX product &copy; {new Date().getFullYear()}</span>
       </div>
       <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 4 }}>

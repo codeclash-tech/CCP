@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 import codeclashLogo from "../../../../desktop/assets/codeclash.ico";
 
@@ -7,7 +7,7 @@ export default function DesktopTitleBar() {
 
   useEffect(() => {
     let mounted = true;
-    const desktopWindow = window.codeClashDesktop.window;
+    const desktopWindow = window.COGNICLASHDesktop.window;
     const unsubscribe = desktopWindow.onMaximizeChanged((isMaximized) => {
       setMaximized(Boolean(isMaximized));
     });
@@ -29,9 +29,9 @@ export default function DesktopTitleBar() {
 
   const controlWindow = async (action) => {
     try {
-      await window.codeClashDesktop.window.control(action);
+      await window.COGNICLASHDesktop.window.control(action);
     } catch (error) {
-      console.error("Unable to control the CodeClash window:", error);
+      console.error("Unable to control the COGNICLASH window:", error);
     }
   };
 
@@ -41,11 +41,11 @@ export default function DesktopTitleBar() {
     <header
       className="desktop-titlebar"
       onDoubleClick={toggleMaximize}
-      aria-label="CodeClash window controls"
+      aria-label="COGNICLASH window controls"
     >
       <div className="desktop-titlebar-brand">
         <img className="desktop-titlebar-mark" src={codeclashLogo} alt="" />
-        <strong>CodeClash</strong>
+        <strong>COGNICLASH</strong>
       </div>
       <div className="desktop-titlebar-actions">
         <button
@@ -75,7 +75,7 @@ export default function DesktopTitleBar() {
         <button
           type="button"
           className="desktop-titlebar-button desktop-titlebar-close"
-          aria-label="Close CodeClash"
+          aria-label="Close COGNICLASH"
           title="Close"
           onClick={() => controlWindow("close")}
           onDoubleClick={(event) => event.stopPropagation()}

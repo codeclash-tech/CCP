@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Save } from "lucide-react";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
@@ -294,7 +294,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
                         type="button"
                         onClick={() => setCycleId(String(cycle._id))}
                       >
-                        <span><strong>{cycle.name}</strong><small>{cycle.cycleKey} · {dateLabel(cycle.startAt)} → {dateLabel(cycle.endAt)}</small></span>
+                        <span><strong>{cycle.name}</strong><small>{cycle.cycleKey} · {dateLabel(cycle.startAt)} â†’ {dateLabel(cycle.endAt)}</small></span>
                         <span className={`weekly-status status-${cycle.status?.toLowerCase()}`}>{cycle.status}</span>
                       </button>
                     ))}
@@ -417,7 +417,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
                                 {entry.securityReport.riskLevel || "LOW"} risk · {entry.securityReport.riskScore || 0}/100
                               </summary>
                               <div>
-                                <p>Mode: {entry.securityReport.executionMode === "DESKTOP_LOCAL" ? "Desktop app" : entry.securityReport.executionMode || (entry.securityReport.submissionId ? "CodeClash service" : "Integrity events")}</p>
+                                <p>Mode: {entry.securityReport.executionMode === "DESKTOP_LOCAL" ? "Desktop app" : entry.securityReport.executionMode || (entry.securityReport.submissionId ? "COGNICLASH service" : "Integrity events")}</p>
                                 <p>Result: {entry.securityReport.resultStatus || entry.securityReport.status} · {entry.securityReport.passed ?? 0}/{entry.securityReport.total ?? 0} tests</p>
                                 <p>Client / runtime: {entry.securityReport.clientVersion || "—"} / {entry.securityReport.engineVersion || "—"}</p>
                                 <p>Protocol: {entry.securityReport.executionProtocolVersion || "—"}</p>

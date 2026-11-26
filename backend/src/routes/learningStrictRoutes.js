@@ -37,6 +37,11 @@ router.get(
   asyncRoute(strictController.getAttempt),
 );
 router.get("/history", ...student, asyncRoute(strictController.listMyAttempts));
+router.get(
+  "/attempts/:attemptId/report.pdf",
+  ...student,
+  asyncRoute(strictController.downloadAttemptReportPdf),
+);
 
 // Admin — results dashboard and Excel export (Super Admin only)
 router.get(

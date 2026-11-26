@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
 
 function createSessionId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -182,14 +182,14 @@ export default function useProctorGuard({
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     const onDesktopFocusChanged =
-      window.codeClashDesktop?.window?.onAssessmentFocusChanged;
+      window.COGNICLASHDesktop?.window?.onAssessmentFocusChanged;
     const removeDesktopFocusListener =
       typeof onDesktopFocusChanged === "function"
         ? onDesktopFocusChanged((isFocused) => {
             if (!isFocused) {
               recordIntegrityEvent(
                 "WINDOW_BLUR",
-                "CodeClash desktop app moved to the background",
+                "COGNICLASH desktop app moved to the background",
               );
             }
           })

@@ -18,7 +18,7 @@ import {
 export function isLocallyValidatedDesktopRequest(req) {
   return (
     req.user?.role === "ADMIN" &&
-    req.headers?.origin === "codeclash://app" &&
+    req.headers?.origin === "COGNICLASH://app" &&
     req.body?.referenceSolutionValidatedLocally === true
   );
 }

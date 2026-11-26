@@ -43,7 +43,7 @@ const optionalVars = {
   JWT_REFRESH_EXPIRY: "7d",
   JWT_ISSUER: "amux-ccp",
   LOG_LEVEL: process.env.NODE_ENV === "production" ? "combined" : "dev",
-  SUPER_ADMIN_EMAIL: "hellocodeclash@gmail.com",
+  SUPER_ADMIN_EMAIL: "helloCOGNICLASH@gmail.com",
   SUPER_ADMIN_PASSWORD: "",
 };
 

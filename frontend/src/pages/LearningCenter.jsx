@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   BookOpen,
@@ -8,7 +8,7 @@ import {
   ChevronRight,
   Download,
   Pencil,
-  Mic,
+  Send,
   Save,
   Trash2,
   Volume2,
@@ -1958,7 +1958,7 @@ function AdminLearning() {
                               onClick={() => moveTopic(index, -1)}
                               type="button"
                             >
-                              ↑
+                              â†‘
                             </button>
                             <button
                               className="learning-link-button"
@@ -1967,7 +1967,7 @@ function AdminLearning() {
                               onClick={() => moveTopic(index, 1)}
                               type="button"
                             >
-                              ↓
+                              â†“
                             </button>
                             <button
                               className="learning-link-button"
@@ -2633,7 +2633,7 @@ function AdminLearning() {
                                       }}
                                       type="button"
                                     >
-                                      ↑
+                                      â†‘
                                     </button>
                                     <button
                                       aria-label={`Move objective ${index + 1} down`}
@@ -2661,7 +2661,7 @@ function AdminLearning() {
                                       }}
                                       type="button"
                                     >
-                                      ↓
+                                      â†“
                                     </button>
                                     <button
                                       className="learning-link-button"
@@ -4329,7 +4329,7 @@ function AdminLearning() {
                           onClick={() => moveTopic(index, -1)}
                           type="button"
                         >
-                          ↑
+                          â†‘
                         </button>
                         <button
                           className="learning-link-button"
@@ -4340,7 +4340,7 @@ function AdminLearning() {
                           onClick={() => moveTopic(index, 1)}
                           type="button"
                         >
-                          ↓
+                          â†“
                         </button>
                         <button
                           className="learning-link-button"
@@ -5098,6 +5098,7 @@ function StudentLearning() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [topicsExpanded, setTopicsExpanded] = useState(false);
   const [courseSummary, setCourseSummary] = useState(null);
   const voiceProviders = useMemo(
     () => ({
@@ -5667,7 +5668,7 @@ function StudentLearning() {
         amount: data.checkout.amount,
         currency: data.checkout.currency,
         order_id: data.checkout.orderId,
-        name: "CodeClash",
+        name: "COGNICLASH",
         description: data.checkout.moduleTitle,
         handler: async (paymentResponse) => {
           try {
@@ -5756,8 +5757,9 @@ function StudentLearning() {
             className="learning-back-button"
             onClick={closeModule}
             type="button"
+            aria-label="Back to all modules"
           >
-            <ArrowLeft size={16} /> All modules
+            <ArrowLeft size={16} />
           </button>
           <header className="learning-heading learning-workspace-heading">
             <div>
@@ -5766,23 +5768,9 @@ function StudentLearning() {
                 {module.title}
               </p>
               <h1>{selectedTopic?.title || "Choose a topic"}</h1>
-              <p>{selectedTopic?.description || module.description}</p>
-              {selectedTopic && objectiveStates.length > 0 && (
-                <p className="learning-objective-summary" role="status">
-                  {
-                    objectiveStates.filter(
-                      (state) => state.state === "MASTERED",
-                    ).length
-                  }{" "}
-                  of {objectiveStates.length} objectives mastered
-                  {currentObjective
-                    ? ` · Current objective: ${currentObjective.title}`
-                    : ""}
-                </p>
-              )}
             </div>
             <div className="learning-progress-summary">
-              <span>Module objectives</span>
+              <span>Module progress</span>
               <strong>{moduleProgress}%</strong>
               <div className="learning-progress-track">
                 <span style={{ width: `${moduleProgress}%` }} />
@@ -5819,42 +5807,15 @@ function StudentLearning() {
                 <div className="learning-panel-title">
                   <div>
                     <h2>{voiceProfile === "boy" ? "Rishi" : "Daisy"}</h2>
-                    <p>Your personal tutor — one idea at a time, no rush.</p>
                   </div>
                 </div>
                 <div className="learning-tutor-controls">
-                  <label className="learning-field">
-                    Voice
-                    <select
-                      value={voiceProfile}
-                      onChange={(event) => setVoiceProfile(event.target.value)}
-                    >
-                      <option value="boy" disabled={!voiceChoices.boy}>
-                        {voiceChoices.boy
-                          ? "Rishi"
-                          : "Rishi (voice not installed)"}
-                      </option>
-                      <option value="girl" disabled={!voiceChoices.girl}>
-                        {voiceChoices.girl
-                          ? "Daisy"
-                          : "Daisy (voice not installed)"}
-                      </option>
-                    </select>
-                  </label>
                   {!voiceChoices[voiceProfile] && (
                     <p className="learning-help" role="status">
                       The selected English voice is not installed. Add an
                       English voice in your device language settings.
                     </p>
                   )}
-                  <label className="learning-voice-toggle">
-                    <input
-                      type="checkbox"
-                      checked={voiceOutput}
-                      onChange={(event) => setVoiceOutput(event.target.checked)}
-                    />
-                    <Volume2 size={16} /> Voice output
-                  </label>
                 </div>
                 {!nickname ? (
                   <form
@@ -5915,163 +5876,10 @@ function StudentLearning() {
                       </p>
                     )}
                     {nickname && currentObjective && isVerificationStage && (
-                      <section
-                        className="learning-task-area"
-                        aria-label="Objective practice tasks"
-                      >
-                        <div className="learning-panel-title">
-                          <div>
-                            <h3>Try a task</h3>
-                            <p>
-                              Show what you understand about:{" "}
-                              {currentObjective.title}
-                            </p>
-                          </div>
-                        </div>
-                        {availableTasks.length === 0 ? (
-                          <p className="learning-muted">
-                            A verification task is not available for this
-                            objective yet. Please ask your course administrator
-                            to review this topic.
-                          </p>
-                        ) : (
-                          availableTasks.map((exercise) => {
-                            const taskId = String(exercise._id);
-                            const result = taskResults[taskId];
-                            return (
-                              <form
-                                className="learning-task-card"
-                                key={taskId}
-                                onSubmit={(event) =>
-                                  submitTask(event, exercise)
-                                }
-                              >
-                                <div>
-                                  <strong>{exercise.title}</strong>
-                                  <div>
-                                    <MathContent>
-                                      {exercise.instructions}
-                                    </MathContent>
-                                  </div>
-                                </div>
-                                {exercise.type === "MATH" ? (
-                                  <>
-                                    <label className="learning-field">
-                                      Your answer
-                                      {exercise.unit
-                                        ? ` (${exercise.unit})`
-                                        : ""}
-                                      <input
-                                        aria-label={`${exercise.title} answer`}
-                                        inputMode="decimal"
-                                        maxLength={3000}
-                                        value={
-                                          taskResponses[`${taskId}:answer`] ||
-                                          ""
-                                        }
-                                        onChange={(event) =>
-                                          setTaskResponses((current) => ({
-                                            ...current,
-                                            [`${taskId}:answer`]:
-                                              event.target.value,
-                                          }))
-                                        }
-                                      />
-                                    </label>
-                                    {exercise.requireReasoning && (
-                                      <label className="learning-field">
-                                        How did you work it out?
-                                        <textarea
-                                          rows={3}
-                                          maxLength={3000}
-                                          value={
-                                            taskResponses[
-                                              `${taskId}:reasoning`
-                                            ] || ""
-                                          }
-                                          onChange={(event) =>
-                                            setTaskResponses((current) => ({
-                                              ...current,
-                                              [`${taskId}:reasoning`]:
-                                                event.target.value,
-                                            }))
-                                          }
-                                        />
-                                      </label>
-                                    )}
-                                  </>
-                                ) : (
-                                  <label className="learning-field">
-                                    {exercise.type === "CODE"
-                                      ? "Your Java solution"
-                                      : "Your response"}
-                                    <textarea
-                                      className={
-                                        exercise.type === "CODE"
-                                          ? "learning-task-code"
-                                          : ""
-                                      }
-                                      maxLength={
-                                        exercise.type === "CODE" ? 20000 : 5000
-                                      }
-                                      rows={exercise.type === "CODE" ? 9 : 4}
-                                      value={
-                                        taskResponses[taskId] ??
-                                        exercise.starterCode ??
-                                        ""
-                                      }
-                                      onChange={(event) =>
-                                        setTaskResponses((current) => ({
-                                          ...current,
-                                          [taskId]: event.target.value,
-                                        }))
-                                      }
-                                    />
-                                  </label>
-                                )}
-                                <button
-                                  className="learning-button"
-                                  disabled={Boolean(taskBusyId) || !session}
-                                  type="submit"
-                                >
-                                  {taskBusyId === taskId
-                                    ? "Checking…"
-                                    : "Submit response"}
-                                </button>
-                                {result && (
-                                  <div
-                                    className={`learning-task-result${result.accepted ? " is-success" : ""}`}
-                                    aria-live="polite"
-                                  >
-                                    <strong>
-                                      {result.accepted
-                                        ? "Task completed"
-                                        : String(
-                                            result.status || "NEEDS_REVIEW",
-                                          ).replaceAll("_", " ")}
-                                    </strong>
-                                    <p>{result.feedback}</p>
-                                    {(result.visibleResults || []).map(
-                                      (visible, index) => (
-                                        <pre
-                                          key={`${visible.testCase || index}-${index}`}
-                                        >
-                                          Example{" "}
-                                          {visible.testCase || index + 1}:{" "}
-                                          {visible.status}
-                                          {visible.output
-                                            ? `\n${visible.output}`
-                                            : ""}
-                                        </pre>
-                                      ),
-                                    )}
-                                  </div>
-                                )}
-                              </form>
-                            );
-                          })
-                        )}
-                      </section>
+                      <p className="learning-muted" role="status">
+                        The tutor will now check your understanding of this
+                        objective through the conversation.
+                      </p>
                     )}
                   </div>
                 )}
@@ -6088,7 +5896,7 @@ function StudentLearning() {
                       className="learning-chat-input"
                       maxLength={2000}
                       placeholder="Ask a question about this topic"
-                      rows={2}
+                      rows={1}
                       value={message}
                       onChange={(event) => {
                         voiceProviders.output?.cancel();
@@ -6105,29 +5913,42 @@ function StudentLearning() {
                         }
                       }}
                     />
-                    <button
-                      aria-label={
-                        voiceInputState === "recording"
-                          ? "Stop recording"
-                          : "Speak to tutor"
-                      }
-                      aria-pressed={voiceInputState === "recording"}
-                      className="learning-button learning-button-secondary"
-                      disabled={["requesting", "transcribing"].includes(
-                        voiceInputState,
-                      )}
-                      onClick={startVoiceInput}
-                      type="button"
-                    >
-                      <Mic size={17} />
-                    </button>
-                    <button
-                      className="learning-button learning-chat-send"
-                      disabled={busy || !message.trim()}
-                      type="submit"
-                    >
-                      Send
-                    </button>
+                    <div className="learning-chat-actions">
+                      <button
+                        type="button"
+                        aria-pressed={voiceProfile === "girl"}
+                        className={`learning-tutor-chip${voiceProfile === "girl" ? " is-active" : ""}`}
+                        onClick={() =>
+                          setVoiceProfile(
+                            voiceProfile === "girl" ? "boy" : "girl",
+                          )
+                        }
+                        title={
+                          voiceProfile === "girl"
+                            ? "Switch to Rishi"
+                            : "Switch to Daisy"
+                        }
+                      >
+                        {voiceProfile === "girl" ? "Daisy" : "Rishi"}
+                        <ChevronRight size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={voiceOutput}
+                        className={`learning-tutor-chip${voiceOutput ? " is-active" : ""}`}
+                        onClick={() => setVoiceOutput((value) => !value)}
+                        title="Tutor voice on/off"
+                      >
+                        <Volume2 size={14} />
+                      </button>
+                      <button
+                        className="learning-button learning-chat-send"
+                        disabled={busy || !message.trim()}
+                        type="submit"
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
                   </form>
                 )}
                 {voiceInputState === "recording" && (
@@ -6158,45 +5979,61 @@ function StudentLearning() {
             )}
           </section>
           <aside className="learning-panel learning-topic-panel">
-            <div className="learning-panel-title">
-              <div>
-                <h2>Topics</h2>
-                <p>Topics unlock as you finish the ones before them.</p>
-              </div>
-            </div>
-            {module.topics.map((topic, index) => {
-              const isComplete = completedTopics.some(
-                (id) => String(id) === String(topic._id),
-              );
-              const isPrerequisiteLocked = !(
-                topic.prerequisiteTopicIds || []
-              ).every((requiredId) =>
-                completedTopics.some((id) => String(id) === String(requiredId)),
-              );
-              return (
-                <button
-                  className={`learning-topic-button${String(topic._id) === topicId ? " is-active" : ""}`}
-                  key={topic._id}
-                  onClick={() => selectTopic(topic)}
-                  disabled={isComplete || isPrerequisiteLocked}
-                  type="button"
-                >
-                  <span>
-                    {isComplete ? (
-                      <Check size={15} />
+            <button
+              type="button"
+              className="learning-topic-panel-trigger"
+              aria-expanded={topicsExpanded}
+              onClick={() => setTopicsExpanded((value) => !value)}
+            >
+              <span className="learning-topic-panel-pill">Topics</span>
+              <ChevronRight
+                size={14}
+                style={{
+                  transform: topicsExpanded ? "rotate(90deg)" : "none",
+                }}
+              />
+            </button>
+            <div
+              className={`learning-topic-list${topicsExpanded ? " is-open" : ""}`}
+            >
+              {module.topics.map((topic, index) => {
+                const isComplete = completedTopics.some(
+                  (id) => String(id) === String(topic._id),
+                );
+                const isPrerequisiteLocked = !(
+                  topic.prerequisiteTopicIds || []
+                ).every((requiredId) =>
+                  completedTopics.some(
+                    (id) => String(id) === String(requiredId),
+                  ),
+                );
+                return (
+                  <button
+                    className={`learning-topic-button${String(topic._id) === topicId ? " is-active" : ""}`}
+                    key={topic._id}
+                    onClick={() => selectTopic(topic)}
+                    disabled={isComplete || isPrerequisiteLocked}
+                    type="button"
+                  >
+                    <span>
+                      {isComplete ? (
+                        <Check size={15} />
+                      ) : (
+                        <span className="learning-topic-number">
+                          {index + 1}
+                        </span>
+                      )}
+                    </span>
+                    <span>{topic.title}</span>
+                    {isPrerequisiteLocked ? (
+                      <span className="learning-muted">Locked</span>
                     ) : (
-                      <span className="learning-topic-number">{index + 1}</span>
+                      <ChevronRight size={15} />
                     )}
-                  </span>
-                  <span>{topic.title}</span>
-                  {isPrerequisiteLocked ? (
-                    <span className="learning-muted">Locked</span>
-                  ) : (
-                    <ChevronRight size={15} />
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </aside>
         </div>
       </div>
@@ -6215,7 +6052,6 @@ function StudentLearning() {
         </button>
         <header className="learning-heading">
           <div>
-            <p className="learning-eyebrow">Thrive course</p>
             <h1>{selectedProgram.title}</h1>
             <p>{selectedProgram.description}</p>
           </div>
@@ -6229,43 +6065,6 @@ function StudentLearning() {
           <p className="learning-alert learning-alert-success" role="status">
             {notice}
           </p>
-        )}
-        {courseSummary && (
-          <section className="learning-panel learning-course-certificate">
-            <div>
-              <h2>Course certificate</h2>
-              {courseSummary.certificate ? (
-                <p>
-                  Completed{" "}
-                  {new Date(
-                    courseSummary.certificate.earnedAt,
-                  ).toLocaleDateString("en-IN", { dateStyle: "medium" })}{" "}
-                  — your certificate has been emailed and is available below.
-                </p>
-              ) : courseSummary.remaining?.length ? (
-                <p>
-                  Complete {courseSummary.remaining.length} more required module
-                  {courseSummary.remaining.length === 1 ? "" : "s"} (
-                  {courseSummary.remaining.map((item) => item.title).join(", ")}
-                  ) to earn the course certificate.
-                </p>
-              ) : (
-                <p>
-                  All required modules completed. Your certificate will be
-                  issued shortly.
-                </p>
-              )}
-            </div>
-            {courseSummary.certificate && (
-              <button
-                className="learning-button"
-                onClick={() => downloadCertificate(courseSummary.certificate)}
-                type="button"
-              >
-                <Download size={15} /> Download course certificate
-              </button>
-            )}
-          </section>
         )}
         <div className="learning-module-cards">
           {selectedProgram.modules.map((module, index) => (
@@ -6442,7 +6241,7 @@ export default function LearningCenter({ adminView = false }) {
         This learning area is not available to your account.
       </p>
       <Link to="/" className="learning-link-button">
-        Return to CodeClash
+        Return to COGNICLASH
       </Link>
     </div>
   );

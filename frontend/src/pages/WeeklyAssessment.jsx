@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
@@ -97,7 +97,7 @@ export default function WeeklyAssessment() {
   const [consoleHeight, setConsoleHeight] = useState(280);
   const isDesktop =
     typeof window !== "undefined" &&
-    typeof window.codeClashDesktop?.engine?.execute === "function";
+    typeof window.COGNICLASHDesktop?.engine?.execute === "function";
 
   const loadAssessment = useCallback(async ({ preserveError = false, silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -179,9 +179,9 @@ export default function WeeklyAssessment() {
       }
     }
 
-    if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
+    if (typeof window.COGNICLASHDesktop?.window?.setChallengeMode === "function") {
       try {
-        await window.codeClashDesktop.window.setChallengeMode(true);
+        await window.COGNICLASHDesktop.window.setChallengeMode(true);
       } catch (challengeModeError) {
         if (document.fullscreenElement && document.exitFullscreen) {
           await document.exitFullscreen();
@@ -212,8 +212,8 @@ export default function WeeklyAssessment() {
     } catch (storageError) {
       console.warn("Unable to clear global challenge session state:", storageError.message);
     }
-    if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
-      await window.codeClashDesktop.window.setChallengeMode(false);
+    if (typeof window.COGNICLASHDesktop?.window?.setChallengeMode === "function") {
+      await window.COGNICLASHDesktop.window.setChallengeMode(false);
     }
     if (document.fullscreenElement && document.exitFullscreen) {
       await document.exitFullscreen();
@@ -395,7 +395,7 @@ export default function WeeklyAssessment() {
       <section className="weekly-page">
         {completedRecoverySubmissions.length === 0 && (
           <header className="weekly-heading">
-            <p className="weekly-eyebrow">TODAY&apos;S CODECLASH CHALLENGE</p>
+            <p className="weekly-eyebrow">TODAY&apos;S COGNICLASH CHALLENGE</p>
             <h1>Daily challenge</h1>
             <p>No daily challenge is open right now. Check back tomorrow for the next challenge.</p>
           </header>
@@ -522,7 +522,7 @@ export default function WeeklyAssessment() {
     showInstructions ? (
       <main className="weekly-instructions-page">
         <section className="weekly-instructions-card" aria-labelledby="weekly-instructions-title">
-          <p className="weekly-eyebrow">TODAY&apos;S CODECLASH CHALLENGE</p>
+          <p className="weekly-eyebrow">TODAY&apos;S COGNICLASH CHALLENGE</p>
           <h1 id="weekly-instructions-title">Before you begin</h1>
           <p className="weekly-instructions-intro">
             Solve today&apos;s problem and submit your best solution before time
@@ -552,7 +552,7 @@ export default function WeeklyAssessment() {
       <main className="weekly-coding-page">
         <header className="weekly-coding-header">
           <div className="weekly-coding-title">
-            <span className="weekly-eyebrow">TODAY&apos;S CODECLASH CHALLENGE</span>
+            <span className="weekly-eyebrow">TODAY&apos;S COGNICLASH CHALLENGE</span>
             <strong>{assessment.cycle.name}</strong>
           </div>
           <div className="weekly-coding-meta">

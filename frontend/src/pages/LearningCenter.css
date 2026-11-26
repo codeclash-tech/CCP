@@ -2001,3 +2001,132 @@
 .learning-topic-button > span:first-child {
   color: var(--lc-accent);
 }
+
+/* ===== Thrive workspace refinements ===== */
+.learning-workspace .learning-back-button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Topic side panel: narrow by default, expands on hover or click */
+.learning-topic-panel {
+  position: relative;
+  min-width: 0;
+  width: 56px;
+  transition: width 0.22s ease;
+  overflow: hidden;
+}
+
+.learning-topic-panel:hover,
+.learning-topic-panel.is-open {
+  width: min(300px, 34vw);
+}
+
+.learning-topic-panel-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.learning-topic-panel-pill {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Chat bar: pill-shaped, actions inside */
+.learning-chat-form {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--border-strong, var(--border-color));
+  border-radius: 999px;
+  background: var(--bg-elevated);
+}
+
+.learning-chat-form .learning-chat-input {
+  border: 0 !important;
+  background: transparent !important;
+  outline: none !important;
+  min-height: 30px;
+  max-height: 120px;
+  padding: 6px 10px !important;
+  flex: 1 1 auto;
+}
+
+.learning-chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 2px;
+  flex: 0 0 auto;
+}
+
+.learning-tutor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.learning-tutor-chip:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  color: var(--text-primary);
+}
+
+.learning-tutor-chip.is-active {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(56, 189, 248, 0.14);
+  color: #7dd3fc;
+}
+
+.learning-workspace .learning-chat-send {
+  min-width: 34px !important;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px !important;
+}
+
+/* Conversation fills available height */
+.learning-workspace .learning-conversation {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .learning-topic-panel,
+  .learning-topic-panel:hover,
+  .learning-topic-panel.is-open {
+    width: 56px;
+  }
+
+  .learning-topic-panel.is-open {
+    width: min(280px, 70vw);
+  }
+}

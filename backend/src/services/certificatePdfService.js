@@ -61,7 +61,7 @@ function drawCertificate(document, input) {
   }
 
   document.fillColor("#1d4ed8").font("Times-Bold").fontSize(31.5)
-    .text("CodeClash", 78.75, 63, { lineBreak: false });
+    .text("COGNICLASH", 78.75, 63, { lineBreak: false });
   document.fillColor("#64748b").font("Helvetica-Bold").fontSize(9.75)
     .text(
       dailyChallenge
@@ -189,7 +189,7 @@ function drawCertificate(document, input) {
     .text("DATE OF COMPLETION", 135, 489.75, { lineBreak: false });
 
   document.fillColor("#0f172a").font("Times-Italic").fontSize(17.25)
-    .text("CodeClash Team", 637.5, 453.75, {
+    .text("COGNICLASH Team", 637.5, 453.75, {
       align: "right",
       width: 127.5,
       lineBreak: false,
@@ -208,7 +208,7 @@ function drawCertificate(document, input) {
     .text(
       learningModule
         ? `CERTIFICATE ID: ${certificate.certificateCode}`
-        : "CODECLASH • COMPETE • CODE • CONQUER",
+        : "COGNICLASH • COMPETE • CODE • CONQUER",
       0,
       519.75,
       { align: "center", width, lineBreak: false },
@@ -227,7 +227,7 @@ function createCertificateDocument(data) {
 export function streamCertificatePdf(data, response) {
   const document = createCertificateDocument(data);
   response.setHeader("Content-Type", "application/pdf");
-  response.setHeader("Content-Disposition", 'attachment; filename="codeclash-certificate.pdf"');
+  response.setHeader("Content-Disposition", 'attachment; filename="COGNICLASH-certificate.pdf"');
   response.setHeader("Cache-Control", "private, no-store");
   document.pipe(response);
   document.end();

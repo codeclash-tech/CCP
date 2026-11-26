@@ -68,7 +68,7 @@ export async function initializeSuperAdmin({
   }
   const user = new userModel({
     email: normalizedEmail,
-    name: "CodeClash Super Admin",
+    name: "COGNICLASH Super Admin",
     organization: "Unspecified",
     role: "ADMIN",
     isVerified: true,

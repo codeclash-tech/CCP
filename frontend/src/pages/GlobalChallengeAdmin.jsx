@@ -375,7 +375,7 @@ export default function GlobalChallengeAdmin({ view = "today" }) {
             className={`btn-secondary${adminTab === "today" ? " weekly-admin-tab-active" : ""}`}
             onClick={() => setAdminTab("today")}
           >
-            Today Challenge
+            Daily challenge
           </button>
           <button
             type="button"

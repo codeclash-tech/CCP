@@ -76,7 +76,7 @@ export async function dispatchLearningCertificateEmail(certificateId) {
         : `${program.title}: ${module?.title || ""}`.trim(),
       challengeType: isCourse ? "LEARNING_COURSE" : "LEARNING_MODULE",
       certificatePdf,
-      certificateFilename: `CodeClash-Learning-${claimed.code}.pdf`,
+      certificateFilename: `COGNICLASH-Learning-${claimed.code}.pdf`,
     });
   } catch (error) {
     delivery = { success: false, error: error.message || String(error) };

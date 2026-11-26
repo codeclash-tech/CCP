@@ -1,145 +1,56 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  RefreshCw,
-  Swords,
-  Trophy,
   ClipboardList,
+  Trophy,
+  Swords,
   ArrowRight,
+  Code2,
+  BookOpen,
+  ListChecks,
+  Download,
+  Timer,
+  CheckCircle2,
 } from "lucide-react";
 import {
   getJoinedRooms,
-  getMyRooms,
   getRoomLeaderboard,
 } from "../services/battleRoomService";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
+import { challengeTypeLabel } from "../utils/challengeCards";
 import "./MyChallenges.css";
 
-function roomStatusLabel(room, now = Date.now()) {
-  if (room.submissionStatus === "COMPLETED") return "Completed";
-  if (room.submissionStatus === "DISQUALIFIED") return "Disqualified";
-  const start = room.startDate || room.startTime;
-  const end = room.endDate || room.endTime;
-  const startMs = start ? new Date(start).getTime() : NaN;
-  const endMs = end ? new Date(end).getTime() : NaN;
-  if (
-    room.status === "ACTIVE" ||
-    (Number.isFinite(startMs) &&
-      Number.isFinite(endMs) &&
-      startMs <= now &&
-      now < endMs)
-  ) {
-    return "Live";
-  }
-  if (room.status === "CLOSED" || (Number.isFinite(endMs) && endMs <= now)) {
-    return "Completed";
-  }
-  return "Upcoming";
-}
-
-function DailyChallengeCard({ item, onOpen }) {
-  const result = item.submission?.status === "FINALIZED";
-  return (
-    <article
-      className="my-challenge-card my-challenge-card-daily"
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(item)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen(item);
-        }
-      }}
-    >
-      <div className="my-challenge-card-head">
-        <Trophy size={17} aria-hidden="true" />
-        <span className="my-challenge-card-kind">Daily Challenge</span>
-        <span
-          className={`my-challenge-status status-${result ? "completed" : "live"}`}
-        >
-          {result ? "Completed" : "Live"}
-        </span>
-      </div>
-      <h3>{item.cycle?.name || "Today's CodeClash Challenge"}</h3>
-      <p className="my-challenge-card-date">
-        {item.cycle?.endAt
-          ? new Date(item.cycle.endAt).toLocaleDateString("en-IN", {
-              dateStyle: "medium",
-            })
-          : ""}
-      </p>
-      <div className="my-challenge-card-footer">
-        <span>Leaderboard</span>
-        <ArrowRight size={14} aria-hidden="true" />
-      </div>
-    </article>
-  );
-}
-
-function BattleCard({ room, onOpen }) {
-  const status = roomStatusLabel(room);
-  return (
-    <article
-      className="my-challenge-card"
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(room)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen(room);
-        }
-      }}
-    >
-      <div className="my-challenge-card-head">
-        <Swords size={17} aria-hidden="true" />
-        <span className="my-challenge-card-kind">CodeClash Battle</span>
-        <span className={`my-challenge-status status-${status.toLowerCase()}`}>
-          {status}
-        </span>
-      </div>
-      <h3>{room.title}</h3>
-      <p className="my-challenge-card-date">
-        Key {room.roomCode} ·{" "}
-        {room.submittedAt
-          ? new Date(room.submittedAt).toLocaleDateString("en-IN", {
-              dateStyle: "medium",
-            })
-          : "Not submitted"}
-      </p>
-      {Number.isFinite(Number(room.totalScore)) && (
-        <p className="my-challenge-card-score">
-          Score <strong>{Math.round(room.totalScore || 0)}</strong>
-        </p>
-      )}
-      <div className="my-challenge-card-footer">
-        <span>Leaderboard</span>
-        <ArrowRight size={14} aria-hidden="true" />
-      </div>
-    </article>
-  );
+function formatWhen(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 export default function MyChallenges() {
   const navigate = useNavigate();
   const [battles, setBattles] = useState([]);
   const [dailyHistory, setDailyHistory] = useState([]);
+  const [strictHistory, setStrictHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    const [joinedResult, historyResult] = await Promise.allSettled([
-      getJoinedRooms(),
-      api.get("/weekly-assessments/history"),
-    ]);
+    const [joinedResult, historyResult, strictResult] =
+      await Promise.allSettled([
+        getJoinedRooms(),
+        api.get("/weekly-assessments/history"),
+        api.get("/learning-strict/history"),
+      ]);
     if (joinedResult.status === "fulfilled") {
       setBattles(
         joinedResult.value.data?.rooms || joinedResult.value.rooms || [],
@@ -154,6 +65,9 @@ export default function MyChallenges() {
             new Date(left.cycle?.startAt || 0),
         );
       setDailyHistory(records);
+    }
+    if (strictResult.status === "fulfilled") {
+      setStrictHistory(strictResult.value.data?.attempts || []);
     }
     setLoading(false);
   }, []);
@@ -198,6 +112,31 @@ export default function MyChallenges() {
     }
   };
 
+  const downloadStrictReport = async (attemptId) => {
+    setDownloading(true);
+    setError("");
+    try {
+      const { data } = await api.get(
+        `/learning-strict/attempts/${attemptId}/report.pdf`,
+        { responseType: "blob" },
+      );
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `CogniClash-report-${attemptId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (downloadError) {
+      setError(
+        downloadError.message || "Could not download this report right now.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) return <PageSkeleton label="Loading your challenges" />;
 
   if (selected) {
@@ -215,15 +154,15 @@ export default function MyChallenges() {
             setLeaderboard(null);
           }}
         >
-          ← Back to My Challenges
+          â† Back to My Challenges
         </button>
         <header className="my-challenge-detail-header">
           <p className="challenges-eyebrow">
-            {isDaily ? "DAILY CHALLENGE" : "CODECLASH BATTLE"}
+            {isDaily ? "DAILY CHALLENGE" : "COGNICLASH BATTLE"}
           </p>
           <h1>
             {isDaily
-              ? selected.item.cycle?.name || "Today's CodeClash Challenge"
+              ? selected.item.cycle?.name || "Today's CogniClash Challenge"
               : selected.item.title}
           </h1>
         </header>
@@ -275,25 +214,25 @@ export default function MyChallenges() {
     );
   }
 
-  const hasAnything = battles.length > 0 || dailyHistory.length > 0;
+  const hasAnything =
+    battles.length > 0 || dailyHistory.length > 0 || strictHistory.length > 0;
+
+  const strictTypeLabel = (contentType) =>
+    contentType === "MCQ"
+      ? "MCQ"
+      : contentType === "CODING"
+        ? "Coding"
+        : "Concepts";
 
   return (
     <main className="my-challenges-page">
       <header className="challenges-header">
-        <p className="challenges-eyebrow">YOUR HISTORY</p>
+        <p className="challenges-eyebrow">COGNICLASH</p>
         <h1>My Challenges</h1>
         <p>
-          Every CodeClash Challenge and battle you have attended — with its
-          leaderboard. Completed challenges are removed automatically.
+          Every challenge you have attended — with its result. Completed
+          challenges are removed automatically.
         </p>
-        <button
-          type="button"
-          className="btn-secondary"
-          style={{ marginTop: 12 }}
-          onClick={load}
-        >
-          <RefreshCw size={14} /> Refresh
-        </button>
       </header>
 
       {error && (
@@ -307,8 +246,8 @@ export default function MyChallenges() {
           <ClipboardList size={30} aria-hidden="true" />
           <h2>Nothing here yet</h2>
           <p>
-            Attend today&apos;s CodeClash Challenge or join a battle — your
-            attended challenges and leaderboards will appear here.
+            Attend today&apos;s COGNICLASH Challenge or join a battle — your
+            attended challenges and results will appear here.
           </p>
           <button
             type="button"
@@ -320,19 +259,149 @@ export default function MyChallenges() {
         </section>
       ) : (
         <div className="my-challenge-grid">
+          {/* Strict evaluations (MCQ / Concepts / Coding style) */}
+          {strictHistory.map((attempt) => {
+            const type = strictTypeLabel(attempt.contentType);
+            const TypeIcon =
+              type === "MCQ"
+                ? ListChecks
+                : type === "Coding"
+                  ? Code2
+                  : BookOpen;
+            return (
+              <article key={`strict-${attempt.id}`} className="cc-card">
+                <div className="cc-card-head">
+                  <span className="cc-card-kind">
+                    <TypeIcon size={13} aria-hidden="true" />
+                    {type}
+                  </span>
+                  <span className="cc-card-chip">
+                    <CheckCircle2 size={12} aria-hidden="true" />
+                    {attempt.overallLevel || "Completed"}
+                  </span>
+                </div>
+                <h3 className="cc-card-title">{attempt.moduleTitle}</h3>
+                <div className="cc-card-meta">
+                  <span className="cc-card-chip">
+                    <Timer size={12} aria-hidden="true" />
+                    {formatWhen(attempt.completedAt)}
+                  </span>
+                  <span className="cc-card-chip">
+                    Score {attempt.scorePercent}%
+                  </span>
+                  <button
+                    type="button"
+                    className="cc-card-enter"
+                    onClick={() => downloadStrictReport(attempt.id)}
+                    disabled={downloading}
+                  >
+                    <Download size={14} aria-hidden="true" />
+                    {downloading ? "Preparing…" : "Report PDF"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+
+          {/* Daily challenges */}
           {dailyHistory.map((item) => (
-            <DailyChallengeCard
+            <article
               key={`daily-${item.cycle?.id}`}
-              item={item}
-              onOpen={openDaily}
-            />
+              className="cc-card cc-card-gold"
+              role="button"
+              tabIndex={0}
+              onClick={() => openDaily(item)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openDaily(item);
+                }
+              }}
+            >
+              <div className="cc-card-head">
+                <span className="cc-card-kind cc-card-kind-gold">
+                  <Trophy size={13} aria-hidden="true" />
+                  Coding
+                </span>
+                <span className="cc-card-chip">
+                  <CheckCircle2 size={12} aria-hidden="true" />
+                  {item.submission?.status === "FINALIZED"
+                    ? "Result ready"
+                    : "Attended"}
+                </span>
+              </div>
+              <h3 className="cc-card-title">
+                {item.cycle?.name || "Today's CogniClash Challenge"}
+              </h3>
+              <div className="cc-card-meta">
+                <span className="cc-card-chip">
+                  <Timer size={12} aria-hidden="true" />
+                  {formatWhen(item.cycle?.endAt)}
+                </span>
+                <button
+                  type="button"
+                  className="cc-card-enter"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openDaily(item);
+                  }}
+                >
+                  Leaderboard
+                  <ArrowRight size={14} aria-hidden="true" />
+                </button>
+              </div>
+            </article>
           ))}
+
+          {/* Battles */}
           {battles.map((room) => (
-            <BattleCard
+            <article
               key={`battle-${room.id || room.roomCode}`}
-              room={room}
-              onOpen={openBattle}
-            />
+              className="cc-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => openBattle(room)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openBattle(room);
+                }
+              }}
+            >
+              <div className="cc-card-head">
+                <span className="cc-card-kind">
+                  <Swords size={13} aria-hidden="true" />
+                  Coding
+                </span>
+                <span className="cc-card-chip">
+                  <CheckCircle2 size={12} aria-hidden="true" />
+                  {room.submissionStatus === "COMPLETED" ? "Completed" : "Live"}
+                </span>
+              </div>
+              <h3 className="cc-card-title">{room.title}</h3>
+              <div className="cc-card-meta">
+                <span className="cc-card-chip">
+                  <Timer size={12} aria-hidden="true" />
+                  {formatWhen(room.submittedAt || room.endDate || room.endTime)}
+                </span>
+                {Number.isFinite(Number(room.totalScore)) && (
+                  <span className="cc-card-chip">
+                    Score {Math.round(room.totalScore || 0)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="cc-card-enter"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openBattle(room);
+                  }}
+                >
+                  Leaderboard
+                  <ArrowRight size={14} aria-hidden="true" />
+                </button>
+              </div>
+            </article>
           ))}
         </div>
       )}

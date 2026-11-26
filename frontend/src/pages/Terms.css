@@ -1,6 +1,7 @@
 .terms-page {
   display: grid;
-  width: min(100%, 980px);
+  width: 100%;
+  max-width: 1600px;
   min-width: 0;
   gap: 16px;
   margin: 0 auto;

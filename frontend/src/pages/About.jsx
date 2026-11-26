@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BarChart3,
@@ -84,13 +84,14 @@ export default function About() {
           <span className="about-eyebrow">
             <Code2 size={15} /> A product by AMUX
           </span>
-          <h1>Make coding practice a shared challenge.</h1>
+          <h1>Measure skill, not just practice.</h1>
           <p>
-            CodeClash is a AMUX's product that lets you create and take part in
-            coding challenges. It provides a platform for developers to test
-            their skills, learn from others, and engage in friendly competition.
-            Whether you're a creator looking to host a challenge or a challenger
-            eager to test your abilities, CodeClash has you covered.
+            COGNICLASH is AMUX's skill-evaluation product. Organizations and
+            learners use it to run coding battles, daily challenges, and
+            concept evaluations — every attempt scored, ranked, and reported.
+            Whether you're a creator looking to host an evaluation or a
+            participant ready to prove your ability, COGNICLASH has you
+            covered.
           </p>
           <p></p>
           <div className="about-hero-actions">
@@ -109,7 +110,7 @@ export default function About() {
         </div>
         <aside
           className="about-hero-stats"
-          aria-label="CodeClash community"
+          aria-label="COGNICLASH community"
           aria-busy={statsLoading}
         >
           <div className="about-stat-card">
@@ -221,12 +222,12 @@ export default function About() {
         </div>
         <div>
           <span className="about-eyebrow">Built for practical practice</span>
-          <h2>Focused coding battles, with clear outcomes.</h2>
+          <h2>Focused evaluations, with clear outcomes.</h2>
           <p>
-            CodeClash brings challenge authoring, timed problem solving, code
+            COGNICLASH brings challenge authoring, timed problem solving, code
             execution, and result tracking together. It gives creators a
-            straightforward way to run an exercise and gives challengers a clear
-            place to put their skills to work.
+            straightforward way to run an evaluation and gives participants a
+            clear place to prove what they can do.
           </p>
         </div>
       </section>
@@ -237,11 +238,11 @@ export default function About() {
           <p>Create an account to host a battle or take part in one.</p>
         </div>
         <Link className="btn-primary" to="/register">
-          Join CodeClash <ArrowRight size={16} />
+          Join COGNICLASH <ArrowRight size={16} />
         </Link>
       </section>
       <p className="about-byline">
-        CodeClash is a product of{" "}
+        COGNICLASH is a product of{" "}
         <a href="https://amux.in" target="_blank" rel="noreferrer">
           AMUX
         </a>

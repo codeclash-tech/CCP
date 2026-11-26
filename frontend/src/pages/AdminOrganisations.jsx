@@ -107,8 +107,7 @@ export default function AdminOrganisations() {
         <p className="challenges-eyebrow">SUPER ADMIN</p>
         <h1>Organisations</h1>
         <p>
-          Generate 16-digit organisation licenses, and monitor every primary
-          admin account with its license expiry.
+          Generate license keys and keep an eye on every organisation's access.
         </p>
       </header>
 
@@ -167,11 +166,10 @@ export default function AdminOrganisations() {
 
       {activeTab === "generate" && (
         <form className="admin-org-generate" onSubmit={generateLicense}>
-          <h2>Generate an organisation license</h2>
+          <h2>Generate a license key</h2>
           <p>
-            A 16-digit license key is generated and emailed to the address
-            below. That key allows one organisation registration before it
-            expires.
+            The key is emailed to the organisation — one registration, valid
+            until it expires.
           </p>
           <label>
             Organisation email

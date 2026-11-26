@@ -3,7 +3,16 @@ import { useAuth } from "../context/AuthContext";
 import UserAvatar from "../components/user/UserAvatar";
 import { updateProfile } from "../services/authService";
 import api from "../services/api";
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  Pencil,
+  X,
+  ShieldCheck,
+  Mail,
+  Building2,
+  CalendarDays,
+} from "lucide-react";
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
@@ -34,7 +43,8 @@ export default function Profile() {
       setOrganizationProfile(null);
       return;
     }
-    api.get("/weekly-assessments/organization/profile")
+    api
+      .get("/weekly-assessments/organization/profile")
       .then(({ data }) => {
         setOrganizationProfile(data.organization || null);
         if (data.organization?.name) setOrganization(data.organization.name);
@@ -114,42 +124,32 @@ export default function Profile() {
 
         .profile-container {
           width: 100%;
+          max-width: 900px;
           margin: 0 auto;
         }
 
-        /* Header */
-
-        .profile-heading {
-          margin-bottom: 22px;
-        }
-
-        .profile-heading h1 {
-          margin: 0;
-          font-size: 25px;
-          line-height: 1.2;
-          font-weight: 700;
-          letter-spacing: -0.025em;
-          color: var(--text-primary);
-        }
-
-        .profile-heading p {
-          margin: 7px 0 0;
-          color: var(--text-muted);
-          font-size: 13px;
-          line-height: 1.5;
-        }
-
-        /* Main Card */
-
+        /* Single premium card */
         .profile-card {
+          position: relative;
           overflow: hidden;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border-color);
-          border-radius: 14px;
-          box-shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
+          border: 1px solid rgba(56, 189, 248, 0.28);
+          border-radius: 20px;
+          background:
+            radial-gradient(ellipse at 88% -10%, rgba(56, 189, 248, 0.16), transparent 55%),
+            linear-gradient(160deg, rgba(15, 30, 58, 0.5), var(--bg-elevated));
+          box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
         }
 
-        /* Profile Hero */
+        .profile-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, #38bdf8, transparent);
+          opacity: 0.7;
+        }
 
         .profile-hero {
           position: relative;
@@ -157,25 +157,14 @@ export default function Profile() {
           align-items: center;
           justify-content: space-between;
           gap: 24px;
-          padding: 28px 30px;
+          padding: 30px 32px 26px;
           border-bottom: 1px solid var(--border-color);
-          background:
-            radial-gradient(
-              circle at 85% 20%,
-              rgba(59, 130, 246, 0.10),
-              transparent 30%
-            ),
-            linear-gradient(
-              180deg,
-              rgba(255, 255, 255, 0.015),
-              transparent
-            );
         }
 
         .profile-identity {
           display: flex;
           align-items: center;
-          gap: 16px;
+          gap: 18px;
           min-width: 0;
         }
 
@@ -186,17 +175,13 @@ export default function Profile() {
           justify-content: center;
         }
 
-        .profile-name-block {
-          min-width: 0;
-        }
-
         .profile-name {
           margin: 0;
           color: var(--text-primary);
-          font-size: 21px;
-          line-height: 1.3;
-          font-weight: 700;
-          letter-spacing: -0.015em;
+          font-size: 24px;
+          line-height: 1.25;
+          font-weight: 800;
+          letter-spacing: -0.02em;
           overflow-wrap: anywhere;
         }
 
@@ -213,10 +198,10 @@ export default function Profile() {
           display: inline-flex;
           align-items: center;
           gap: 7px;
-          padding: 7px 11px;
-          border: 1px solid rgba(34, 197, 94, 0.18);
+          padding: 7px 12px;
+          border: 1px solid rgba(34, 197, 94, 0.2);
           border-radius: 999px;
-          background: rgba(34, 197, 94, 0.07);
+          background: rgba(34, 197, 94, 0.08);
           color: var(--color-success);
           font-size: 12px;
           font-weight: 600;
@@ -228,26 +213,16 @@ export default function Profile() {
           height: 6px;
           border-radius: 50%;
           background: currentColor;
-          box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.08);
+          box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
         }
-
-        /* Information */
 
         .profile-content {
-          padding: 26px 30px 30px;
-        }
-
-        .profile-section-title {
-          margin: 0 0 15px;
-          color: var(--text-primary);
-          font-size: 13px;
-          font-weight: 650;
-          letter-spacing: 0.01em;
+          padding: 24px 32px 30px;
         }
 
         .profile-details {
           display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+          grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 12px;
           margin: 0;
         }
@@ -256,30 +231,25 @@ export default function Profile() {
           min-width: 0;
           padding: 15px 16px;
           border: 1px solid var(--border-color);
-          border-radius: 10px;
-          background: rgba(255, 255, 255, 0.012);
-          transition:
-            border-color 160ms ease,
-            background 160ms ease;
-        }
-
-        .profile-detail:hover {
-          border-color: color-mix(
-            in srgb,
-            var(--border-color) 65%,
-            var(--text-muted)
-          );
-          background: rgba(255, 255, 255, 0.018);
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.015);
         }
 
         .profile-detail dt {
-          margin: 0 0 7px;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin: 0 0 8px;
           color: var(--text-muted);
           font-size: 11px;
           line-height: 1.3;
           font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 0.065em;
+          letter-spacing: 0.07em;
+        }
+
+        .profile-detail dt svg {
+          color: var(--accent-blue-bright, #38bdf8);
         }
 
         .profile-detail dd {
@@ -291,40 +261,19 @@ export default function Profile() {
           overflow-wrap: anywhere;
         }
 
-        .profile-detail dd.success {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          color: var(--color-success);
-        }
-
-        .success-check {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 15px;
-          height: 15px;
-          border-radius: 50%;
-          background: rgba(34, 197, 94, 0.12);
-          font-size: 9px;
-          line-height: 1;
-        }
-
         .profile-role {
           display: inline-flex;
           align-items: center;
           width: fit-content;
-          padding: 4px 8px;
-          border-radius: 6px;
-          background: rgba(59, 130, 246, 0.08);
-          border: 1px solid rgba(59, 130, 246, 0.14);
+          padding: 4px 10px;
+          border-radius: 100px;
+          background: rgba(56, 189, 248, 0.1);
+          border: 1px solid rgba(56, 189, 248, 0.3);
           color: var(--text-primary);
           font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.03em;
+          font-weight: 700;
+          letter-spacing: 0.04em;
         }
-
-        /* Footer */
 
         .profile-footer {
           display: flex;
@@ -344,10 +293,14 @@ export default function Profile() {
         }
 
         .profile-footer-mark {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
           color: var(--text-muted);
           font-size: 11px;
-          font-weight: 600;
-          opacity: 0.7;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          opacity: 0.8;
         }
 
         .profile-edit-form {
@@ -374,7 +327,7 @@ export default function Profile() {
           min-height: 42px;
           padding: 9px 11px;
           border: 1px solid var(--border-color);
-          border-radius: 7px;
+          border-radius: 8px;
           background: var(--bg-main);
           color: var(--text-primary);
           font: 14px var(--font-ui);
@@ -412,19 +365,9 @@ export default function Profile() {
           }
         }
 
-        /* Responsive */
-
         @media (max-width: 680px) {
           .profile-page {
             padding: 24px 16px 40px;
-          }
-
-          .profile-heading {
-            margin-bottom: 16px;
-          }
-
-          .profile-heading h1 {
-            font-size: 22px;
           }
 
           .profile-hero {
@@ -442,10 +385,7 @@ export default function Profile() {
             grid-template-columns: 1fr;
           }
 
-          .profile-edit-actions {
-            grid-column: auto;
-          }
-
+          .profile-edit-actions,
           .profile-edit-feedback {
             grid-column: auto;
           }
@@ -466,46 +406,31 @@ export default function Profile() {
           }
 
           .profile-name {
-            font-size: 18px;
-          }
-
-          .profile-email {
-            font-size: 12px;
-          }
-
-          .profile-avatar :global(*) {
-            max-width: 46px;
-          }
-
-          .profile-content {
-            padding: 18px;
-          }
-
-          .profile-detail {
-            padding: 13px 14px;
+            font-size: 19px;
           }
         }
       `}</style>
 
       <div className="profile-container">
-        <header className="profile-heading">
-          <h1>Profile</h1>
-          <p>Manage and view your account information.</p>
-        </header>
-
         <section className="profile-card">
           <div className="profile-hero">
             <div className="profile-identity">
               <div className="profile-avatar">
-                <UserAvatar name={user?.name} size={58} />
+                <UserAvatar name={user?.name} size={64} />
               </div>
 
-              <div className="profile-name-block">
+              <div>
                 <h2 className="profile-name">{user?.name || "Your profile"}</h2>
-
                 <p className="profile-email">
                   {user?.email || "No email available"}
                 </p>
+                <span className="profile-role" style={{ marginTop: 8 }}>
+                  {user?.role === "ADMIN"
+                    ? "Super Admin"
+                    : isOrganizationUser
+                      ? "Primary Admin"
+                      : "Participant"}
+                </span>
               </div>
             </div>
 
@@ -516,21 +441,25 @@ export default function Profile() {
           </div>
 
           <div className="profile-content">
-            <h3 className="profile-section-title">Account information</h3>
-
             <dl className="profile-details">
               <div className="profile-detail">
-                <dt>Email</dt>
+                <dt>
+                  <Mail size={13} /> Email
+                </dt>
                 <dd>{user?.email || "—"}</dd>
               </div>
 
               <div className="profile-detail">
-                <dt>Organization</dt>
+                <dt>
+                  <Building2 size={13} /> Organization
+                </dt>
                 <dd>{displayOrganization || "Not set"}</dd>
               </div>
 
               <div className="profile-detail">
-                <dt>Member since</dt>
+                <dt>
+                  <CalendarDays size={13} /> Member since
+                </dt>
                 <dd>
                   {user?.createdAt
                     ? new Date(user.createdAt).toLocaleDateString()
@@ -596,7 +525,10 @@ export default function Profile() {
                 </div>
               </form>
             ) : (
-              <div className="profile-edit-actions" style={{ marginTop: 20 }}>
+              <div
+                className="profile-edit-actions"
+                style={{ marginTop: 20, justifyContent: "flex-start" }}
+              >
                 <button
                   className="btn-secondary"
                   type="button"
@@ -609,7 +541,7 @@ export default function Profile() {
                   <Pencil size={14} />
                   Edit profile
                 </button>
-                {error && (
+                {error && !editing && (
                   <p className="profile-edit-feedback error" role="alert">
                     {error}
                   </p>
@@ -623,7 +555,9 @@ export default function Profile() {
                 account details.
               </p>
 
-              <span className="profile-footer-mark">ACCOUNT</span>
+              <span className="profile-footer-mark">
+                <ShieldCheck size={13} /> AMUX ACCOUNT
+              </span>
             </div>
           </div>
         </section>

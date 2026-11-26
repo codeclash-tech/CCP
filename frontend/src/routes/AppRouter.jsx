@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+﻿import { lazy, Suspense, useEffect, useState } from "react";
 import {
   HashRouter,
   Routes,
@@ -50,7 +50,7 @@ function AppLayout({ children }) {
   );
   const { user } = useAuth();
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
+    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
 
   useEffect(() => {
     const updateFullscreenState = () => {
@@ -149,7 +149,7 @@ function AccessDeniedPage() {
     <section className="development-route-page" role="alert">
       <h1>Access denied</h1>
       <p>
-        This section is available only to the authorized CodeClash role for
+        This section is available only to the authorized COGNICLASH role for
         this account.
       </p>
     </section>
@@ -276,7 +276,7 @@ function RouteSkeleton({ fullScreen = false }) {
 }
 
 export default function AppRouter() {
-  if (typeof window === "undefined" || !window.codeClashDesktop) {
+  if (typeof window === "undefined" || !window.COGNICLASHDesktop) {
     return (
       <Suspense fallback={<RouteSkeleton />}>
         <PublicLanding />

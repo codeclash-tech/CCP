@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import config from "../config/env.js";
 import { streamCertificatePdf } from "./certificatePdfService.js";
 
-const CERTIFICATE_AUDIENCE = "codeclash-battle-certificate";
+const CERTIFICATE_AUDIENCE = "COGNICLASH-battle-certificate";
 const CERTIFICATE_TOKEN_LIFETIME = "1y";
 
 function normalizedCertificateData(data) {

@@ -5,6 +5,7 @@ import {
   listStrictAttempts,
   getStrictModuleResults,
 } from "../services/learningStrictService.js";
+import { buildAttemptReportPdf } from "../services/strictReportPdfService.js";
 import { buildStrictResultsWorkbook } from "../services/strictResultsExportService.js";
 import LearningModule from "../models/LearningModule.js";
 
@@ -114,6 +115,25 @@ export async function listMyAttempts(req, res) {
     return res
       .status(500)
       .json({ error: "Could not load assessment history." });
+  }
+}
+
+export async function downloadAttemptReportPdf(req, res) {
+  try {
+    const pdf = await buildAttemptReportPdf(req.userId, req.params.attemptId);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition":
+        `attachment; filename="CogniClash-evaluation-report.pdf"`,
+    });
+    return res.status(200).send(pdf);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    if (status >= 500)
+      console.error("[StrictController] report pdf failed:", error.message);
+    return res
+      .status(status)
+      .json({ error: error.message || "Could not generate the report." });
   }
 }
 

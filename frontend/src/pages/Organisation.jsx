@@ -8,9 +8,17 @@ import {
   KeyRound,
   Users,
   ArrowRight,
+  Pencil,
+  Trash2,
+  Activity,
+  Code2,
 } from "lucide-react";
 import api from "../services/api";
-import { getMyRooms, getRoomLeaderboard } from "../services/battleRoomService";
+import {
+  getMyRooms,
+  getRoomLeaderboard,
+  deleteRoom,
+} from "../services/battleRoomService";
 import PageSkeleton from "../components/layout/PageSkeleton";
 import { formatDate } from "../utils/helpers";
 import { useAuth } from "../context/AuthContext";
@@ -51,10 +59,12 @@ export default function Organisation() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardError, setLeaderboardError] = useState("");
+  const [deletingCode, setDeletingCode] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,7 +80,9 @@ export default function Organisation() {
     if (roomsResult.status === "fulfilled") {
       setRooms(roomsResult.value.rooms || []);
     } else {
-      setError(roomsResult.reason?.message || "Could not load your battles.");
+      setError(
+        roomsResult.reason?.message || "Could not load your challenges.",
+      );
     }
     setLoading(false);
   }, []);
@@ -93,6 +105,29 @@ export default function Organisation() {
       );
     } finally {
       setLeaderboardLoading(false);
+    }
+  };
+
+  const handleDelete = async (room) => {
+    if (
+      !window.confirm(
+        `Delete "${room.title}"? Participants will lose access and this cannot be undone.`,
+      )
+    )
+      return;
+    setDeletingCode(room.roomCode);
+    setError("");
+    setNotice("");
+    try {
+      await deleteRoom(room.roomCode);
+      setNotice("Challenge deleted.");
+      setRooms((current) =>
+        current.filter((item) => item.roomCode !== room.roomCode),
+      );
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete this challenge.");
+    } finally {
+      setDeletingCode("");
     }
   };
 
@@ -119,10 +154,10 @@ export default function Organisation() {
             setLeaderboard(null);
           }}
         >
-          ← Back to My Battles
+          â† Back to My Hosted challenges
         </button>
         <header className="challenges-header">
-          <p className="challenges-eyebrow">BATTLE LEADERBOARD</p>
+          <p className="challenges-eyebrow">CHALLENGE MONITOR</p>
           <h1>{selectedRoom.title}</h1>
           <p>
             Key {selectedRoom.roomCode} · {selectedRoom.participantCount || 0}{" "}
@@ -177,12 +212,14 @@ export default function Organisation() {
       <header className="organisation-header">
         <div className="organisation-header-main">
           <div className="organisation-badge">
-            <Building2 size={18} aria-hidden="true" />
+            <Building2 size={30} aria-hidden="true" />
           </div>
           <div>
-            <p className="challenges-eyebrow">ORGANISATION</p>
-            <h1>
-              {profile?.name || user?.organization || "Your organisation"}
+            <p className="challenges-eyebrow">
+              {profile?.name || user?.organization || "YOUR ORGANISATION"}
+            </p>
+            <h1 className="organisation-welcome">
+              Welcome, {user?.name || "there"}
             </h1>
           </div>
           {remainingDays !== null && (
@@ -201,6 +238,11 @@ export default function Organisation() {
           {error}
         </p>
       )}
+      {notice && (
+        <p className="weekly-admin-notice" role="status">
+          {notice}
+        </p>
+      )}
 
       <div
         className="organisation-tabs"
@@ -214,7 +256,7 @@ export default function Organisation() {
           className={activeTab === "create" ? "selected" : ""}
           onClick={() => setActiveTab("create")}
         >
-          <PlusCircle size={15} /> Create Challenges
+          <PlusCircle size={15} /> Create a new battle
         </button>
         <button
           type="button"
@@ -223,7 +265,7 @@ export default function Organisation() {
           className={activeTab === "battles" ? "selected" : ""}
           onClick={() => setActiveTab("battles")}
         >
-          <Swords size={15} /> My Battles
+          <Swords size={15} /> My Hosted challenges
         </button>
       </div>
 
@@ -232,7 +274,7 @@ export default function Organisation() {
           <div className="organisation-create-copy">
             <h2>Create a new battle</h2>
             <p>
-              Build a private CodeClash battle with your own questions, test
+              Build a private COGNICLASH battle with your own questions, test
               cases, and schedule. Once created, the battle is published and
               every participant can join with its key.
             </p>
@@ -250,6 +292,10 @@ export default function Organisation() {
             strokeWidth={1}
             aria-hidden="true"
           />
+          <span className="organisation-create-brand">
+            <Code2 size={14} aria-hidden="true" />
+            CogniClash
+          </span>
         </section>
       )}
 
@@ -263,7 +309,7 @@ export default function Organisation() {
               marginBottom: 14,
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 19 }}>Battles you created</h2>
+            <h2 style={{ margin: 0, fontSize: 19 }}>Challenges you hosted</h2>
             <button
               type="button"
               className="btn-secondary"
@@ -275,55 +321,74 @@ export default function Organisation() {
           </div>
           {rooms.length === 0 ? (
             <p className="my-challenges-empty">
-              You haven&apos;t created any battles yet. Create your first battle
-              to publish it to participants.
+              You haven&apos;t hosted any challenges yet. Create your first
+              battle to publish it to participants.
             </p>
           ) : (
             <div className="organisation-battle-grid">
               {rooms.map((room) => {
                 const status = roomStatusLabel(room);
                 return (
-                  <article
-                    key={room.id || room.roomCode}
-                    className="my-challenge-card"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openRoom(room)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openRoom(room);
-                      }
-                    }}
-                  >
-                    <div className="my-challenge-card-head">
-                      <KeyRound size={16} aria-hidden="true" />
-                      <span className="my-challenge-card-kind">
+                  <article key={room.id || room.roomCode} className="cc-card">
+                    <div className="cc-card-head">
+                      <span className="cc-card-kind">
+                        <KeyRound size={13} aria-hidden="true" />
                         {room.roomCode}
                       </span>
                       <span
-                        className="my-challenge-status"
-                        style={{
-                          color: statusColor(status),
-                          borderColor: statusColor(status),
-                        }}
+                        className="cc-card-chip"
+                        style={{ color: statusColor(status) }}
                       >
                         {status}
                       </span>
                     </div>
-                    <h3>{room.title}</h3>
-                    <p className="my-challenge-card-date">
+                    <h3 className="cc-card-title">{room.title}</h3>
+                    <p className="cc-card-desc">
                       {room.questionCount || 0} question
                       {room.questionCount === 1 ? "" : "s"} · Created{" "}
-                      {formatDate(room.createdAt)}
-                    </p>
-                    <p className="my-challenge-card-date">
-                      <Users size={12} style={{ verticalAlign: "-2px" }} />{" "}
+                      {formatDate(room.createdAt)} ·{" "}
                       {room.participantCount || 0} participants
                     </p>
-                    <div className="my-challenge-card-footer">
-                      <span>View leaderboard</span>
-                      <ArrowRight size={14} aria-hidden="true" />
+                    <div className="cc-card-meta">
+                      <button
+                        type="button"
+                        className="cc-card-save"
+                        title="Edit challenge"
+                        onClick={() =>
+                          navigate(`/battle-room/${room.roomCode}/edit`)
+                        }
+                      >
+                        <Pencil size={13} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="cc-card-save"
+                        title="Monitor challenge"
+                        onClick={() => openRoom(room)}
+                      >
+                        <Activity size={13} /> Monitor
+                      </button>
+                      <button
+                        type="button"
+                        className="cc-card-save"
+                        title="Delete challenge"
+                        disabled={deletingCode === room.roomCode}
+                        onClick={() => handleDelete(room)}
+                      >
+                        <Trash2 size={13} />
+                        {deletingCode === room.roomCode
+                          ? "Deleting…"
+                          : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        className="cc-card-enter"
+                        style={{ marginLeft: "auto" }}
+                        onClick={() => openRoom(room)}
+                      >
+                        <Users size={13} /> Leaderboard
+                        <ArrowRight size={13} />
+                      </button>
                     </div>
                   </article>
                 );

@@ -24,11 +24,7 @@ export const ROLE_NAVIGATION = {
     { path: "/organisation", label: "Organisation", icon: Building2 },
   ],
   [ASSESSMENT_ROLES.SUPER_ADMIN]: [
-    {
-      path: "/admin",
-      label: "Today Challenge",
-      icon: CalendarDays,
-    },
+  { path: "/admin", label: "Daily Challenge", icon: CalendarDays },
     { path: "/admin/organisations", label: "Organisations", icon: Building2 },
     { path: "/admin/learning", label: "Thrive", icon: BookOpen },
   ],
@@ -36,6 +32,6 @@ export const ROLE_NAVIGATION = {
 
 export const ROLE_LABELS = {
   [ASSESSMENT_ROLES.CANDIDATE]: "Participant",
-  [ASSESSMENT_ROLES.ORGANIZATION_USER]: "Primary Admin",
-  [ASSESSMENT_ROLES.SUPER_ADMIN]: "Super Admin",
+  [ASSESSMENT_ROLES.ORGANIZATION_USER]: "Organization Admin",
+  [ASSESSMENT_ROLES.SUPER_ADMIN]: "AMUX Admin",
 };
