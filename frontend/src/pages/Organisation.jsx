@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   Building2,
   PlusCircle,
   Swords,
@@ -154,7 +155,7 @@ export default function Organisation() {
             setLeaderboard(null);
           }}
         >
-          ← Back to My Hosted challenges
+          <ArrowLeft size={15} /> Back to My Hosted challenges
         </button>
         <header className="challenges-header">
           <p className="challenges-eyebrow">CHALLENGE MONITOR</p>

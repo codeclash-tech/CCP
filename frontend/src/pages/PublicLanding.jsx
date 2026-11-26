@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowUpRight, ArrowDown, ChevronRight, Swords } from "lucide-react";
 import desktopPackage from "../../../desktop/package.json";
 import brandIcon from "../../../desktop/assets/codeclash.ico";
 import "./PublicLanding.css";
@@ -111,14 +112,14 @@ export default function PublicLanding() {
               href={DOWNLOAD_URL}
               onClick={handleDownloadClick}
             >
-              Download for Windows <span aria-hidden="true">↗</span>
+              Download for Windows <ArrowUpRight size={15} aria-hidden="true" />
             </a>
             <a className="public-landing-secondary-link" href="#experience">
-              Explore CogniClash <span aria-hidden="true">↓</span>
+              Explore CogniClash <ArrowDown size={15} aria-hidden="true" />
             </a>
           </div>
           <p className="public-landing-version">
-            Windows desktop app <span aria-hidden="true">·</span> Version{" "}
+            Windows desktop app <span aria-hidden="true">|</span> Version{" "}
             {desktopPackage.version}
           </p>
         </div>
@@ -143,22 +144,22 @@ export default function PublicLanding() {
                 <strong>Daily Challenge</strong>
                 <small>A fresh challenge awaits</small>
               </span>
-              <span className="public-landing-preview-arrow">↗</span>
+              <span className="public-landing-preview-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
             </div>
             <div className="public-landing-preview-challenge secondary">
-              <span className="public-landing-preview-icon crossed">âš”</span>
+              <span className="public-landing-preview-icon crossed"><Swords size={16} aria-hidden="true" /></span>
               <span>
                 <strong>Battle Rooms</strong>
                 <small>Join in or host your own</small>
               </span>
-              <span className="public-landing-preview-arrow">↗</span>
+              <span className="public-landing-preview-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
             </div>
             <div className="public-landing-preview-code" aria-hidden="true">
               <span>public class</span> Solution {"{"}
               <br />
               &nbsp;&nbsp;<span>void</span> makeYourMove() {"{"}
               <br />
-              &nbsp;&nbsp;&nbsp;&nbsp;solve(); <b>â–Œ</b>
+              &nbsp;&nbsp;&nbsp;&nbsp;solve(); <b>_</b>
               <br />
               &nbsp;&nbsp;{"}"}
               <br />
@@ -194,7 +195,7 @@ export default function PublicLanding() {
             <article className="public-landing-pillar" key={pillar.number}>
               <span className="public-landing-pillar-number">{pillar.number}</span>
               <div className="public-landing-pillar-mark" aria-hidden="true">
-                {pillar.number === "01" ? "</>" : pillar.number === "02" ? "âš”" : "+"}
+                {pillar.number === "01" ? "</>" : pillar.number === "02" ? <Swords size={18} aria-hidden="true" /> : "+"}
               </div>
               <h3>{pillar.title}</h3>
               <p>{pillar.description}</p>
@@ -229,7 +230,7 @@ export default function PublicLanding() {
         <div className="public-landing-audience-list">
           {audiences.map(([title, description]) => (
             <article key={title}>
-              <span aria-hidden="true">↗</span>
+              <ChevronRight size={16} aria-hidden="true" />
               <div>
                 <h3>{title}</h3>
                 <p>{description}</p>
@@ -252,10 +253,10 @@ export default function PublicLanding() {
           href={DOWNLOAD_URL}
           onClick={handleDownloadClick}
         >
-          Get CogniClash for Windows <span aria-hidden="true">↗</span>
+          Get CogniClash for Windows <ArrowUpRight size={15} aria-hidden="true" />
         </a>
         <span className="public-landing-final-version">
-          Version {desktopPackage.version} <span aria-hidden="true">·</span> Windows desktop app
+          Version {desktopPackage.version} <span aria-hidden="true">|</span> Windows desktop app
         </span>
       </section>
 

@@ -335,7 +335,7 @@ export default function GlobalChallengeAdmin({ view = "today" }) {
         .toLowerCase()
         .includes(questionSearch.trim().toLowerCase()),
   );
-  const title = adminTab === "questions" ? "Today Challenge · Questions" : "Today Challenge";
+  const title = adminTab === "questions" ? "Daily Challenge · Questions" : "Daily Challenge";
   const currentCycle = cycles.find((cycle) =>
     cycle.isGlobalChallenge &&
       new Date(cycle.startAt) <= Date.now() &&

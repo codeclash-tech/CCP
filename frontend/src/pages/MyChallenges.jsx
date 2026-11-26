@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   ClipboardList,
   Trophy,
   Swords,
@@ -154,7 +155,7 @@ export default function MyChallenges() {
             setLeaderboard(null);
           }}
         >
-          ← Back to My Challenges
+          <ArrowLeft size={15} /> Back to My Challenges
         </button>
         <header className="my-challenge-detail-header">
           <p className="challenges-eyebrow">
