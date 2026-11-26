@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, RefreshCw, Settings2, UserRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -12,17 +12,17 @@ import "../styles/productPages.css";
 export default function Settings() {
   const { user } = useAuth();
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
+    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   const [preferences, setPreferences] = useState(getEditorPreferences);
   const [saved, setSaved] = useState(false);
   const [engineStatus, setEngineStatus] = useState("checking");
   const [checkingEngine, setCheckingEngine] = useState(false);
 
   const checkEngine = async () => {
-    if (typeof window.COGNICLASHDesktop?.engine?.status !== "function") return;
+    if (typeof window.codeClashDesktop?.engine?.status !== "function") return;
     setCheckingEngine(true);
     try {
-      const status = await window.COGNICLASHDesktop.engine.status();
+      const status = await window.codeClashDesktop.engine.status();
       setEngineStatus(status?.status === "UP" ? "ready" : "unavailable");
     } catch {
       setEngineStatus("unavailable");

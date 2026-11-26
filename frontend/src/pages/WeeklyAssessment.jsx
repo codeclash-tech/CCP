@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
@@ -97,7 +97,7 @@ export default function WeeklyAssessment() {
   const [consoleHeight, setConsoleHeight] = useState(280);
   const isDesktop =
     typeof window !== "undefined" &&
-    typeof window.COGNICLASHDesktop?.engine?.execute === "function";
+    typeof window.codeClashDesktop?.engine?.execute === "function";
 
   const loadAssessment = useCallback(async ({ preserveError = false, silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -179,9 +179,9 @@ export default function WeeklyAssessment() {
       }
     }
 
-    if (typeof window.COGNICLASHDesktop?.window?.setChallengeMode === "function") {
+    if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
       try {
-        await window.COGNICLASHDesktop.window.setChallengeMode(true);
+        await window.codeClashDesktop.window.setChallengeMode(true);
       } catch (challengeModeError) {
         if (document.fullscreenElement && document.exitFullscreen) {
           await document.exitFullscreen();
@@ -212,8 +212,8 @@ export default function WeeklyAssessment() {
     } catch (storageError) {
       console.warn("Unable to clear global challenge session state:", storageError.message);
     }
-    if (typeof window.COGNICLASHDesktop?.window?.setChallengeMode === "function") {
-      await window.COGNICLASHDesktop.window.setChallengeMode(false);
+    if (typeof window.codeClashDesktop?.window?.setChallengeMode === "function") {
+      await window.codeClashDesktop.window.setChallengeMode(false);
     }
     if (document.fullscreenElement && document.exitFullscreen) {
       await document.exitFullscreen();

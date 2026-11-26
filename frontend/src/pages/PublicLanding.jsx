@@ -111,10 +111,10 @@ export default function PublicLanding() {
               href={DOWNLOAD_URL}
               onClick={handleDownloadClick}
             >
-              Download for Windows <span aria-hidden="true">â†—</span>
+              Download for Windows <span aria-hidden="true">↗</span>
             </a>
             <a className="public-landing-secondary-link" href="#experience">
-              Explore CogniClash <span aria-hidden="true">â†“</span>
+              Explore CogniClash <span aria-hidden="true">↓</span>
             </a>
           </div>
           <p className="public-landing-version">
@@ -143,7 +143,7 @@ export default function PublicLanding() {
                 <strong>Daily Challenge</strong>
                 <small>A fresh challenge awaits</small>
               </span>
-              <span className="public-landing-preview-arrow">â†—</span>
+              <span className="public-landing-preview-arrow">↗</span>
             </div>
             <div className="public-landing-preview-challenge secondary">
               <span className="public-landing-preview-icon crossed">âš”</span>
@@ -151,7 +151,7 @@ export default function PublicLanding() {
                 <strong>Battle Rooms</strong>
                 <small>Join in or host your own</small>
               </span>
-              <span className="public-landing-preview-arrow">â†—</span>
+              <span className="public-landing-preview-arrow">↗</span>
             </div>
             <div className="public-landing-preview-code" aria-hidden="true">
               <span>public class</span> Solution {"{"}
@@ -229,7 +229,7 @@ export default function PublicLanding() {
         <div className="public-landing-audience-list">
           {audiences.map(([title, description]) => (
             <article key={title}>
-              <span aria-hidden="true">â†—</span>
+              <span aria-hidden="true">↗</span>
               <div>
                 <h3>{title}</h3>
                 <p>{description}</p>
@@ -252,7 +252,7 @@ export default function PublicLanding() {
           href={DOWNLOAD_URL}
           onClick={handleDownloadClick}
         >
-          Get CogniClash for Windows <span aria-hidden="true">â†—</span>
+          Get CogniClash for Windows <span aria-hidden="true">↗</span>
         </a>
         <span className="public-landing-final-version">
           Version {desktopPackage.version} <span aria-hidden="true">·</span> Windows desktop app

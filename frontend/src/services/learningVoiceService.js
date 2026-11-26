@@ -169,7 +169,7 @@ function createDesktopSpeechInputProvider(browser, speech) {
 }
 
 export function createSpeechInputProvider(browser = globalThis) {
-  const desktopSpeech = browser.COGNICLASHDesktop?.speech;
+  const desktopSpeech = browser.codeClashDesktop?.speech;
   if (desktopSpeech && typeof desktopSpeech.transcribe === "function") {
     return createDesktopSpeechInputProvider(browser, desktopSpeech);
   }

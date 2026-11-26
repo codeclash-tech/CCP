@@ -1958,7 +1958,7 @@ function AdminLearning() {
                               onClick={() => moveTopic(index, -1)}
                               type="button"
                             >
-                              â†‘
+                              ↑
                             </button>
                             <button
                               className="learning-link-button"
@@ -1967,7 +1967,7 @@ function AdminLearning() {
                               onClick={() => moveTopic(index, 1)}
                               type="button"
                             >
-                              â†“
+                              ↓
                             </button>
                             <button
                               className="learning-link-button"
@@ -2633,7 +2633,7 @@ function AdminLearning() {
                                       }}
                                       type="button"
                                     >
-                                      â†‘
+                                      ↑
                                     </button>
                                     <button
                                       aria-label={`Move objective ${index + 1} down`}
@@ -2661,7 +2661,7 @@ function AdminLearning() {
                                       }}
                                       type="button"
                                     >
-                                      â†“
+                                      ↓
                                     </button>
                                     <button
                                       className="learning-link-button"
@@ -4329,7 +4329,7 @@ function AdminLearning() {
                           onClick={() => moveTopic(index, -1)}
                           type="button"
                         >
-                          â†‘
+                          ↑
                         </button>
                         <button
                           className="learning-link-button"
@@ -4340,7 +4340,7 @@ function AdminLearning() {
                           onClick={() => moveTopic(index, 1)}
                           type="button"
                         >
-                          â†“
+                          ↓
                         </button>
                         <button
                           className="learning-link-button"

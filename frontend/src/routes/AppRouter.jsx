@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   HashRouter,
   Routes,
@@ -50,7 +50,7 @@ function AppLayout({ children }) {
   );
   const { user } = useAuth();
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
+    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
 
   useEffect(() => {
     const updateFullscreenState = () => {
@@ -276,7 +276,7 @@ function RouteSkeleton({ fullScreen = false }) {
 }
 
 export default function AppRouter() {
-  if (typeof window === "undefined" || !window.COGNICLASHDesktop) {
+  if (typeof window === "undefined" || !window.codeClashDesktop) {
     return (
       <Suspense fallback={<RouteSkeleton />}>
         <PublicLanding />

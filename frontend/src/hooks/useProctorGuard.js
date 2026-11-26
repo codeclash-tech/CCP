@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 function createSessionId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -182,7 +182,7 @@ export default function useProctorGuard({
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     const onDesktopFocusChanged =
-      window.COGNICLASHDesktop?.window?.onAssessmentFocusChanged;
+      window.codeClashDesktop?.window?.onAssessmentFocusChanged;
     const removeDesktopFocusListener =
       typeof onDesktopFocusChanged === "function"
         ? onDesktopFocusChanged((isFocused) => {

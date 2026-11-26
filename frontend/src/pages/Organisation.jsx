@@ -154,7 +154,7 @@ export default function Organisation() {
             setLeaderboard(null);
           }}
         >
-          â† Back to My Hosted challenges
+          ← Back to My Hosted challenges
         </button>
         <header className="challenges-header">
           <p className="challenges-eyebrow">CHALLENGE MONITOR</p>

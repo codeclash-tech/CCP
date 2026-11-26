@@ -294,7 +294,7 @@ export default function WeeklyAdminAssessment({ view = "cycles" }) {
                         type="button"
                         onClick={() => setCycleId(String(cycle._id))}
                       >
-                        <span><strong>{cycle.name}</strong><small>{cycle.cycleKey} · {dateLabel(cycle.startAt)} â†’ {dateLabel(cycle.endAt)}</small></span>
+                        <span><strong>{cycle.name}</strong><small>{cycle.cycleKey} · {dateLabel(cycle.startAt)} → {dateLabel(cycle.endAt)}</small></span>
                         <span className={`weekly-status status-${cycle.status?.toLowerCase()}`}>{cycle.status}</span>
                       </button>
                     ))}

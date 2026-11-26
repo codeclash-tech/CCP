@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   KeyRound,
@@ -48,7 +48,7 @@ const targetAudiences = [
 export default function Home() {
   const { user } = useAuth();
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
+    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   if (isDesktop) {
     return (
       <main className="product-page desktop-dashboard">

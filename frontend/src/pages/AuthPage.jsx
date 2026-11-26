@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Code2,
@@ -32,7 +32,7 @@ const fieldStyle = {
 export default function AuthPage({ mode }) {
   const isRegistration = mode === "register";
   const isDesktop =
-    typeof window !== "undefined" && Boolean(window.COGNICLASHDesktop);
+    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
   const location = useLocation();
   const navigate = useNavigate();
   const { signIn } = useAuth();

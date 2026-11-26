@@ -1,4 +1,4 @@
-﻿import api, { getFreshAccessTokenForDesktopSubmission } from "./api";
+import api, { getFreshAccessTokenForDesktopSubmission } from "./api";
 import {
   executeQuestionTestCasesLocally,
   submitQuestionLocally,
@@ -24,7 +24,7 @@ export const generateStarterCode = (
 
 export const generateExpectedOutputs = (question) => {
   const desktopBridge =
-    typeof window !== "undefined" ? window.COGNICLASHDesktop : undefined;
+    typeof window !== "undefined" ? window.codeClashDesktop : undefined;
   return generateReferenceOutputs(
     question,
     desktopBridge,
@@ -99,7 +99,7 @@ export const submitSolution = async ({
 }) => {
   const isDesktop =
     typeof window !== "undefined" &&
-    typeof window.COGNICLASHDesktop?.assessment?.submit === "function";
+    typeof window.codeClashDesktop?.assessment?.submit === "function";
 
   if (isDesktop) {
     return submitQuestionLocally({
@@ -125,7 +125,7 @@ export const submitSolution = async ({
 export const runSolution = ({ roomCode, questionId, code, language, question }) => {
   if (
     typeof window !== "undefined" &&
-    typeof window.COGNICLASHDesktop?.engine?.execute === "function"
+    typeof window.codeClashDesktop?.engine?.execute === "function"
   ) {
     return executeQuestionTestCasesLocally({ question, code, language });
   }

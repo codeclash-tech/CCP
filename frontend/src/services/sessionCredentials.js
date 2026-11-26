@@ -1,4 +1,4 @@
-﻿const ACCESS_TOKEN_KEY = "ccp_access_token";
+const ACCESS_TOKEN_KEY = "ccp_access_token";
 const REFRESH_TOKEN_KEY = "ccp_refresh_token";
 
 let desktopTokens;
@@ -7,7 +7,7 @@ let desktopTokenRequest;
 async function readDesktopTokens() {
   if (desktopTokens) return desktopTokens;
   if (!desktopTokenRequest) {
-    desktopTokenRequest = window.COGNICLASHDesktop.auth
+    desktopTokenRequest = window.codeClashDesktop.auth
       .getTokens()
       .then(async (tokens) => {
         if (!tokens.accessToken && !tokens.refreshToken) {
@@ -16,7 +16,7 @@ async function readDesktopTokens() {
             refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY),
           };
           if (legacyTokens.accessToken || legacyTokens.refreshToken) {
-            await window.COGNICLASHDesktop.auth.setTokens(legacyTokens);
+            await window.codeClashDesktop.auth.setTokens(legacyTokens);
             localStorage.removeItem(ACCESS_TOKEN_KEY);
             localStorage.removeItem(REFRESH_TOKEN_KEY);
             tokens = legacyTokens;
@@ -36,7 +36,7 @@ export async function getStoredCredential(key) {
   if (key !== ACCESS_TOKEN_KEY && key !== REFRESH_TOKEN_KEY) {
     throw new TypeError("Unsupported authentication credential.");
   }
-  if (typeof window.COGNICLASHDesktop?.auth?.getTokens === "function") {
+  if (typeof window.codeClashDesktop?.auth?.getTokens === "function") {
     const tokens = await readDesktopTokens();
     return key === ACCESS_TOKEN_KEY
       ? tokens.accessToken
@@ -54,9 +54,9 @@ export async function hasStoredCredential() {
 }
 
 export async function storeAuthTokens(accessToken, refreshToken) {
-  if (typeof window.COGNICLASHDesktop?.auth?.setTokens === "function") {
+  if (typeof window.codeClashDesktop?.auth?.setTokens === "function") {
     const tokens = { accessToken, refreshToken };
-    await window.COGNICLASHDesktop.auth.setTokens(tokens);
+    await window.codeClashDesktop.auth.setTokens(tokens);
     desktopTokens = tokens;
     return;
   }
@@ -67,8 +67,8 @@ export async function storeAuthTokens(accessToken, refreshToken) {
 }
 
 export async function clearAuthTokens() {
-  if (typeof window.COGNICLASHDesktop?.auth?.clearTokens === "function") {
-    await window.COGNICLASHDesktop.auth.clearTokens();
+  if (typeof window.codeClashDesktop?.auth?.clearTokens === "function") {
+    await window.codeClashDesktop.auth.clearTokens();
     desktopTokens = { accessToken: null, refreshToken: null };
     return;
   }

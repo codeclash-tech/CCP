@@ -154,7 +154,7 @@ export default function MyChallenges() {
             setLeaderboard(null);
           }}
         >
-          â† Back to My Challenges
+          ← Back to My Challenges
         </button>
         <header className="my-challenge-detail-header">
           <p className="challenges-eyebrow">

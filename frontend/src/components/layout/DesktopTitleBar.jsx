@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Maximize2, Minimize2, Minus, X } from "lucide-react";
 import codeclashLogo from "../../../../desktop/assets/codeclash.ico";
 
@@ -7,7 +7,7 @@ export default function DesktopTitleBar() {
 
   useEffect(() => {
     let mounted = true;
-    const desktopWindow = window.COGNICLASHDesktop.window;
+    const desktopWindow = window.codeClashDesktop.window;
     const unsubscribe = desktopWindow.onMaximizeChanged((isMaximized) => {
       setMaximized(Boolean(isMaximized));
     });
@@ -29,7 +29,7 @@ export default function DesktopTitleBar() {
 
   const controlWindow = async (action) => {
     try {
-      await window.COGNICLASHDesktop.window.control(action);
+      await window.codeClashDesktop.window.control(action);
     } catch (error) {
       console.error("Unable to control the COGNICLASH window:", error);
     }
