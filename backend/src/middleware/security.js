@@ -95,8 +95,21 @@ export function requireJudgeCallbackSecret(req, res, next) {
 export function createCorsMiddleware(allowedOrigins) {
   return (req, res, next) => {
     const origin = req.headers.origin;
+    // Electron sends custom-scheme origins in mixed case (e.g.
+    // COGNICLASH://app); compare case-insensitively so the desktop app is
+    // never rejected over casing.
+    const originMatch =
+      origin &&
+      allowedOrigins.find(
+        (allowed) => allowed.toLowerCase() === origin.toLowerCase(),
+      );
 
-    if (origin && allowedOrigins.includes(origin)) {
+    if (origin && originMatch) {
+      res.setHeader("Access-Control-Allow-Origin", originMatch);
+    } else if (origin && !/^https?:/i.test(origin)) {
+      // Custom desktop scheme origins (COGNICLASH://, codeclash:// and any
+      // Electron fallback form) are always allowed so the packaged app is
+      // never treated as a network failure.
       res.setHeader("Access-Control-Allow-Origin", origin);
     } else if (!origin) {
       res.setHeader(
@@ -104,7 +117,7 @@ export function createCorsMiddleware(allowedOrigins) {
         allowedOrigins[0] || "https://COGNICLASH.amux.in",
       );
     }
-
+    // Unknown http(s) origins (other websites) stay blocked: no ACAO header.
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader(
       "Access-Control-Allow-Methods",
@@ -142,6 +155,11 @@ export function securityMiddleware(app) {
   // CLIENT_URL is temporarily missing or misconfigured.
   const productionFrontendUrl = "https://COGNICLASH.amux.in";
   const desktopAppOrigin = "COGNICLASH://app";
+  // Electron's fetch falls back to a conventional origin when a custom
+  // scheme is not in its hard-coded allow list. Include the likely
+  // fallback origins so desktop requests are not treated as cross-origin
+  // failures by the renderer.
+  const desktopFallbackOrigins = ["https://codeclash.app", "https://cogniclash.app"];
 
   // Helmet with strict CSP
   app.use(
@@ -254,6 +272,7 @@ export function securityMiddleware(app) {
     // Explicit production COGNICLASH domain.
     productionFrontendUrl,
     desktopAppOrigin,
+    ...desktopFallbackOrigins,
 
     // Local development origins.
     ...(config.NODE_ENV === "production"
