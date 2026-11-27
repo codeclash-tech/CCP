@@ -199,6 +199,16 @@
   color: var(--color-success, #2ea043);
 }
 
+.public-landing-final-actions {
+  margin-top: 24px;
+  justify-content: center;
+  gap: 14px;
+}
+
+.public-landing-final-actions .public-landing-secondary-link {
+  font-size: 13px;
+}
+
 .public-landing-footer-top {
   display: flex;
   width: 100%;

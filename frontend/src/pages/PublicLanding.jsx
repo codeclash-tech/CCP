@@ -111,13 +111,15 @@ export default function PublicLanding() {
           <Link to="/terms" onClick={closeMenu}>
             Terms
           </Link>
+          <Link to="/login" onClick={closeMenu}>
+            Sign in
+          </Link>
           <Link
             className="public-landing-nav-download"
-            to="/install-desktop"
+            to="/register"
             onClick={closeMenu}
           >
-            <Download size={13} aria-hidden="true" />
-            Get the app
+            Create account
           </Link>
         </div>
         <button
@@ -144,6 +146,12 @@ export default function PublicLanding() {
           <Link to="/terms" onClick={closeMenu}>
             Terms
           </Link>
+          <Link to="/login" onClick={closeMenu}>
+            Sign in
+          </Link>
+          <Link to="/register" onClick={closeMenu}>
+            Create account
+          </Link>
           <Link to="/install-desktop" onClick={closeMenu}>
             <Download size={14} aria-hidden="true" />
             Install desktop app
@@ -162,7 +170,7 @@ export default function PublicLanding() {
       >
         <div className="public-landing-hero-copy">
           <p className="public-landing-eyebrow">
-            The desktop home for coding battles
+            Coding battles in your browser or desktop
           </p>
           <h1 id="public-landing-title">
             Think sharp.
@@ -172,12 +180,20 @@ export default function PublicLanding() {
           <p className="public-landing-description">
             Turn coding practice into a challenge worth showing up for. Take on
             a daily problem, compete in a Battle Room, or host one for your
-            community — the same focused experience in the CogniClash desktop
-            app and on the web.
+            community — right here in your browser, or in the CogniClash
+            Windows desktop app. Same interface, same account, same
+            leaderboard.
           </p>
           <div className="public-landing-actions">
-            <a
+            <Link
               className="public-landing-download"
+              to="/register"
+              onClick={closeMenu}
+            >
+              Start on the web <ArrowUpRight size={15} aria-hidden="true" />
+            </Link>
+            <a
+              className="public-landing-secondary-link"
               href={DOWNLOAD_URL}
               onClick={handleDownloadClick}
             >
@@ -251,7 +267,7 @@ export default function PublicLanding() {
           </div>
           <div className="public-landing-preview-footer">
             <span>
-              <i /> Desktop workspace
+              <i /> Coding workspace
             </span>
             <span>JAVA</span>
           </div>
@@ -281,7 +297,8 @@ export default function PublicLanding() {
           </h2>
           <p>
             CogniClash gives individual practice and group challenges a shared,
-            focused experience — identical in the desktop app and on the web.
+            focused experience — run it in your browser or in the Windows app,
+            it looks and works the same.
           </p>
         </div>
         <div className="public-landing-pillars">
@@ -362,10 +379,11 @@ export default function PublicLanding() {
             <p className="public-landing-eyebrow">Strict evaluations</p>
             <h2>Coding &amp; strict tests run in the desktop app</h2>
             <p>
-              Practice challenges are open to everyone on the web. Strict
-              evaluations and graded coding tests open in a locked-down,
-              distraction-free environment — so they run in the CogniClash
-              desktop app only. When you start one from the web, we take you
+              Everything else — practice challenges, daily challenge, battle
+              rooms, learning — works right here on the web with your same
+              account. Strict evaluations and graded coding tests open in a
+              locked-down, proctored environment, so those run in the
+              CogniClash desktop app only. Starting one from the web takes you
               straight to the install page.
             </p>
             <div className="public-landing-desktop-note-actions">
@@ -390,20 +408,23 @@ export default function PublicLanding() {
           <span>a CogniClash?</span>
         </h2>
         <p>
-          Download the Windows app and bring a little more purpose to your next
-          coding session.
+          Start solving right now in your browser, or install the Windows app
+          for proctored strict evaluations — same account either way.
         </p>
-        <a
-          className="public-landing-download"
-          href={DOWNLOAD_URL}
-          onClick={handleDownloadClick}
-        >
-          Get CogniClash for Windows{" "}
-          <ArrowUpRight size={15} aria-hidden="true" />
-        </a>
+        <div className="public-landing-actions public-landing-final-actions">
+          <Link
+            className="public-landing-download"
+            to="/register"
+          >
+            Create free account <ArrowUpRight size={15} aria-hidden="true" />
+          </Link>
+          <Link className="public-landing-secondary-link" to="/login">
+            Sign in <ArrowUpRight size={15} aria-hidden="true" />
+          </Link>
+        </div>
         <span className="public-landing-final-version">
-          Version {desktopPackage.version} <span aria-hidden="true">|</span>{" "}
-          Windows desktop app
+          Web app free <span aria-hidden="true">|</span> Windows app v{" "}
+          {desktopPackage.version}
         </span>
       </section>
 
@@ -423,6 +444,7 @@ export default function PublicLanding() {
             <a href="#how-it-works">How it works</a>
             <Link to="/about">About</Link>
             <Link to="/terms">Terms</Link>
+            <Link to="/login">Sign in</Link>
             <a href="mailto:helloamux@gmail.com">Contact support</a>
           </nav>
           <a
