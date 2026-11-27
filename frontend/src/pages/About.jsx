@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { getPlatformStats } from "../services/platformService";
+import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
+import { MonitorSmartphone, ShieldCheck, Download } from "lucide-react";
 import "./About.css";
 
 function formatCount(value) {
@@ -38,6 +40,7 @@ function loadPlatformStats() {
 }
 
 export default function About() {
+  const isDesktop = isDesktopRuntime();
   const [stats, setStats] = useState(cachedPlatformStats);
   const [statsLoading, setStatsLoading] = useState(!cachedPlatformStats);
   const [statsError, setStatsError] = useState("");
@@ -92,11 +95,16 @@ export default function About() {
             you're a creator looking to host an evaluation or a participant
             ready to prove your ability, CogniClash has you covered.
           </p>
-          <p></p>
           <div className="about-hero-actions">
-            <Link className="btn-primary" to="/register">
-              Get started <ArrowRight size={16} />
-            </Link>
+            {isDesktop ? (
+              <Link className="btn-primary" to="/register">
+                Get started <ArrowRight size={16} />
+              </Link>
+            ) : (
+              <Link className="btn-primary" to="/install-desktop">
+                <Download size={16} /> Get the desktop app
+              </Link>
+            )}
             <a
               className="about-amux-link"
               href="https://amux.in"
@@ -188,9 +196,15 @@ export default function About() {
                 <CheckCircle2 size={16} /> Review submissions and results
               </li>
             </ul>
-            <Link to="/battle-room/create" className="about-card-link">
-              Create a battle <ArrowRight size={15} />
-            </Link>
+            {isDesktop ? (
+              <Link to="/battle-room/create" className="about-card-link">
+                Create a battle <ArrowRight size={15} />
+              </Link>
+            ) : (
+              <Link to="/install-desktop" className="about-card-link">
+                Available in the desktop app <ArrowRight size={15} />
+              </Link>
+            )}
           </article>
           <article className="about-audience-card">
             <span className="about-card-icon">
@@ -213,9 +227,15 @@ export default function About() {
                 <CheckCircle2 size={16} /> See your score and leaderboard
               </li>
             </ul>
-            <Link to="/battle-room" className="about-card-link">
-              Find a battle <ArrowRight size={15} />
-            </Link>
+            {isDesktop ? (
+              <Link to="/battle-room" className="about-card-link">
+                Find a battle <ArrowRight size={15} />
+              </Link>
+            ) : (
+              <Link to="/install-desktop" className="about-card-link">
+                Available in the desktop app <ArrowRight size={15} />
+              </Link>
+            )}
           </article>
         </div>
       </section>
@@ -236,14 +256,61 @@ export default function About() {
         </div>
       </section>
 
+      {!isDesktop && (
+        <section className="about-web-desktop-note">
+          <div className="about-web-desktop-card">
+            <span className="about-card-icon">
+              <MonitorSmartphone size={21} />
+            </span>
+            <h3>Web for practice, desktop for strict evaluations</h3>
+            <p>
+              Everything you see on this site is the same interface you get
+              inside the CogniClash desktop app. Practice and browsing work on
+              the web; strict evaluations and graded coding tests open in a
+              proctored desktop environment, so they run in the Windows app
+              only. Starting one from the web takes you straight to the
+              install page.
+            </p>
+            <div className="about-web-desktop-actions">
+              <a
+                className="btn-primary"
+                href={DOWNLOAD_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Download size={15} /> Download for Windows
+              </a>
+              <Link to="/install-desktop" className="btn-secondary">
+                <ShieldCheck size={14} /> How install &amp; strict mode works
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="about-cta">
         <div>
           <h2>Ready to join the next challenge?</h2>
-          <p>Create an account to host a battle or take part in one.</p>
+          <p>
+            {isDesktop
+              ? "Create an account to host a battle or take part in one."
+              : "Install the desktop app to host a battle or take part in one."}
+          </p>
         </div>
-        <Link className="btn-primary" to="/register">
-          Join CogniClash <ArrowRight size={16} />
-        </Link>
+        {isDesktop ? (
+          <Link className="btn-primary" to="/register">
+            Join CogniClash <ArrowRight size={16} />
+          </Link>
+        ) : (
+          <a
+            className="btn-primary"
+            href={DOWNLOAD_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Download size={16} /> Get CogniClash
+          </a>
+        )}
       </section>
       <p className="about-byline">
         CogniClash is a product of{" "}

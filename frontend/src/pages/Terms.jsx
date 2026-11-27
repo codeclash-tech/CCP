@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, Check, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { isDesktopRuntime } from "../utils/desktopDownload";
 import "./Terms.css";
 
 const TERMS = [
@@ -133,11 +134,14 @@ const TERMS = [
 export default function Terms() {
   const navigate = useNavigate();
   const [agreed, setAgreed] = useState(false);
+  const isDesktop = isDesktopRuntime();
+  const backTarget = isDesktop ? "/register" : "/";
+  const backLabel = isDesktop ? "Back to registration" : "Back to home";
 
   return (
     <main className="terms-page">
-      <Link className="terms-back-link" to="/register">
-        <ArrowLeft size={15} /> Back to registration
+      <Link className="terms-back-link" to={backTarget}>
+        <ArrowLeft size={15} /> {backLabel}
       </Link>
       <header className="terms-header">
         <span className="about-eyebrow">
@@ -178,14 +182,21 @@ export default function Terms() {
           className="btn-primary"
           type="button"
           disabled={!agreed}
-          onClick={() =>
-            navigate("/register", {
-              replace: true,
-              state: { termsAccepted: true },
-            })
-          }
+          onClick={() => {
+            if (isDesktop) {
+              navigate("/register", {
+                replace: true,
+                state: { termsAccepted: true },
+              });
+            } else {
+              navigate("/", { replace: true });
+            }
+          }}
         >
-          <Check size={16} /> Agree and continue to registration
+          <Check size={16} />{" "}
+          {isDesktop
+            ? "Agree and continue to registration"
+            : "Agree and continue"}
         </button>
       </section>
     </main>

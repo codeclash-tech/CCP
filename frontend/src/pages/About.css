@@ -654,3 +654,48 @@
     grid-column: 1 / -1;
   }
 }
+
+/* Web-only: web vs desktop note (hidden inside the desktop app) */
+.about-web-desktop-note {
+  margin-top: 52px;
+}
+
+.about-web-desktop-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 26px clamp(18px, 3vw, 30px);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(13, 122, 235, 0.1), transparent 55%),
+    var(--bg-card);
+}
+
+.about-web-desktop-card h3 {
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+.about-web-desktop-card p {
+  max-width: 640px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.about-web-desktop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+@media (max-width: 700px) {
+  .about-web-desktop-actions .btn-primary,
+  .about-web-desktop-actions .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+}
