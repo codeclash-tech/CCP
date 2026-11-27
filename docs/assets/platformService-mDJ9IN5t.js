@@ -1,0 +1,1 @@
+import{t as e}from"./api-CX5zGd-d.js";var t=()=>e.get(`/platform/stats`).then(e=>e.data),n=t=>e.put(`/platform/creator-profile`,t).then(e=>e.data);export{n,t};

@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
   HashRouter,
-  BrowserRouter,
   Routes,
   Route,
   Navigate,
@@ -422,7 +421,9 @@ function RouteSkeleton({ fullScreen = false }) {
 }
 
 function WebRouter() {
-  const Router = BrowserRouter;
+  // HashRouter keeps deep links (e.g. /#/install-desktop) working when the
+  // docs site is hosted statically from the repo's docs folder.
+  const Router = HashRouter;
   return (
     <Router>
       <AuthProvider>

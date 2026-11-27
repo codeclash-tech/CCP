@@ -75,9 +75,12 @@ function serveBundledMonaco() {
 }
 
 // https://vite.dev/config/
+const isDocsBuild = process.env.CODECLASH_DOCS_BUILD === "true";
+
 export default defineConfig({
-  base: process.env.CODECLASH_DESKTOP_BUILD === "true" ? "./" : "/",
+  base: "./",
   plugins: [react(), serveBundledMonaco()],
+  ...(isDocsBuild ? { build: { outDir: "../docs" } } : {}),
 
   server: {
     fs: {

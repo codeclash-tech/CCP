@@ -1,0 +1,526 @@
+import{n as e,t}from"./jsx-runtime-B8EBQspR.js";import{n}from"./chunk-OB3PAWPO-DqLPppvq.js";import{t as r}from"./arrow-right-CJ6BCL8y.js";import{t as i}from"./circle-check-Yn0_GOXw.js";import{t as a}from"./circle-plus-DUufGA_1.js";import{t as o}from"./key-round-XP8lI_ID.js";import{t as s}from"./lock-keyhole-CgydPXUu.js";import{t as c}from"./mail-BmCdNAv5.js";import{t as l}from"./swords-CbH3AgOw.js";import{t as u}from"./terminal-CTE4pGCl.js";import{t as d}from"./trophy-DA-ugRfC.js";import{g as f,i as p}from"./index-oZJ9aelt.js";var m=e(`briefcase`,[[`path`,{d:`M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16`,key:`jecpp`}],[`rect`,{width:`20`,height:`14`,x:`2`,y:`6`,rx:`2`,key:`i6l2r4`}]]),h=e(`graduation-cap`,[[`path`,{d:`M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z`,key:`j76jl0`}],[`path`,{d:`M22 10v6`,key:`1lu8f3`}],[`path`,{d:`M6 12.5V16a6 3 0 0 0 12 0v-3.5`,key:`1r8lef`}]]),g=t(),_=[{icon:a,title:`Author your own evaluations`,text:`Write questions, set test cases, and schedule timed rooms with a secure key — your rules, your participants.`},{icon:o,title:`Join with a single key`,text:`Participants enter a private battle with a 6-character key and compete on the same clock.`},{icon:s,title:`Daily global challenge`,text:`One new problem every day for the whole platform. One leaderboard. Results reset at midnight.`},{icon:c,title:`Enterprise & partnerships`,text:`Custom integrations for startups, universities, and academies. Talk to the AMUX team.`}],v=[{icon:m,label:`Technical Hiring & Interviews`},{icon:h,label:`Colleges & Universities`},{icon:f,label:`Bootcamps & Training Centers`}];function y(){let{user:e}=p();return typeof window<`u`&&window.codeClashDesktop?(0,g.jsxs)(`main`,{className:`product-page desktop-dashboard`,children:[(0,g.jsxs)(`header`,{className:`desktop-dashboard-intro`,children:[(0,g.jsxs)(`div`,{children:[(0,g.jsxs)(`p`,{className:`home-welcome home-welcome-bubble`,children:[`Welcome,`,` `,e?.organization&&e.organization!==`Unspecified`?e.organization:e?.name||`there`]}),(0,g.jsx)(`h1`,{children:`Prove skill. Beat the clock.`}),(0,g.jsx)(`p`,{children:`A precision evaluation system for daily assessment, head-to-head battles, and measurable, report-backed progress.`})]}),(0,g.jsx)(`span`,{className:`desktop-dashboard-tag`,children:`SKILL EVALUATION`})]}),(0,g.jsx)(`section`,{className:`desktop-daily-challenge`,"aria-labelledby":`desktop-daily-title`,children:(0,g.jsxs)(`div`,{className:`desktop-daily-content`,children:[(0,g.jsxs)(`span`,{className:`desktop-daily-badge`,children:[(0,g.jsx)(s,{size:15,"aria-hidden":`true`}),`TODAY'S CHALLENGE`]}),(0,g.jsxs)(`h2`,{id:`desktop-daily-title`,children:[`A new problem.`,(0,g.jsx)(`br`,{}),`A sharper you.`]}),(0,g.jsx)(`p`,{children:`Take on a fresh challenge, sharpen your problem-solving skills, and see how you stack up on the daily leaderboard.`}),(0,g.jsxs)(`div`,{className:`desktop-daily-actions`,children:[(0,g.jsxs)(n,{className:`desktop-daily-primary`,to:`/challenges`,children:[(0,g.jsx)(s,{size:16,"aria-hidden":`true`}),`Start today's challenge`]}),(0,g.jsx)(n,{className:`desktop-daily-secondary`,to:`/my-challenges`,children:`My challenges`})]})]})}),(0,g.jsxs)(`section`,{className:`desktop-dashboard-section`,"aria-labelledby":`desktop-battle-title`,children:[(0,g.jsxs)(`div`,{className:`desktop-dashboard-section-heading`,children:[(0,g.jsxs)(`div`,{children:[(0,g.jsx)(`p`,{className:`product-eyebrow`,children:`CHOOSE YOUR NEXT MOVE`}),(0,g.jsx)(`h2`,{id:`desktop-battle-title`,children:`Choose your next evaluation`})]}),(0,g.jsx)(`p`,{children:`Practice solo or bring your team into the competition.`})]}),(0,g.jsxs)(`div`,{className:`desktop-dashboard-quick-links`,children:[(0,g.jsxs)(n,{className:`desktop-dashboard-quick-link`,to:`/battle-room`,children:[(0,g.jsx)(`span`,{className:`desktop-dashboard-icon`,children:(0,g.jsx)(l,{size:20})}),(0,g.jsxs)(`span`,{children:[(0,g.jsx)(`strong`,{children:`Battles`}),(0,g.jsx)(`small`,{children:`Join a private coding evaluation.`})]}),(0,g.jsx)(r,{size:17,"aria-hidden":`true`})]}),(0,g.jsxs)(n,{className:`desktop-dashboard-quick-link`,to:`/battle-room/create`,children:[(0,g.jsx)(`span`,{className:`desktop-dashboard-icon`,children:(0,g.jsx)(a,{size:20})}),(0,g.jsxs)(`span`,{children:[(0,g.jsx)(`strong`,{children:`Create a Battle`}),(0,g.jsx)(`small`,{children:`Set up challenges and invite others.`})]}),(0,g.jsx)(r,{size:17,"aria-hidden":`true`})]}),(0,g.jsxs)(n,{className:`desktop-dashboard-quick-link`,to:`/my-challenges`,children:[(0,g.jsx)(`span`,{className:`desktop-dashboard-icon`,children:(0,g.jsx)(d,{size:20})}),(0,g.jsxs)(`span`,{children:[(0,g.jsx)(`strong`,{children:`My Challenges`}),(0,g.jsx)(`small`,{children:`See your attended challenges and leaderboards.`})]}),(0,g.jsx)(r,{size:17,"aria-hidden":`true`})]})]})]})]}):(0,g.jsxs)(`main`,{className:`home-page`,children:[(0,g.jsxs)(`p`,{className:`home-welcome home-welcome-bubble`,children:[`Welcome,`,` `,e?.organization&&e.organization!==`Unspecified`?e.organization:e?.name||`there`]}),(0,g.jsx)(`style`,{children:`
+        .home-welcome-bubble {
+          display: inline-flex;
+          align-items: center;
+          margin: 0 0 18px;
+          padding: 8px 18px;
+          border-radius: 100px;
+          border: 1px solid rgba(56, 189, 248, 0.35);
+          background: rgba(56, 189, 248, 0.1);
+          color: #7dd3fc;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .home-page {
+          width: 100%;
+          max-width: 1600px;
+          margin: 0 auto;
+          padding: 20px var(--page-gutter) 48px;
+          font-family: var(--font-ui);
+          color: var(--text-primary);
+          box-sizing: border-box;
+        }
+
+        .home-page * {
+          box-sizing: border-box;
+        }
+
+        /* HERO */
+        .home-hero {
+          position: relative;
+          isolation: isolate;
+          overflow: hidden;
+          padding: clamp(28px, 4vw, 52px) clamp(24px, 4vw, 48px);
+          margin-bottom: 32px;
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          border-radius: 20px;
+          background:
+            radial-gradient(
+              ellipse at 88% 12%,
+              rgba(0, 119, 255, 0.25),
+              transparent 45%
+            ),
+            radial-gradient(
+              ellipse at 10% 100%,
+              rgba(0, 212, 255, 0.12),
+              transparent 45%
+            ),
+            linear-gradient(
+              120deg,
+              #050b1c 0%,
+              #07132e 55%,
+              #071027 100%
+            );
+          box-shadow:
+            0 20px 40px rgba(0, 0, 0, 0.35),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          display: grid;
+          grid-template-columns: 1fr 460px;
+          gap: 36px;
+          align-items: center;
+        }
+
+        /* Grid background */
+        .home-hero::before {
+          content: "";
+          position: absolute;
+          z-index: -1;
+          inset: 0;
+          opacity: 0.18;
+          background-image:
+            linear-gradient(rgba(76, 140, 255, 0.18) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(76, 140, 255, 0.18) 1px, transparent 1px);
+          background-size: 32px 32px;
+          mask-image: radial-gradient(circle at 60% 50%, black 30%, transparent 80%);
+          pointer-events: none;
+        }
+
+        /* Hero content */
+        .home-hero-content {
+          position: relative;
+          z-index: 1;
+        }
+
+        .home-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 14px;
+          border-radius: 100px;
+          background: rgba(37, 99, 235, 0.15);
+          border: 1px solid rgba(59, 130, 246, 0.3);
+          color: var(--accent-blue-bright, #38bdf8);
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.3px;
+          margin-bottom: 20px;
+        }
+
+        .home-hero h1 {
+          margin: 0 0 14px;
+          color: #f8fafc;
+          font-size: clamp(32px, 4vw, 52px);
+          font-weight: 800;
+          line-height: 1.1;
+          letter-spacing: -1.5px;
+        }
+
+        .home-hero h1 span {
+          background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .home-hero-description {
+          max-width: 600px;
+          margin: 0 0 26px;
+          color: #a5b4cc;
+          font-size: 15px;
+          line-height: 1.75;
+        }
+
+        .home-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 14px;
+          margin-bottom: 32px;
+        }
+
+        .home-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          min-height: 44px;
+          padding: 10px 20px;
+          border: 1px solid transparent;
+          border-radius: 8px;
+          font-size: 14px;
+          font-weight: 600;
+          text-decoration: none;
+          cursor: pointer;
+          transition:
+            opacity 0.2s ease,
+            transform 0.2s ease,
+            background 0.2s ease,
+            box-shadow 0.2s ease,
+            border-color 0.2s ease;
+        }
+
+        .home-btn:hover {
+          transform: translateY(-2px);
+        }
+
+        .home-btn.primary {
+          color: #fff;
+          background: var(--accent-blue-bright, #2563eb);
+          box-shadow: 0 4px 18px rgba(37, 99, 235, 0.35);
+        }
+
+        .home-btn.primary:hover {
+          box-shadow: 0 8px 25px rgba(37, 99, 235, 0.5);
+        }
+
+        .home-btn.secondary {
+          border-color: rgba(148, 163, 184, 0.25);
+          color: #e2e8f0;
+          background: rgba(255, 255, 255, 0.04);
+          backdrop-filter: blur(8px);
+        }
+
+        .home-btn.secondary:hover {
+          border-color: rgba(56, 189, 248, 0.5);
+          background: rgba(56, 189, 248, 0.08);
+          color: #ffffff;
+        }
+
+        /* Hero Target Audience Bar */
+        .home-hero-highlights {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 20px;
+          padding-top: 20px;
+          border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .home-highlight-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #94a3b8;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .home-highlight-item svg {
+          color: var(--accent-blue-bright, #38bdf8);
+        }
+
+        /* JAVA TERMINAL PREVIEW WIDGET */
+        .home-hero-preview {
+          position: relative;
+          width: 100%;
+          border-radius: 12px;
+          background: rgba(10, 19, 40, 0.9);
+          border: 1px solid rgba(56, 189, 248, 0.25);
+          box-shadow:
+            0 15px 30px rgba(0, 0, 0, 0.5),
+            0 0 30px rgba(37, 99, 235, 0.15);
+          backdrop-filter: blur(12px);
+          overflow: hidden;
+        }
+
+        .preview-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 16px;
+          background: rgba(5, 12, 28, 0.85);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .preview-dots {
+          display: flex;
+          gap: 6px;
+        }
+
+        .preview-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+        }
+
+        .preview-dot.red { background: #ef4444; }
+        .preview-dot.yellow { background: #f59e0b; }
+        .preview-dot.green { background: #10b981; }
+
+        .preview-title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: #64748b;
+          font-size: 11px;
+          font-family: monospace;
+          letter-spacing: 0.5px;
+        }
+
+        .preview-body {
+          padding: 18px 20px;
+          font-family: "Fira Code", "Courier New", monospace;
+          font-size: 12.5px;
+          line-height: 1.6;
+          color: #cbd5e1;
+        }
+
+        .code-keyword { color: #f472b6; }
+        .code-type { color: #38bdf8; }
+        .code-func { color: #60a5fa; }
+        .code-string { color: #34d399; }
+        .code-comment { color: #64748b; font-style: italic; }
+
+        .preview-status {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-top: 16px;
+          padding: 8px 12px;
+          border-radius: 6px;
+          background: rgba(16, 185, 129, 0.1);
+          border: 1px solid rgba(16, 185, 129, 0.25);
+          color: #34d399;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        /* SECTION HEADING */
+        .home-section-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        .home-section-heading h2 {
+          margin: 0 0 4px;
+          font-size: 22px;
+          font-weight: 700;
+          letter-spacing: -0.5px;
+        }
+
+        .home-section-heading p {
+          margin: 0;
+          color: var(--text-muted);
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        /* ACTION CARDS */
+        .home-cards {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 20px;
+          margin-bottom: 24px;
+        }
+
+        .home-card {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          min-width: 0;
+          min-height: 210px;
+          padding: 24px;
+          border: 1px solid var(--border-color);
+          border-radius: 14px;
+          background: var(--bg-elevated);
+          transition:
+            transform 0.25s ease,
+            box-shadow 0.25s ease,
+            border-color 0.25s ease;
+          overflow: hidden;
+        }
+
+        .home-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, transparent, var(--accent-blue-bright), transparent);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .home-card-badge {
+          position: absolute;
+          top: 18px;
+          right: 18px;
+          padding: 3px 8px;
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: var(--text-muted);
+          font-size: 10px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+          .home-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.25);
+          }
+
+          .home-card:hover::before {
+            opacity: 1;
+          }
+
+          .home-card:hover .home-card-icon {
+            transform: scale(1.08);
+            border-color: rgba(56, 189, 248, 0.4);
+            background: rgba(37, 99, 235, 0.18);
+          }
+        }
+
+        .home-card-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 44px;
+          height: 44px;
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          border-radius: 10px;
+          background: rgba(37, 99, 235, 0.1);
+          color: var(--accent-blue-bright);
+          transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+        }
+
+        .home-card h3 {
+          margin: 16px 0 8px;
+          font-size: 16px;
+          font-weight: 600;
+          line-height: 1.4;
+        }
+
+        .home-card p {
+          flex: 1;
+          margin: 0 0 20px;
+          color: var(--text-muted);
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .home-card-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--accent-blue-bright);
+          font-size: 13px;
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .home-card-link:hover {
+          text-decoration: underline;
+        }
+
+        .home-card-link svg {
+          transition: transform 0.2s ease;
+        }
+
+        .home-card-link:hover svg {
+          transform: translateX(4px);
+        }
+
+        .home-btn:focus-visible,
+        .home-card-link:focus-visible {
+          outline: 2px solid #06d6f5;
+          outline-offset: 4px;
+        }
+
+        /* RESPONSIVE BREAKPOINTS */
+        @media (max-width: 1100px) {
+          .home-hero {
+            grid-template-columns: 1fr;
+            gap: 28px;
+          }
+
+          .home-hero-preview {
+            max-width: 580px;
+            margin: 0 auto;
+          }
+        }
+
+        @media (max-width: 900px) {
+          .home-page {
+            padding-left: var(--page-gutter-compact);
+            padding-right: var(--page-gutter-compact);
+          }
+
+          .home-cards {
+            gap: 16px;
+          }
+
+          .home-card {
+            padding: 20px;
+          }
+        }
+
+        @media (max-width: 720px) {
+          .home-cards {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .home-card:last-child {
+            grid-column: 1 / -1;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .home-page {
+            padding: 12px var(--page-gutter-compact) 32px;
+          }
+
+          .home-hero {
+            padding: 24px 20px;
+            margin-bottom: 24px;
+            border-radius: 14px;
+          }
+
+          .home-eyebrow {
+            margin-bottom: 14px;
+            font-size: 11px;
+          }
+
+          .home-hero h1 {
+            font-size: clamp(28px, 7vw, 36px);
+            letter-spacing: -1px;
+          }
+
+          .home-hero-description {
+            font-size: 13px;
+            margin-bottom: 20px;
+          }
+
+          .home-actions {
+            flex-direction: column;
+            align-items: stretch;
+            margin-bottom: 24px;
+          }
+
+          .home-btn {
+            width: 100%;
+            min-height: 44px;
+          }
+
+          .home-hero-preview {
+            display: none;
+          }
+
+          .home-cards {
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .home-card,
+          .home-card:last-child {
+            grid-column: auto;
+            min-height: auto;
+            padding: 20px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .home-card,
+          .home-btn,
+          .home-card-link svg,
+          .home-card-icon {
+            transition: none !important;
+          }
+        }
+      `}),(0,g.jsxs)(`section`,{className:`home-hero`,children:[(0,g.jsxs)(`div`,{className:`home-hero-content`,children:[(0,g.jsxs)(`div`,{className:`home-eyebrow`,children:[(0,g.jsx)(l,{size:15}),(0,g.jsx)(`span`,{children:`CogniClash · CODING EVALUATION · AN AMUX PRODUCT`})]}),(0,g.jsxs)(`h1`,{children:[`Where skill is measured,`,(0,g.jsx)(`br`,{}),(0,g.jsx)(`span`,{children:`not just practiced.`})]}),(0,g.jsx)(`p`,{className:`home-hero-description`,children:`CogniClash is the evaluation engine of AMUX. Host coding battles, run daily assessments, and rank talent on verifiable leaderboards — built for technical hiring, colleges, and training academies.`}),(0,g.jsxs)(`div`,{className:`home-actions`,children:[(0,g.jsxs)(n,{to:`/challenges`,className:`home-btn primary`,children:[(0,g.jsx)(s,{size:16}),`Browse challenges`,(0,g.jsx)(r,{size:15})]}),(0,g.jsxs)(n,{to:`/my-challenges`,className:`home-btn secondary`,children:[(0,g.jsx)(d,{size:15}),`My results`]})]}),(0,g.jsx)(`div`,{className:`home-hero-highlights`,children:v.map(({icon:e,label:t})=>(0,g.jsxs)(`div`,{className:`home-highlight-item`,children:[(0,g.jsx)(e,{size:15}),(0,g.jsx)(`span`,{children:t})]},t))})]}),(0,g.jsxs)(`div`,{className:`home-hero-preview`,"aria-hidden":`true`,children:[(0,g.jsxs)(`div`,{className:`preview-header`,children:[(0,g.jsxs)(`div`,{className:`preview-dots`,children:[(0,g.jsx)(`div`,{className:`preview-dot red`}),(0,g.jsx)(`div`,{className:`preview-dot yellow`}),(0,g.jsx)(`div`,{className:`preview-dot green`})]}),(0,g.jsxs)(`div`,{className:`preview-title`,children:[(0,g.jsx)(u,{size:12}),(0,g.jsx)(`span`,{children:`Solution.java`})]})]}),(0,g.jsxs)(`div`,{className:`preview-body`,children:[(0,g.jsxs)(`div`,{children:[(0,g.jsx)(`span`,{className:`code-keyword`,children:`public class`}),` `,(0,g.jsx)(`span`,{className:`code-type`,children:`Solution`}),` {`]}),(0,g.jsxs)(`div`,{style:{paddingLeft:`16px`},children:[(0,g.jsx)(`span`,{className:`code-keyword`,children:`public static`}),` `,(0,g.jsx)(`span`,{className:`code-type`,children:`boolean`}),` `,(0,g.jsx)(`span`,{className:`code-func`,children:`evalClash`}),`(`,(0,g.jsx)(`span`,{className:`code-type`,children:`int`}),`[] nums,`,` `,(0,g.jsx)(`span`,{className:`code-type`,children:`int`}),` target) {`]}),(0,g.jsx)(`div`,{style:{paddingLeft:`32px`},children:(0,g.jsx)(`span`,{className:`code-comment`,children:`// Solve. Submit. Compete.`})}),(0,g.jsxs)(`div`,{style:{paddingLeft:`32px`},children:[(0,g.jsx)(`span`,{className:`code-keyword`,children:`var`}),` seen =`,` `,(0,g.jsx)(`span`,{className:`code-keyword`,children:`new`}),` `,(0,g.jsx)(`span`,{className:`code-type`,children:`HashSet`}),`<`,(0,g.jsx)(`span`,{className:`code-type`,children:`Integer`}),`>();`]}),(0,g.jsxs)(`div`,{style:{paddingLeft:`32px`},children:[(0,g.jsx)(`span`,{className:`code-keyword`,children:`for`}),` (`,(0,g.jsx)(`span`,{className:`code-type`,children:`int`}),` n : nums) {`]}),(0,g.jsxs)(`div`,{style:{paddingLeft:`48px`},children:[(0,g.jsx)(`span`,{className:`code-keyword`,children:`if`}),` (seen.contains(target - n)) `,(0,g.jsx)(`span`,{className:`code-keyword`,children:`return true`}),`;`]}),(0,g.jsx)(`div`,{style:{paddingLeft:`48px`},children:`seen.add(n);`}),(0,g.jsx)(`div`,{style:{paddingLeft:`32px`},children:`}`}),(0,g.jsxs)(`div`,{style:{paddingLeft:`32px`},children:[(0,g.jsx)(`span`,{className:`code-keyword`,children:`return false`}),`;`]}),(0,g.jsx)(`div`,{style:{paddingLeft:`16px`},children:`}`}),(0,g.jsx)(`div`,{children:`}`}),(0,g.jsxs)(`div`,{className:`preview-status`,children:[(0,g.jsxs)(`span`,{style:{display:`flex`,alignItems:`center`,gap:`6px`},children:[(0,g.jsx)(i,{size:14}),`Java Runtime: All 15 Test Cases Passed`]}),(0,g.jsx)(`span`,{style:{color:`#94a3b8`,fontWeight:`normal`},children:`0.02s`})]})]})]})]}),(0,g.jsxs)(`section`,{children:[(0,g.jsx)(`div`,{className:`home-section-heading`,children:(0,g.jsxs)(`div`,{children:[(0,g.jsx)(`h2`,{children:`What you can do with CogniClash`}),(0,g.jsx)(`p`,{children:`One system to author, run, and evaluate skill challenges — and turn every attempt into a result you can trust.`})]})}),(0,g.jsx)(`div`,{className:`home-cards`,children:_.map(({icon:e,title:t,text:n})=>(0,g.jsxs)(`article`,{className:`home-card`,children:[(0,g.jsx)(`div`,{className:`home-card-icon`,children:(0,g.jsx)(e,{size:22})}),(0,g.jsx)(`h3`,{children:t}),(0,g.jsx)(`p`,{children:n})]},t))})]})]})}export{y as default};
