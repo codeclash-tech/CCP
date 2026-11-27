@@ -1,8 +1,25 @@
-import { Brain, ShieldCheck, Download } from "lucide-react";
-import { DOWNLOAD_URL, isDesktopRuntime } from "../../utils/desktopDownload";
+import { useState } from "react";
+import { ShieldCheck, Download } from "lucide-react";
+import {
+  DOWNLOAD_URL,
+  isDesktopRuntime,
+  isMobileDevice,
+} from "../../utils/desktopDownload";
 
 export default function Footer() {
   const isDesktop = isDesktopRuntime();
+  const [downloadNotice, setDownloadNotice] = useState("");
+
+  const handleDownload = () => {
+    if (isMobileDevice()) {
+      setDownloadNotice(
+        "The CogniClash desktop app is available on Windows. Open this page on a desktop computer to download it.",
+      );
+      return;
+    }
+
+    window.open(DOWNLOAD_URL, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <footer
@@ -22,9 +39,9 @@ export default function Footer() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Brain size={14} />
         <span>
-          CogniClash · an AMUX product &copy; {new Date().getFullYear()}
+          CogniClash · Evaluation platform by AMUX &copy;{" "}
+          {new Date().getFullYear()}
         </span>
       </div>
       <div
@@ -40,11 +57,10 @@ export default function Footer() {
           Built with integrity
         </span>
         {!isDesktop && (
-          <a
+          <button
+            type="button"
             className="footer-download-link"
-            href={DOWNLOAD_URL}
-            target="_blank"
-            rel="noreferrer"
+            onClick={handleDownload}
             style={{
               display: "inline-flex",
               alignItems: "center",
@@ -54,18 +70,24 @@ export default function Footer() {
               border: "1px solid rgba(13, 122, 235, 0.45)",
               background: "var(--accent-blue-soft)",
               color: "var(--accent-blue-bright)",
+              font: "inherit",
               fontSize: 12,
               fontWeight: 600,
-              textDecoration: "none",
               transition: "all 0.15s ease",
+              cursor: "pointer",
             }}
           >
             <Download size={13} />
             Download desktop app
-          </a>
+          </button>
         )}
         <span>v1.0.0</span>
       </div>
+      {downloadNotice && (
+        <p className="app-footer-download-notice" role="status">
+          {downloadNotice}
+        </p>
+      )}
     </footer>
   );
 }

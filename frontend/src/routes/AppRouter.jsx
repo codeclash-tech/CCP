@@ -9,7 +9,11 @@ import {
 } from "react-router-dom";
 import { ArrowUpRight, Monitor, ShieldCheck } from "lucide-react";
 import { AuthProvider } from "../context/AuthContext";
-import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
+import {
+  DOWNLOAD_URL,
+  isDesktopRuntime,
+  isMobileDevice,
+} from "../utils/desktopDownload";
 import desktopPackage from "../../../desktop/package.json";
 
 import Navbar from "../components/layout/Navbar";
@@ -78,7 +82,7 @@ function AppLayout({ children }) {
       className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
     >
       {isDesktop && !isFullscreen && <DesktopTitleBar />}
-      {!isFullscreen && <Navbar />}
+      {!isFullscreen && !user && <Navbar />}
       <div
         className={`app-shell-body${user ? " app-shell-body-authenticated" : ""}${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
       >
@@ -98,36 +102,48 @@ function AppLayout({ children }) {
           />
         )}
         <main className="app-shell-content">
-          <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
+          <div className="app-shell-page">
+            <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
+          </div>
+          {!isFullscreen && <Footer />}
         </main>
       </div>
-      {!isFullscreen && <Footer />}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/* Strict-evaluation desktop gate (web only)                           */
+/* Supervised evaluation desktop gate (web only)                       */
 /* ------------------------------------------------------------------ */
 
 function StrictDesktopGate() {
+  const [downloadNotice, setDownloadNotice] = useState("");
+
+  const handleDownload = (event) => {
+    if (isMobileDevice()) {
+      event.preventDefault();
+      setDownloadNotice(
+        "The CogniClash desktop app is available on Windows. Open this page on a desktop computer to download it.",
+      );
+    }
+  };
+
   return (
     <div className="install-desktop-page">
       <div className="install-desktop-card">
         <div className="install-desktop-icon" aria-hidden="true">
           <Monitor size={26} />
         </div>
-        <p className="install-desktop-eyebrow">Desktop required</p>
+        <p className="install-desktop-eyebrow">Supervised evaluation</p>
         <h1>
-          Strict evaluations run in the
+          This evaluation runs in the
           <br />
           <span>CogniClash desktop app</span>
         </h1>
         <p className="install-desktop-copy">
-          Coding and strict tests use a locked-down, proctored environment that
-          keeps the evaluation fair for everyone, so they open in the desktop
-          app only. Install it once — it is free, and the interface inside the
-          app is identical to this web experience.
+          This supervised evaluation uses a secure desktop environment to
+          support a consistent experience for everyone. Install the free
+          CogniClash app on Windows, then sign in with your existing account.
         </p>
         <div className="install-desktop-meta">
           <span>
@@ -138,18 +154,24 @@ function StrictDesktopGate() {
         <a
           className="install-desktop-download"
           href={DOWNLOAD_URL}
+          onClick={handleDownload}
           target="_blank"
           rel="noreferrer"
         >
           Download CogniClash <ArrowUpRight size={15} />
         </a>
+        {downloadNotice && (
+          <p className="install-desktop-copy" role="status">
+            {downloadNotice}
+          </p>
+        )}
         <Link to="/" className="btn-secondary install-desktop-back">
           Back to CogniClash
         </Link>
         <ol className="install-desktop-steps">
           <li>Download and run the installer.</li>
           <li>Sign in with your existing CogniClash account.</li>
-          <li>Open the challenge — your strict evaluation continues there.</li>
+          <li>Return to your evaluation to continue.</li>
         </ol>
       </div>
     </div>

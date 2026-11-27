@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { ROLE_NAVIGATION } from "../../routes/roleNavigation";
 import { getAssessmentRole } from "../../routes/roleAccess";
 import { useAuth } from "../../context/AuthContext";
+import brandIcon from "../../../../desktop/assets/codeclash.ico";
 
 export default function RoleNavigation({ open = false, onNavigate, onToggle }) {
   const { user, signOut } = useAuth();
@@ -33,13 +34,15 @@ export default function RoleNavigation({ open = false, onNavigate, onToggle }) {
       className={`role-navigation${open ? " is-open" : ""}`}
     >
       <div className="role-navigation-header">
-        <p className="role-navigation-welcome">
-          Welcome,
-          {" "}
-          {user?.organization && user.organization !== "Unspecified"
-            ? user.organization
-            : user.name || "there"}
-        </p>
+        <NavLink
+          to="/"
+          className="role-navigation-brand"
+          aria-label="CogniClash evaluation platform home"
+          onClick={onNavigate}
+        >
+          <img src={brandIcon} alt="" />
+          <span>CogniClash</span>
+        </NavLink>
         <button
           type="button"
           className="role-navigation-mobile-toggle"
@@ -48,9 +51,20 @@ export default function RoleNavigation({ open = false, onNavigate, onToggle }) {
           aria-expanded={open}
           onClick={() => onToggle?.(!open)}
         >
-          {open ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+          {open ? (
+            <X size={18} aria-hidden="true" />
+          ) : (
+            <Menu size={18} aria-hidden="true" />
+          )}
         </button>
       </div>
+      <p className="role-navigation-welcome">
+        Welcome,{" "}
+        {user?.organization && user.organization !== "Unspecified"
+          ? user.organization
+          : user.name || "there"}
+      </p>
+      <p className="role-navigation-caption">Evaluation platform</p>
       <nav className="role-navigation-links" aria-label="Main navigation">
         {links.map(({ path, label, icon: Icon }) => (
           <NavLink

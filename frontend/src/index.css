@@ -1568,8 +1568,10 @@ canvas {
 }
 
 .role-navigation-caption {
+  margin: 0 10px 20px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
 }
 
 .role-navigation-links {
@@ -1802,6 +1804,28 @@ canvas {
 @media (prefers-reduced-motion: reduce) {
   .role-navigation {
     transition: none;
+  }
+}
+
+.desktop-auth-brand img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.web-auth-home-link img {
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
+}
+
+@media (max-width: 760px) {
+  .app-footer {
+    align-items: flex-start !important;
+  }
+
+  .app-footer-download-notice {
+    text-align: left;
   }
 }
 
@@ -2285,7 +2309,10 @@ canvas {
 
 .app-shell {
   min-width: 0;
-  min-height: 100dvh;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .app-shell-body {
@@ -2293,6 +2320,7 @@ canvas {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .app-shell-body-authenticated {
@@ -2308,7 +2336,7 @@ canvas {
 }
 
 .app-shell:not(.desktop-app-shell) {
-  --app-shell-topbar-height: 68px;
+  --app-shell-topbar-height: 0px;
 }
 
 .app-navbar .app-navbar-brand-group {
@@ -2318,6 +2346,30 @@ canvas {
 }
 
 .app-navbar .app-navbar-brand {
+  max-width: 100%;
+}
+
+.app-navbar-brand img {
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
+}
+
+.app-footer {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+.app-footer-download-notice {
+  flex: 1 0 100%;
+  color: var(--color-warning);
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.app-shell-page > * {
+  min-width: 0;
   max-width: 100%;
 }
 
@@ -2339,18 +2391,23 @@ canvas {
 }
 
 .role-navigation {
-  position: sticky;
-  top: var(--app-shell-topbar-height, 68px);
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
   z-index: 250;
   display: flex;
   width: auto;
   min-width: 0;
-  height: calc(100dvh - var(--app-shell-topbar-height, 68px));
+  height: 100%;
   min-height: 0;
   flex: 0 0 auto;
   flex-direction: column;
-  align-self: start;
+  align-self: stretch;
   overflow: hidden;
+  visibility: visible;
+  transform: none;
   padding: 25px 12px 12px;
   border-right: 1px solid var(--border-color);
   background: var(--bg-elevated);
@@ -2362,13 +2419,33 @@ canvas {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 0 10px 22px;
+  padding: 0 10px 8px;
+}
+
+.role-navigation-brand {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.role-navigation-brand img {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .role-navigation-welcome {
   min-width: 0;
   overflow: hidden;
-  padding: 0;
+  padding: 0 10px;
   border: 0;
   color: var(--text-muted);
   font-size: 12px;
@@ -2487,13 +2564,25 @@ canvas {
 }
 
 .app-shell-content {
+  display: flex;
+  height: 100%;
+  flex: 1 1 auto;
+  flex-direction: column;
   width: 100%;
   min-width: 0;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
 }
 
+.app-shell-page {
+  min-width: 0;
+  min-height: 100%;
+}
+
+.app-shell-page > *,
 .app-shell-content > * {
   min-width: 0;
   max-width: 100%;
@@ -2510,11 +2599,11 @@ canvas {
 
 @media (max-width: 1200px) {
   .app-shell-body-authenticated {
-    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-columns: 228px minmax(0, 1fr);
   }
 
   .desktop-app-shell .app-shell-body.app-shell-body-authenticated {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 228px minmax(0, 1fr);
   }
 
   .desktop-app-shell .role-navigation {
@@ -2531,27 +2620,42 @@ canvas {
 @media (max-width: 760px) {
   .app-shell-body-authenticated,
   .desktop-app-shell .app-shell-body.app-shell-body-authenticated {
-    grid-template-columns: 52px minmax(0, 1fr);
+    grid-template-columns: 58px minmax(0, 1fr);
   }
 
   .role-navigation {
-    width: 52px;
-    height: calc(100dvh - var(--app-shell-topbar-height, 68px));
-    padding: 8px;
+    width: 58px;
+    height: 100%;
+    padding: 12px 8px;
     transition:
       width 0.16s ease,
       transform 0.16s ease;
   }
 
   .role-navigation-header {
-    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
     padding: 0;
   }
 
   .role-navigation-welcome,
+  .role-navigation-caption,
   .role-navigation-links,
   .role-navigation-account {
     display: none;
+  }
+
+  .role-navigation-brand {
+    justify-content: center;
+  }
+
+  .role-navigation-brand span {
+    display: none;
+  }
+
+  .role-navigation-brand img {
+    width: 30px;
+    height: 30px;
   }
 
   .role-navigation-mobile-toggle {
@@ -2560,19 +2664,37 @@ canvas {
 
   .role-navigation.is-open {
     position: fixed;
-    top: var(--app-shell-topbar-height, 68px);
+    top: 0;
     bottom: 0;
     left: 0;
     z-index: 320;
     width: min(280px, calc(100vw - 48px));
-    height: calc(100dvh - var(--app-shell-topbar-height, 68px));
-    padding: 16px 12px 12px;
+    height: 100dvh;
+    padding: 18px 12px 12px;
     box-shadow: 12px 0 32px rgb(0 0 0 / 35%);
   }
 
   .role-navigation.is-open .role-navigation-header {
-    justify-content: space-between;
-    padding: 0 10px 22px;
+    flex-direction: row;
+    padding: 0 10px 12px;
+  }
+
+  .role-navigation.is-open .role-navigation-brand {
+    justify-content: flex-start;
+  }
+
+  .role-navigation.is-open .role-navigation-brand span {
+    display: inline;
+  }
+
+  .role-navigation.is-open .role-navigation-welcome {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .role-navigation.is-open .role-navigation-caption {
+    display: block;
+    margin-bottom: 18px;
   }
 
   .role-navigation.is-open .role-navigation-welcome,
@@ -2587,7 +2709,7 @@ canvas {
 
   .role-navigation-backdrop {
     position: fixed;
-    inset: var(--app-shell-topbar-height, 68px) 0 0;
+    inset: 0;
     z-index: 310;
     display: block;
     border: 0;

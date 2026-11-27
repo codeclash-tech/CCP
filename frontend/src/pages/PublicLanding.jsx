@@ -4,67 +4,49 @@ import {
   ArrowUpRight,
   ArrowDown,
   ChevronRight,
-  Swords,
   Menu,
   X,
   Download,
   MonitorSmartphone,
   ShieldCheck,
+  CheckCircle2,
 } from "lucide-react";
 import desktopPackage from "../../../desktop/package.json";
 import brandIcon from "../../../desktop/assets/codeclash.ico";
-import { DOWNLOAD_URL } from "../utils/desktopDownload";
+import { DOWNLOAD_URL, isMobileDevice } from "../utils/desktopDownload";
 import "./PublicLanding.css";
-
-const MOBILE_DEVICE_PATTERN =
-  /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i;
-
-function isDesktopDevice() {
-  const { userAgent, userAgentData, platform, maxTouchPoints } =
-    window.navigator;
-  const isIPadOS = platform === "MacIntel" && maxTouchPoints > 1;
-
-  return (
-    userAgentData?.mobile !== true &&
-    !MOBILE_DEVICE_PATTERN.test(userAgent) &&
-    !isIPadOS
-  );
-}
 
 const pillars = [
   {
     number: "01",
-    title: "Practice with purpose",
+    title: "Measure with clarity",
     description:
-      "Build a daily problem-solving habit with a fresh challenge and a clear place to track your progress.",
+      "Set clear expectations and give every participant a focused, consistent evaluation experience.",
   },
   {
     number: "02",
-    title: "Compete in real time",
+    title: "Understand progress",
     description:
-      "Join a Battle Room, solve the challenge under time, and follow the standings with your participants.",
+      "Bring progress and outcomes together so individuals and teams can make informed next steps.",
   },
   {
     number: "03",
-    title: "Bring your own challenge",
+    title: "Fit your process",
     description:
-      "Create a room, set the questions and schedule, then invite your group to take part.",
+      "Organize evaluation experiences around your group, schedule, and goals.",
   },
 ];
 
 const audiences = [
-  ["For developers", "Make practice a focused part of your routine."],
-  ["For educators", "Give a class a shared space to solve and compete."],
-  ["For teams", "Run structured coding sessions with your own challenges."],
+  ["For organizations", "Create a consistent way to understand capability."],
+  ["For educators", "Support fair, structured evaluation for every learner."],
+  ["For teams", "Align people around clear expectations and outcomes."],
 ];
 
 const steps = [
-  ["Get the app", "Download CogniClash for Windows and sign in."],
-  ["Choose a challenge", "Try the daily challenge or join a Battle Room."],
-  [
-    "Solve and compare",
-    "Submit your work and see the standings when judging finishes.",
-  ],
+  ["Set the context", "Choose an evaluation experience that fits your goals."],
+  ["Take part", "Give each participant a clear, focused experience."],
+  ["Review outcomes", "Use results to guide meaningful next steps."],
 ];
 
 export default function PublicLanding() {
@@ -72,10 +54,10 @@ export default function PublicLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   function handleDownloadClick(event) {
-    if (!isDesktopDevice()) {
+    if (isMobileDevice()) {
       event.preventDefault();
       setDownloadNotice(
-        "CogniClash is available for desktop devices only. Open this page on a desktop computer to download the Windows app.",
+        "The CogniClash desktop app is available on Windows. Open this page on a desktop computer to download it.",
       );
       return;
     }
@@ -100,7 +82,7 @@ export default function PublicLanding() {
         </a>
         <div className="public-landing-nav-links">
           <a href="#experience" onClick={closeMenu}>
-            Experience
+            Platform
           </a>
           <a href="#how-it-works" onClick={closeMenu}>
             How it works
@@ -135,7 +117,7 @@ export default function PublicLanding() {
       {menuOpen && (
         <div className="public-landing-mobile-menu" role="menu">
           <a href="#experience" onClick={closeMenu}>
-            Experience
+            Platform
           </a>
           <a href="#how-it-works" onClick={closeMenu}>
             How it works
@@ -170,19 +152,18 @@ export default function PublicLanding() {
       >
         <div className="public-landing-hero-copy">
           <p className="public-landing-eyebrow">
-            Coding battles in your browser or desktop
+            A clearer standard for evaluation
           </p>
           <h1 id="public-landing-title">
-            Think sharp.
+            Evaluate with clarity.
             <br />
-            <span>Code under pressure.</span>
+            <span>Understand potential.</span>
           </h1>
           <p className="public-landing-description">
-            Turn coding practice into a challenge worth showing up for. Take on
-            a daily problem, compete in a Battle Room, or host one for your
-            community — right here in your browser, or in the CogniClash
-            Windows desktop app. Same interface, same account, same
-            leaderboard.
+            CogniClash brings structured evaluations into one calm, consistent
+            workspace. Set clear expectations, give people a comfortable way
+            to take part, and make better-informed decisions with results you
+            can understand.
           </p>
           <div className="public-landing-actions">
             <Link
@@ -196,11 +177,11 @@ export default function PublicLanding() {
               Sign in
             </Link>
             <a className="public-landing-secondary-link" href="#experience">
-              Explore CogniClash <ArrowDown size={15} aria-hidden="true" />
+              Discover the platform <ArrowDown size={15} aria-hidden="true" />
             </a>
           </div>
           <p className="public-landing-version">
-            Web app <span aria-hidden="true">|</span> Windows desktop app v{" "}
+            Web platform <span aria-hidden="true">|</span> Windows app v{" "}
             {desktopPackage.version}
           </p>
         </div>
@@ -215,23 +196,25 @@ export default function PublicLanding() {
               <span>CogniClash</span>
             </div>
             <span className="public-landing-preview-status">
-              <i /> READY TO CLASH
+              <i /> EVALUATION OVERVIEW
             </span>
           </div>
           <div className="public-landing-preview-body">
             <div className="public-landing-preview-kicker">
-              TODAY&apos;S MOVE
+              EVALUATION SNAPSHOT
             </div>
             <h2>
-              One problem.
-              <br />A sharper mind.
+              Clear expectations.
+              <br />Meaningful outcomes.
             </h2>
-            <p>Make your next coding session count.</p>
+            <p>A considered experience for every participant.</p>
             <div className="public-landing-preview-challenge">
-              <span className="public-landing-preview-icon">&lt;/&gt;</span>
+              <span className="public-landing-preview-icon">
+                <CheckCircle2 size={17} aria-hidden="true" />
+              </span>
               <span>
-                <strong>Daily Challenge</strong>
-                <small>A fresh challenge awaits</small>
+                <strong>Evaluation progress</strong>
+                <small>Clear status at every step</small>
               </span>
               <span className="public-landing-preview-arrow">
                 <ArrowUpRight size={16} aria-hidden="true" />
@@ -239,33 +222,26 @@ export default function PublicLanding() {
             </div>
             <div className="public-landing-preview-challenge secondary">
               <span className="public-landing-preview-icon crossed">
-                <Swords size={16} aria-hidden="true" />
+                <ShieldCheck size={16} aria-hidden="true" />
               </span>
               <span>
-                <strong>Battle Rooms</strong>
-                <small>Join in or host your own</small>
+                <strong>Consistent process</strong>
+                <small>One workspace for your group</small>
               </span>
               <span className="public-landing-preview-arrow">
                 <ArrowUpRight size={16} aria-hidden="true" />
               </span>
             </div>
-            <div className="public-landing-preview-code" aria-hidden="true">
-              <span>public class</span> Solution {"{"}
-              <br />
-              &nbsp;&nbsp;<span>void</span> makeYourMove() {"{"}
-              <br />
-              &nbsp;&nbsp;&nbsp;&nbsp;solve(); <b>_</b>
-              <br />
-              &nbsp;&nbsp;{"}"}
-              <br />
-              {"}"}
+            <div className="public-landing-preview-summary">
+              <span>PARTICIPANT EXPERIENCE</span>
+              <strong>Structured · Fair · Actionable</strong>
             </div>
           </div>
           <div className="public-landing-preview-footer">
             <span>
-              <i /> Coding workspace
+              <i /> Evaluation workspace
             </span>
-            <span>JAVA</span>
+            <span>READY</span>
           </div>
         </div>
       </section>
@@ -274,27 +250,27 @@ export default function PublicLanding() {
         className="public-landing-positioning"
         aria-label="Product promise"
       >
-        <span>LESS PASSIVE PRACTICE</span>
+        <span>CONSISTENT EVALUATIONS</span>
         <b aria-hidden="true">/</b>
-        <span>MORE REAL CHALLENGES</span>
+        <span>CLEAR EXPECTATIONS</span>
         <b aria-hidden="true">/</b>
-        <span>ONE PLACE TO CLASH</span>
+        <span>CONFIDENT DECISIONS</span>
       </section>
 
       <section className="public-landing-section" id="experience">
         <div className="public-landing-section-heading">
           <p className="public-landing-eyebrow">
-            Built around the moment you solve
+            Designed for fair, thoughtful evaluation
           </p>
           <h2>
-            Practice alone.
+            One considered experience.
             <br />
-            <span>Make it a competition.</span>
+            <span>From start to outcome.</span>
           </h2>
           <p>
-            CogniClash gives individual practice and group challenges a shared,
-            focused experience — run it in your browser or in the Windows app,
-            it looks and works the same.
+            CogniClash helps organizations deliver a clear, consistent process
+            for individuals and groups, with a familiar experience across web
+            and desktop.
           </p>
         </div>
         <div className="public-landing-pillars">
@@ -305,9 +281,9 @@ export default function PublicLanding() {
               </span>
               <div className="public-landing-pillar-mark" aria-hidden="true">
                 {pillar.number === "01" ? (
-                  "</>"
+                  <CheckCircle2 size={18} aria-hidden="true" />
                 ) : pillar.number === "02" ? (
-                  <Swords size={18} aria-hidden="true" />
+                  <ShieldCheck size={18} aria-hidden="true" />
                 ) : (
                   "+"
                 )}
@@ -322,10 +298,10 @@ export default function PublicLanding() {
       <section className="public-landing-how" id="how-it-works">
         <div className="public-landing-how-heading">
           <p className="public-landing-eyebrow">
-            Your next challenge is three steps away
+            A simple path from setup to insight
           </p>
           <h2>
-            Open. Solve. <span>Clash.</span>
+            Set. Evaluate. <span>Understand.</span>
           </h2>
         </div>
         <div className="public-landing-steps">
@@ -345,12 +321,12 @@ export default function PublicLanding() {
       >
         <div>
           <p className="public-landing-eyebrow">
-            Made for people who build skills together
+            Made for people who develop talent together
           </p>
           <h2 id="public-landing-audience-title">
-            Your group.
+            Your people.
             <br />
-            <span>Your next coding battle.</span>
+            <span>Your next step, made clearer.</span>
           </h2>
         </div>
         <div className="public-landing-audience-list">
@@ -366,29 +342,33 @@ export default function PublicLanding() {
         </div>
       </section>
 
-      <section className="public-landing-desktop-note" id="strict-evaluations">
+      <section
+        className="public-landing-desktop-note"
+        id="supervised-evaluations"
+      >
         <div className="public-landing-desktop-note-card">
           <div className="public-landing-desktop-note-icon" aria-hidden="true">
             <MonitorSmartphone size={22} />
           </div>
           <div>
-            <p className="public-landing-eyebrow">Strict evaluations</p>
-            <h2>Coding &amp; strict tests run in the desktop app</h2>
+            <p className="public-landing-eyebrow">
+              A secure option for supervised evaluations
+            </p>
+            <h2>Some evaluations are best completed on desktop</h2>
             <p>
-              Everything else — practice challenges, daily challenge, battle
-              rooms, learning — works right here on the web with your same
-              account. Strict evaluations and graded coding tests open in a
-              locked-down, proctored environment, so those run in the
-              CogniClash desktop app only. Starting one from the web takes you
-              straight to the install page.
+              Most of the platform is available right here on the web. When an
+              evaluation requires a supervised environment, CogniClash guides
+              participants to its Windows desktop app, using the same account
+              and familiar experience.
             </p>
             <div className="public-landing-desktop-note-actions">
               <Link className="public-landing-download" to="/install-desktop">
-                Install CogniClash <ArrowUpRight size={15} aria-hidden="true" />
+                Learn about the desktop app{" "}
+                <ArrowUpRight size={15} aria-hidden="true" />
               </Link>
               <span className="public-landing-desktop-note-hint">
                 <ShieldCheck size={14} aria-hidden="true" />
-                Secure · Proctored · Free for students
+                Secure · Supervised · Free to get started
               </span>
             </div>
           </div>
@@ -397,15 +377,15 @@ export default function PublicLanding() {
 
       <section className="public-landing-final-cta" id="download">
         <div className="public-landing-final-glow" aria-hidden="true" />
-        <p className="public-landing-eyebrow">Your next move starts here</p>
+        <p className="public-landing-eyebrow">Start with a clearer process</p>
         <h2>
-          Ready to make it
+          Ready to make
           <br />
-          <span>a CogniClash?</span>
+          <span>better decisions?</span>
         </h2>
         <p>
-          Start solving right now in your browser, or install the Windows app
-          for proctored strict evaluations — same account either way.
+          Bring your next evaluation into one focused workspace. Create your
+          account and get started in minutes.
         </p>
         <div className="public-landing-actions public-landing-final-actions">
           <Link
@@ -452,9 +432,14 @@ export default function PublicLanding() {
             Download for Windows
             <small>v{desktopPackage.version}</small>
           </a>
+          {downloadNotice && (
+            <p className="public-landing-footer-download-notice" role="status">
+              {downloadNotice}
+            </p>
+          )}
         </div>
         <div className="public-landing-footer-bottom">
-          <span>Practice with purpose. Compete with confidence.</span>
+          <span>          Evaluate with clarity. Move forward with confidence.</span>
           <span>
             &copy; {new Date().getFullYear()} AMUX · All rights reserved
           </span>

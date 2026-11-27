@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Monitor,
@@ -6,16 +7,26 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import desktopPackage from "../../../desktop/package.json";
-import { DOWNLOAD_URL } from "../utils/desktopDownload";
+import { DOWNLOAD_URL, isMobileDevice } from "../utils/desktopDownload";
 import "./InstallDesktop.css";
 
 /**
- * Install-desktop page. Shown on the web when a visitor tries to attend a
- * strict / coding evaluation — those run only inside the desktop app.
+ * Install-desktop page for supervised evaluations that require the desktop app.
  */
 export default function InstallDesktop() {
   const [searchParams] = useSearchParams();
+  const [downloadNotice, setDownloadNotice] = useState("");
   const fromStrict = searchParams.get("from") === "strict-assessment";
+
+  const handleDownload = (event) => {
+    if (isMobileDevice()) {
+      event.preventDefault();
+      setDownloadNotice(
+        "The CogniClash desktop app is available on Windows. Open this page on a desktop computer to download it.",
+      );
+    }
+  };
+
   return (
     <div className="install-desktop-page">
       <div className="install-desktop-card">
@@ -26,15 +37,16 @@ export default function InstallDesktop() {
           {fromStrict ? "Strict evaluation" : "Desktop required"}
         </p>
         <h1>
-          {fromStrict ? "This strict evaluation runs in the" : "Strict evaluations run in the"}
+          {fromStrict
+            ? "This supervised evaluation runs in the"
+            : "Supervised evaluations run in the"}
           <br />
           <span>CogniClash desktop app</span>
         </h1>
         <p className="install-desktop-copy">
-          Coding and strict tests use a locked-down, proctored environment that
-          keeps the evaluation fair for everyone, so they open in the desktop
-          app only. Install it once — it is free, and the interface inside the
-          app is identical to this web experience.
+          This evaluation uses a secure desktop environment to support a
+          consistent experience for everyone. Install the free CogniClash app
+          on Windows, then sign in with your existing account.
         </p>
         <div className="install-desktop-meta">
           <span>
@@ -45,11 +57,17 @@ export default function InstallDesktop() {
         <a
           className="install-desktop-download"
           href={DOWNLOAD_URL}
+          onClick={handleDownload}
           target="_blank"
           rel="noreferrer"
         >
           Download CogniClash <ArrowUpRight size={15} />
         </a>
+        {downloadNotice && (
+          <p className="install-desktop-copy" role="status">
+            {downloadNotice}
+          </p>
+        )}
         <Link to="/" className="btn-secondary install-desktop-back">
           Back to web experience
         </Link>
@@ -62,8 +80,7 @@ export default function InstallDesktop() {
             account.
           </li>
           <li>
-            <CheckCircle2 size={14} /> Open the challenge — your strict
-            evaluation continues there.
+            <CheckCircle2 size={14} /> Return to your evaluation to continue.
           </li>
         </ol>
       </div>

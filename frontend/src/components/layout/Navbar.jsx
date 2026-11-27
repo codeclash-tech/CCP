@@ -1,6 +1,6 @@
 ﻿import { Link } from "react-router-dom";
-import { Brain } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import brandIcon from "../../../../desktop/assets/codeclash.ico";
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -9,7 +9,7 @@ export default function Navbar() {
     <header className="app-navbar">
       <div className="app-navbar-brand-group">
         <Link to="/" className="app-navbar-brand">
-          <Brain size={27} aria-hidden="true" />
+          <img src={brandIcon} alt="" />
           <span>CogniClash</span>
         </Link>
       </div>

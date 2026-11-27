@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  Brain,
   Eye,
   EyeOff,
   LoaderCircle,
@@ -16,6 +15,7 @@ import {
   verifyRegistrationOtp,
 } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
+import brandIcon from "../../../desktop/assets/codeclash.ico";
 
 const fieldStyle = {
   width: "100%",
@@ -241,24 +241,23 @@ export default function AuthPage({ mode }) {
     >
       <aside className="desktop-auth-intro">
         <div className="desktop-auth-brand">
-          <Brain size={23} aria-hidden="true" />
+          <img src={brandIcon} alt="" />
           <span>CogniClash</span>
         </div>
         <div className="desktop-auth-message">
           <span className="desktop-auth-icon">
             <Swords size={22} aria-hidden="true" />
           </span>
-          <p className="desktop-auth-eyebrow">CODE. COMPETE. IMPROVE.</p>
-          <h2>Bring your best solution to the battle.</h2>
+          <p className="desktop-auth-eyebrow">EVALUATE WITH CONFIDENCE</p>
+          <h2>A clearer way to understand potential.</h2>
           <p>
-            Join coding challenges, take on Battle Rooms, and follow your
-            results in one focused workspace — in your browser or in the
-            desktop app.
+            A focused evaluation platform for individuals and teams, with
+            clear outcomes and a consistent experience from start to finish.
           </p>
         </div>
         <div className="desktop-auth-assurance">
           <ShieldCheck size={17} aria-hidden="true" />
-          <span>Your account and submissions are protected by CogniClash.</span>
+          <span>Your account and evaluation records are protected by CogniClash.</span>
         </div>
       </aside>
       <section
@@ -279,7 +278,7 @@ export default function AuthPage({ mode }) {
             className="web-auth-home-link"
             aria-label="Back to CogniClash home"
           >
-            <Brain size={17} aria-hidden="true" />
+            <img src={brandIcon} alt="" />
             <span>CogniClash</span>
           </Link>
         )}
