@@ -1,11 +1,21 @@
 import { useState } from "react";
-import { ArrowUpRight, ArrowDown, ChevronRight, Swords } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  ArrowUpRight,
+  ArrowDown,
+  ChevronRight,
+  Swords,
+  Menu,
+  X,
+  Download,
+  MonitorSmartphone,
+  ShieldCheck,
+} from "lucide-react";
 import desktopPackage from "../../../desktop/package.json";
 import brandIcon from "../../../desktop/assets/codeclash.ico";
+import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
 import "./PublicLanding.css";
 
-const DOWNLOAD_URL =
-  "https://github.com/codeclash-tech/CCP/releases/download/v1.0.0/CogniClash.Setup.exe";
 const MOBILE_DEVICE_PATTERN =
   /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i;
 
@@ -55,6 +65,7 @@ const steps = [
 
 export default function PublicLanding() {
   const [downloadNotice, setDownloadNotice] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   function handleDownloadClick(event) {
     if (!isDesktopDevice()) {
@@ -66,27 +77,54 @@ export default function PublicLanding() {
     }
 
     setDownloadNotice("");
+    setMenuOpen(false);
   }
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <main className="public-landing" id="home">
       <nav className="public-landing-nav" aria-label="Main navigation">
-        <a className="public-landing-brand" href="#home" aria-label="CogniClash home">
+        <a className="public-landing-brand" href="#home" aria-label="CogniClash home" onClick={closeMenu}>
           <img src={brandIcon} alt="" />
           <span>CogniClash</span>
         </a>
         <div className="public-landing-nav-links">
-          <a href="#experience">Experience</a>
-          <a href="#how-it-works">How it works</a>
-          <a
+          <a href="#experience" onClick={closeMenu}>Experience</a>
+          <a href="#how-it-works" onClick={closeMenu}>How it works</a>
+          <Link to="/about" onClick={closeMenu}>About</Link>
+          <Link to="/terms" onClick={closeMenu}>Terms</Link>
+          <Link
             className="public-landing-nav-download"
-            href={DOWNLOAD_URL}
-            onClick={handleDownloadClick}
+            to="/install-desktop"
+            onClick={closeMenu}
           >
-            Download app
-          </a>
+            <Download size={13} aria-hidden="true" />
+            Get the app
+          </Link>
         </div>
+        <button
+          type="button"
+          className="public-landing-menu-toggle"
+          aria-label={menuOpen ? "Close menu" : "Open menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
       </nav>
+      {menuOpen && (
+        <div className="public-landing-mobile-menu" role="menu">
+          <a href="#experience" onClick={closeMenu}>Experience</a>
+          <a href="#how-it-works" onClick={closeMenu}>How it works</a>
+          <Link to="/about" onClick={closeMenu}>About</Link>
+          <Link to="/terms" onClick={closeMenu}>Terms</Link>
+          <Link to="/install-desktop" onClick={closeMenu}>
+            <Download size={14} aria-hidden="true" />
+            Install desktop app
+          </Link>
+        </div>
+      )}
       {downloadNotice && (
         <p className="public-landing-download-notice" role="status">
           {downloadNotice}
@@ -104,7 +142,8 @@ export default function PublicLanding() {
           <p className="public-landing-description">
             Turn coding practice into a challenge worth showing up for. Take on
             a daily problem, compete in a Battle Room, or host one for your
-            community — all in the CogniClash Windows app.
+            community — the same focused experience in the CogniClash desktop
+            app and on the web.
           </p>
           <div className="public-landing-actions">
             <a
@@ -187,7 +226,7 @@ export default function PublicLanding() {
           <h2>Practice alone.<br /><span>Make it a competition.</span></h2>
           <p>
             CogniClash gives individual practice and group challenges a shared,
-            focused desktop experience.
+            focused experience — identical in the desktop app and on the web.
           </p>
         </div>
         <div className="public-landing-pillars">
@@ -240,6 +279,34 @@ export default function PublicLanding() {
         </div>
       </section>
 
+      <section className="public-landing-desktop-note" id="strict-evaluations">
+        <div className="public-landing-desktop-note-card">
+          <div className="public-landing-desktop-note-icon" aria-hidden="true">
+            <MonitorSmartphone size={22} />
+          </div>
+          <div>
+            <p className="public-landing-eyebrow">Strict evaluations</p>
+            <h2>Coding &amp; strict tests run in the desktop app</h2>
+            <p>
+              Practice challenges are open to everyone on the web. Strict
+              evaluations and graded coding tests open in a locked-down,
+              distraction-free environment — so they run in the CogniClash
+              desktop app only. When you start one from the web, we take you
+              straight to the install page.
+            </p>
+            <div className="public-landing-desktop-note-actions">
+              <Link className="public-landing-download" to="/install-desktop">
+                Install CogniClash <ArrowUpRight size={15} aria-hidden="true" />
+              </Link>
+              <span className="public-landing-desktop-note-hint">
+                <ShieldCheck size={14} aria-hidden="true" />
+                Secure · Proctored · Free for students
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="public-landing-final-cta" id="download">
         <div className="public-landing-final-glow" aria-hidden="true" />
         <p className="public-landing-eyebrow">Your next move starts here</p>
@@ -261,12 +328,32 @@ export default function PublicLanding() {
       </section>
 
       <footer className="public-landing-footer">
-        <a className="public-landing-footer-brand" href="#home">
-          <img src={brandIcon} alt="" />
-          <span>CogniClash <small>by AMUX</small></span>
-        </a>
-        <span>Practice with purpose. Compete with confidence.</span>
-        <a href="mailto:helloamux@gmail.com">Contact support</a>
+        <div className="public-landing-footer-top">
+          <a className="public-landing-footer-brand" href="#home">
+            <img src={brandIcon} alt="" />
+            <span>CogniClash <small>by AMUX</small></span>
+          </a>
+          <nav className="public-landing-footer-links" aria-label="Footer navigation">
+            <a href="#experience">Experience</a>
+            <a href="#how-it-works">How it works</a>
+            <Link to="/about">About</Link>
+            <Link to="/terms">Terms</Link>
+            <a href="mailto:helloamux@gmail.com">Contact support</a>
+          </nav>
+          <a
+            className="public-landing-footer-download"
+            href={DOWNLOAD_URL}
+            onClick={handleDownloadClick}
+          >
+            <Download size={14} aria-hidden="true" />
+            Download for Windows
+            <small>v{desktopPackage.version}</small>
+          </a>
+        </div>
+        <div className="public-landing-footer-bottom">
+          <span>Practice with purpose. Compete with confidence.</span>
+          <span>&copy; {new Date().getFullYear()} AMUX · All rights reserved</span>
+        </div>
       </footer>
     </main>
   );

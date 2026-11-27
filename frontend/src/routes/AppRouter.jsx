@@ -1,11 +1,16 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import {
   HashRouter,
+  BrowserRouter,
   Routes,
   Route,
   Navigate,
   useLocation,
+  Link,
 } from "react-router-dom";
+import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
+import { Monitor, Download, ShieldCheck, ArrowUpRight, Menu, X } from "lucide-react";
+import desktopPackage from "../../../desktop/package.json";
 import { AuthProvider } from "../context/AuthContext";
 
 import Navbar from "../components/layout/Navbar";
@@ -21,6 +26,7 @@ import {
 } from "./roleAccess";
 
 const Home = lazy(() => import("../pages/Home"));
+const InstallDesktop = lazy(() => import("../pages/InstallDesktop"));
 const BattleRoom = lazy(() => import("../pages/BattleRoom"));
 const CreateBattleRoom = lazy(() => import("../pages/CreateBattleRoom"));
 const RoomParticipants = lazy(() => import("../pages/RoomParticipants"));
@@ -49,8 +55,148 @@ function AppLayout({ children }) {
     () => typeof document !== "undefined" && Boolean(document.fullscreenElement),
   );
   const { user } = useAuth();
-  const isDesktop =
-    typeof window !== "undefined" && Boolean(window.codeClashDesktop);
+  const isDesktop = isDesktopRuntime();
+
+  const webLinks = [
+    { to: "/", label: "Home" },
+    { to: "/about", label: "About" },
+    { to: "/terms", label: "Terms" },
+    { to: "/install-desktop", label: "Get the app", download: true },
+  ];
+
+  return (
+    <div
+      className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
+    >
+      {isDesktop && !isFullscreen && <DesktopTitleBar />}
+      {!isFullscreen && !isDesktop && <WebNavbar links={webLinks} />}
+      <div
+        className={`app-shell-body${user ? " app-shell-body-authenticated" : ""}${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
+      >
+        {user && (
+          <RoleNavigation
+            open={navigationOpen}
+            onNavigate={() => setNavigationOpen(false)}
+            onToggle={setNavigationOpen}
+          />
+        )}
+        {user && navigationOpen && (
+          <button
+            type="button"
+            className="role-navigation-backdrop"
+            aria-label="Close navigation"
+            onClick={() => setNavigationOpen(false)}
+          />
+        )}
+        <main className="app-shell-content">
+          <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
+        </main>
+      </div>
+      {!isFullscreen && !isDesktop && <Footer />}
+    </div>
+  );
+}
+
+function WebNavbar({ links = [] }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const close = () => setMenuOpen(false);
+
+  return (
+    <header className="app-navbar">
+      <div className="app-navbar-brand-group">
+        <Link to="/" className="app-navbar-brand" onClick={close}>
+          <Brain size={27} aria-hidden="true" />
+          <span>CogniClash</span>
+        </Link>
+      </div>
+      <nav className="app-navbar-links web-navbar-links" aria-label="Main navigation">
+        {links.map(({ to, label, download }) => (
+          <Link
+            key={`${to}-${label}`}
+            to={to}
+            className={download ? "app-navbar-download-link" : undefined}
+            onClick={close}
+          >
+            {download && <Download size={13} aria-hidden="true" />}
+            <span>{label}</span>
+          </Link>
+        ))}
+      </nav>
+      <button
+        type="button"
+        className="app-navbar-mobile-toggle"
+        aria-label={menuOpen ? "Close menu" : "Open menu"}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        {menuOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+      {menuOpen && (
+        <div className="app-navbar-mobile-menu" role="menu">
+          {links.map(({ to, label, download }) => (
+            <Link key={`${to}-${label}`} to={to} onClick={close}>
+              {download && <Download size={15} aria-hidden="true" />}
+              <span>{label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </header>
+  );
+}
+
+function StrictDesktopGate() {
+  return (
+    <div className="install-desktop-page">
+      <div className="install-desktop-card">
+        <div className="install-desktop-icon" aria-hidden="true">
+          <Monitor size={26} />
+        </div>
+        <p className="install-desktop-eyebrow">Desktop required</p>
+        <h1>
+          Strict evaluations run in the<br />
+          <span>CogniClash desktop app</span>
+        </h1>
+        <p className="install-desktop-copy">
+          Coding and strict tests use a locked-down, proctored environment that
+          keeps the evaluation fair for everyone, so they open in the desktop
+          app only. Install it once — it is free, and the interface inside the
+          app is identical to this web experience.
+        </p>
+        <div className="install-desktop-meta">
+          <span>
+            <ShieldCheck size={14} /> Secure &amp; proctored
+          </span>
+          <span>v{desktopPackage.version} · Windows</span>
+        </div>
+        <a
+          className="install-desktop-download"
+          href={DOWNLOAD_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Download CogniClash <ArrowUpRight size={15} />
+        </a>
+        <Link to="/" className="btn-secondary install-desktop-back">
+          Back to web experience
+        </Link>
+        <ol className="install-desktop-steps">
+          <li>Download and run the installer.</li>
+          <li>Sign in with your existing CogniClash account.</li>
+          <li>Open the challenge — your strict evaluation continues there.</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function LegacyAppLayout({ children }) {
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(
+    () => typeof document !== "undefined" && Boolean(document.fullscreenElement),
+  );
+  const { user } = useAuth();
+  const isDesktop = isDesktopRuntime();
 
   useEffect(() => {
     const updateFullscreenState = () => {
@@ -275,11 +421,63 @@ function RouteSkeleton({ fullScreen = false }) {
   );
 }
 
+function WebRouter() {
+  const Router = BrowserRouter;
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          <Route path="/" element={<PublicLanding />} />
+          <Route
+            path="/about"
+            element={
+              <AppLayout>
+                <About />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/terms"
+            element={
+              <AppLayout>
+                <Terms />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/install-desktop"
+            element={
+              <AppLayout>
+                <InstallDesktop />
+              </AppLayout>
+            }
+          />
+          <Route
+            path="/strict-assessment/:moduleId"
+            element={
+              <AppLayout>
+                <StrictDesktopGate />
+              </AppLayout>
+            }
+          />
+          <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route path="/register" element={<Navigate to="/" replace />} />
+          <Route path="/weekly-assessment" element={<Navigate to="/" replace />} />
+          <Route path="/challenges" element={<Navigate to="/" replace />} />
+          <Route path="/battle-room" element={<Navigate to="/" replace />} />
+          <Route path="/my-challenges" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </Router>
+  );
+}
+
 export default function AppRouter() {
-  if (typeof window === "undefined" || !window.codeClashDesktop) {
+  if (!isDesktopRuntime()) {
     return (
       <Suspense fallback={<RouteSkeleton />}>
-        <PublicLanding />
+        <WebRouter />
       </Suspense>
     );
   }
