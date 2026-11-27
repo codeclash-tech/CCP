@@ -190,21 +190,17 @@ export default function PublicLanding() {
               to="/register"
               onClick={closeMenu}
             >
-              Start on the web <ArrowUpRight size={15} aria-hidden="true" />
+              Get started — it&apos;s free <ArrowUpRight size={15} aria-hidden="true" />
             </Link>
-            <a
-              className="public-landing-secondary-link"
-              href={DOWNLOAD_URL}
-              onClick={handleDownloadClick}
-            >
-              Download for Windows <ArrowUpRight size={15} aria-hidden="true" />
-            </a>
+            <Link className="public-landing-secondary-link" to="/login">
+              Sign in
+            </Link>
             <a className="public-landing-secondary-link" href="#experience">
               Explore CogniClash <ArrowDown size={15} aria-hidden="true" />
             </a>
           </div>
           <p className="public-landing-version">
-            Windows desktop app <span aria-hidden="true">|</span> Version{" "}
+            Web app <span aria-hidden="true">|</span> Windows desktop app v{" "}
             {desktopPackage.version}
           </p>
         </div>

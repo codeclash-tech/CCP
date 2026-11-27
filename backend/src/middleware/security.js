@@ -154,6 +154,15 @@ export function securityMiddleware(app) {
   // Keeping this explicit ensures the custom domain works even if
   // CLIENT_URL is temporarily missing or misconfigured.
   const productionFrontendUrl = "https://COGNICLASH.amux.in";
+  // Hosted static website (Render). Render serves the site on an
+  // onrender.com subdomain and any custom domain mapped to it; allow both
+  // so the web app can authenticate and run against the same backend as
+  // the desktop app.
+  const hostedSiteOrigins = [
+    "https://ccp-frontend.onrender.com",
+    "https://ccp.onrender.com",
+    "https://ccp-web.onrender.com",
+  ];
   const desktopAppOrigin = "COGNICLASH://app";
   // Electron's fetch falls back to a conventional origin when a custom
   // scheme is not in its hard-coded allow list. Include the likely
@@ -190,6 +199,7 @@ export function securityMiddleware(app) {
             "'self'",
             clientUrl,
             productionFrontendUrl,
+            ...hostedSiteOrigins,
             "https://code-executor.onrender.com",
           ].filter(Boolean),
 
@@ -273,6 +283,9 @@ export function securityMiddleware(app) {
     productionFrontendUrl,
     desktopAppOrigin,
     ...desktopFallbackOrigins,
+
+    // Hosted static website origins (Render).
+    ...hostedSiteOrigins,
 
     // Local development origins.
     ...(config.NODE_ENV === "production"

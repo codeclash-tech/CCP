@@ -230,38 +230,37 @@ export default function AuthPage({ mode }) {
 
   return (
     <main
-      className={`auth-page${isDesktop ? " desktop-auth-page" : ""}`}
+      className={`auth-page${isDesktop ? " desktop-auth-page" : ""}${!isDesktop ? " web-auth-page" : ""}`}
       style={{
-        minHeight: isDesktop ? "100%" : "calc(100vh - 112px)",
+        minHeight: isDesktop ? "100%" : "100dvh",
         display: "grid",
         placeItems: "center",
-        padding: 24,
+        padding: isDesktop ? 24 : "clamp(18px, 5vw, 48px)",
         boxSizing: "border-box",
       }}
     >
-      {isDesktop && (
-        <aside className="desktop-auth-intro">
-          <div className="desktop-auth-brand">
-            <Brain size={23} aria-hidden="true" />
-            <span>CogniClash</span>
-          </div>
-          <div className="desktop-auth-message">
-            <span className="desktop-auth-icon">
-              <Swords size={22} aria-hidden="true" />
-            </span>
-            <p className="desktop-auth-eyebrow">CODE. COMPETE. IMPROVE.</p>
-            <h2>Bring your best solution to the battle.</h2>
-            <p>
-              Join coding challenges, take on Battle Rooms, and follow your
-              results in one focused workspace.
-            </p>
-          </div>
-          <div className="desktop-auth-assurance">
-            <ShieldCheck size={17} aria-hidden="true" />
-            <span>Your account and submissions are protected by CogniClash.</span>
-          </div>
-        </aside>
-      )}
+      <aside className="desktop-auth-intro">
+        <div className="desktop-auth-brand">
+          <Brain size={23} aria-hidden="true" />
+          <span>CogniClash</span>
+        </div>
+        <div className="desktop-auth-message">
+          <span className="desktop-auth-icon">
+            <Swords size={22} aria-hidden="true" />
+          </span>
+          <p className="desktop-auth-eyebrow">CODE. COMPETE. IMPROVE.</p>
+          <h2>Bring your best solution to the battle.</h2>
+          <p>
+            Join coding challenges, take on Battle Rooms, and follow your
+            results in one focused workspace — in your browser or in the
+            desktop app.
+          </p>
+        </div>
+        <div className="desktop-auth-assurance">
+          <ShieldCheck size={17} aria-hidden="true" />
+          <span>Your account and submissions are protected by CogniClash.</span>
+        </div>
+      </aside>
       <section
         className={`auth-card${isDesktop ? " desktop-auth-card" : ""}`}
         style={{
@@ -271,13 +270,18 @@ export default function AuthPage({ mode }) {
           borderRadius: 12,
           padding: 28,
           boxSizing: "border-box",
+          position: "relative",
         }}
       >
-        {isDesktop && (
-          <div className="desktop-auth-card-brand">
-            <Brain size={19} aria-hidden="true" />
+        {!isDesktop && (
+          <Link
+            to="/"
+            className="web-auth-home-link"
+            aria-label="Back to CogniClash home"
+          >
+            <Brain size={17} aria-hidden="true" />
             <span>CogniClash</span>
-          </div>
+          </Link>
         )}
         <h1 style={{ color: "var(--text-primary)", fontSize: 21, margin: "0 0 6px" }}>
           {isRegistration

@@ -253,40 +253,23 @@ function UnauthenticatedOnlyPage({ mode }) {
   const { isAuthenticated, sessionError, refreshProfile } = useAuth();
   if (sessionError && !isAuthenticated) {
     return (
-      <AppLayout>
-        <div
-          role="status"
-          style={{
-            padding: "10px 16px",
-            color: "var(--text-muted)",
-            background: "var(--bg-elevated)",
-            textAlign: "center",
-            fontSize: 13,
-          }}
+      <div className="web-auth-session-note" role="status">
+        Your saved session could not be verified. You can still sign in.
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={refreshProfile}
         >
-          Your saved session could not be verified. You can still sign in.
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={refreshProfile}
-            style={{ marginLeft: 10, padding: "4px 8px", fontSize: 12 }}
-          >
-            Retry
-          </button>
-        </div>
-        <Suspense fallback={<AuthRouteSkeleton />}>
-          <AuthPage mode={mode} />
-        </Suspense>
-      </AppLayout>
+          Retry
+        </button>
+      </div>
     );
   }
   if (isAuthenticated) return <Navigate to="/" replace />;
   return (
-    <AppLayout>
-      <Suspense fallback={<AuthRouteSkeleton />}>
-        <AuthPage mode={mode} />
-      </Suspense>
-    </AppLayout>
+    <Suspense fallback={<AuthRouteSkeleton />}>
+      <AuthPage mode={mode} />
+    </Suspense>
   );
 }
 
@@ -663,16 +646,13 @@ export default function AppRouter() {
   );
 }
 
-/* Logged-out users see the landing/docs experience at "/", logged-in
-   users land directly in the app dashboard — on both web and desktop. */
+/* Logged-out users start at the sign-in experience (desktop-style flow);
+   the full landing page lives one click away. Logged-in users land
+   directly in the app dashboard — on both web and desktop. */
 function AuthAwareHome() {
   const { user, isAuthenticated, loading } = useAuth();
   if (loading) {
-    return (
-      <AppLayout>
-        <RouteSkeleton />
-      </AppLayout>
-    );
+    return <AuthRouteSkeleton />;
   }
   if (isAuthenticated && user) {
     return (
@@ -681,5 +661,5 @@ function AuthAwareHome() {
       </ProtectedLayout>
     );
   }
-  return <PublicLanding />;
+  return isDesktop ? <Navigate to="/login" replace /> : <PublicLanding />;
 }

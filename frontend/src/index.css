@@ -2082,6 +2082,74 @@ canvas {
       var(--bg-main);
   }
 
+  /* Web: identical premium split layout, standalone (no navbar/footer) */
+  .web-auth-page {
+    width: min(100%, 1440px);
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+    align-items: stretch;
+    gap: clamp(28px, 5vw, 72px);
+    margin: 0 auto;
+    padding: clamp(32px, 6vh, 72px) clamp(24px, 6vw, 88px) !important;
+    background:
+      radial-gradient(ellipse at 12% 14%, rgba(13, 122, 235, 0.12), transparent 42%)
+      ;
+    background-color: var(--bg-main);
+  }
+
+  .web-auth-page .desktop-auth-intro {
+    display: flex;
+  }
+
+  .web-auth-home-link {
+    position: absolute;
+    top: -44px;
+    left: 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
+
+  .web-auth-home-link:hover {
+    color: var(--text-primary);
+  }
+
+  .web-auth-session-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 100dvh;
+    padding: 24px;
+    background: var(--bg-main);
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .web-auth-page {
+      grid-template-columns: minmax(0, 1fr);
+      place-items: center;
+      gap: 0;
+      padding-top: 84px !important;
+    }
+
+    .web-auth-page .desktop-auth-intro {
+      display: none;
+    }
+
+    .web-auth-home-link {
+      top: -46px;
+    }
+  }
+
   .desktop-auth-intro {
     display: flex;
     min-width: 0;
