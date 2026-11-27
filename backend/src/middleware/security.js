@@ -159,10 +159,16 @@ export function securityMiddleware(app) {
   // so the web app can authenticate and run against the same backend as
   // the desktop app.
   const hostedSiteOrigins = [
+    "https://ccp-ce2f.onrender.com",
     "https://ccp-frontend.onrender.com",
-    "https://ccp.onrender.com",
-    "https://ccp-web.onrender.com",
   ];
+  // Additional origins can be added without a code change: set
+  // ADDITIONAL_CLIENT_ORIGINS in the backend environment as a
+  // comma-separated list (e.g. "https://ccp-ce2f.onrender.com,https://ccp.amux.in").
+  const additionalClientOrigins = (config.ADDITIONAL_CLIENT_ORIGINS || "")
+    .split(",")
+    .map((value) => value.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
   const desktopAppOrigin = "COGNICLASH://app";
   // Electron's fetch falls back to a conventional origin when a custom
   // scheme is not in its hard-coded allow list. Include the likely
@@ -286,6 +292,7 @@ export function securityMiddleware(app) {
 
     // Hosted static website origins (Render).
     ...hostedSiteOrigins,
+    ...additionalClientOrigins,
 
     // Local development origins.
     ...(config.NODE_ENV === "production"
