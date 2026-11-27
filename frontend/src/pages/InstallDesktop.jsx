@@ -1,5 +1,11 @@
 import { Link } from "react-router-dom";
-import { Monitor, Download, ShieldCheck, ArrowUpRight, CheckCircle2 } from "lucide-react";
+import {
+  Monitor,
+  Download,
+  ShieldCheck,
+  ArrowUpRight,
+  CheckCircle2,
+} from "lucide-react";
 import desktopPackage from "../../../desktop/package.json";
 import { DOWNLOAD_URL } from "../utils/desktopDownload";
 import "./InstallDesktop.css";

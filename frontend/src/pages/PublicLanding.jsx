@@ -20,7 +20,8 @@ const MOBILE_DEVICE_PATTERN =
   /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i;
 
 function isDesktopDevice() {
-  const { userAgent, userAgentData, platform, maxTouchPoints } = window.navigator;
+  const { userAgent, userAgentData, platform, maxTouchPoints } =
+    window.navigator;
   const isIPadOS = platform === "MacIntel" && maxTouchPoints > 1;
 
   return (
@@ -60,7 +61,10 @@ const audiences = [
 const steps = [
   ["Get the app", "Download CogniClash for Windows and sign in."],
   ["Choose a challenge", "Try the daily challenge or join a Battle Room."],
-  ["Solve and compare", "Submit your work and see the standings when judging finishes."],
+  [
+    "Solve and compare",
+    "Submit your work and see the standings when judging finishes.",
+  ],
 ];
 
 export default function PublicLanding() {
@@ -85,15 +89,28 @@ export default function PublicLanding() {
   return (
     <main className="public-landing" id="home">
       <nav className="public-landing-nav" aria-label="Main navigation">
-        <a className="public-landing-brand" href="#home" aria-label="CogniClash home" onClick={closeMenu}>
+        <a
+          className="public-landing-brand"
+          href="#home"
+          aria-label="CogniClash home"
+          onClick={closeMenu}
+        >
           <img src={brandIcon} alt="" />
           <span>CogniClash</span>
         </a>
         <div className="public-landing-nav-links">
-          <a href="#experience" onClick={closeMenu}>Experience</a>
-          <a href="#how-it-works" onClick={closeMenu}>How it works</a>
-          <Link to="/about" onClick={closeMenu}>About</Link>
-          <Link to="/terms" onClick={closeMenu}>Terms</Link>
+          <a href="#experience" onClick={closeMenu}>
+            Experience
+          </a>
+          <a href="#how-it-works" onClick={closeMenu}>
+            How it works
+          </a>
+          <Link to="/about" onClick={closeMenu}>
+            About
+          </Link>
+          <Link to="/terms" onClick={closeMenu}>
+            Terms
+          </Link>
           <Link
             className="public-landing-nav-download"
             to="/install-desktop"
@@ -115,10 +132,18 @@ export default function PublicLanding() {
       </nav>
       {menuOpen && (
         <div className="public-landing-mobile-menu" role="menu">
-          <a href="#experience" onClick={closeMenu}>Experience</a>
-          <a href="#how-it-works" onClick={closeMenu}>How it works</a>
-          <Link to="/about" onClick={closeMenu}>About</Link>
-          <Link to="/terms" onClick={closeMenu}>Terms</Link>
+          <a href="#experience" onClick={closeMenu}>
+            Experience
+          </a>
+          <a href="#how-it-works" onClick={closeMenu}>
+            How it works
+          </a>
+          <Link to="/about" onClick={closeMenu}>
+            About
+          </Link>
+          <Link to="/terms" onClick={closeMenu}>
+            Terms
+          </Link>
           <Link to="/install-desktop" onClick={closeMenu}>
             <Download size={14} aria-hidden="true" />
             Install desktop app
@@ -131,9 +156,14 @@ export default function PublicLanding() {
         </p>
       )}
 
-      <section className="public-landing-hero" aria-labelledby="public-landing-title">
+      <section
+        className="public-landing-hero"
+        aria-labelledby="public-landing-title"
+      >
         <div className="public-landing-hero-copy">
-          <p className="public-landing-eyebrow">The desktop home for coding battles</p>
+          <p className="public-landing-eyebrow">
+            The desktop home for coding battles
+          </p>
           <h1 id="public-landing-title">
             Think sharp.
             <br />
@@ -163,7 +193,10 @@ export default function PublicLanding() {
           </p>
         </div>
 
-        <div className="public-landing-preview" aria-label="CogniClash app preview">
+        <div
+          className="public-landing-preview"
+          aria-label="CogniClash app preview"
+        >
           <div className="public-landing-preview-topbar">
             <div className="public-landing-preview-brand">
               <img src={brandIcon} alt="" />
@@ -174,8 +207,13 @@ export default function PublicLanding() {
             </span>
           </div>
           <div className="public-landing-preview-body">
-            <div className="public-landing-preview-kicker">TODAY&apos;S MOVE</div>
-            <h2>One problem.<br />A sharper mind.</h2>
+            <div className="public-landing-preview-kicker">
+              TODAY&apos;S MOVE
+            </div>
+            <h2>
+              One problem.
+              <br />A sharper mind.
+            </h2>
             <p>Make your next coding session count.</p>
             <div className="public-landing-preview-challenge">
               <span className="public-landing-preview-icon">&lt;/&gt;</span>
@@ -183,15 +221,21 @@ export default function PublicLanding() {
                 <strong>Daily Challenge</strong>
                 <small>A fresh challenge awaits</small>
               </span>
-              <span className="public-landing-preview-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
+              <span className="public-landing-preview-arrow">
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </span>
             </div>
             <div className="public-landing-preview-challenge secondary">
-              <span className="public-landing-preview-icon crossed"><Swords size={16} aria-hidden="true" /></span>
+              <span className="public-landing-preview-icon crossed">
+                <Swords size={16} aria-hidden="true" />
+              </span>
               <span>
                 <strong>Battle Rooms</strong>
                 <small>Join in or host your own</small>
               </span>
-              <span className="public-landing-preview-arrow"><ArrowUpRight size={16} aria-hidden="true" /></span>
+              <span className="public-landing-preview-arrow">
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </span>
             </div>
             <div className="public-landing-preview-code" aria-hidden="true">
               <span>public class</span> Solution {"{"}
@@ -206,13 +250,18 @@ export default function PublicLanding() {
             </div>
           </div>
           <div className="public-landing-preview-footer">
-            <span><i /> Desktop workspace</span>
+            <span>
+              <i /> Desktop workspace
+            </span>
             <span>JAVA</span>
           </div>
         </div>
       </section>
 
-      <section className="public-landing-positioning" aria-label="Product promise">
+      <section
+        className="public-landing-positioning"
+        aria-label="Product promise"
+      >
         <span>LESS PASSIVE PRACTICE</span>
         <b aria-hidden="true">/</b>
         <span>MORE REAL CHALLENGES</span>
@@ -222,8 +271,14 @@ export default function PublicLanding() {
 
       <section className="public-landing-section" id="experience">
         <div className="public-landing-section-heading">
-          <p className="public-landing-eyebrow">Built around the moment you solve</p>
-          <h2>Practice alone.<br /><span>Make it a competition.</span></h2>
+          <p className="public-landing-eyebrow">
+            Built around the moment you solve
+          </p>
+          <h2>
+            Practice alone.
+            <br />
+            <span>Make it a competition.</span>
+          </h2>
           <p>
             CogniClash gives individual practice and group challenges a shared,
             focused experience — identical in the desktop app and on the web.
@@ -232,9 +287,17 @@ export default function PublicLanding() {
         <div className="public-landing-pillars">
           {pillars.map((pillar) => (
             <article className="public-landing-pillar" key={pillar.number}>
-              <span className="public-landing-pillar-number">{pillar.number}</span>
+              <span className="public-landing-pillar-number">
+                {pillar.number}
+              </span>
               <div className="public-landing-pillar-mark" aria-hidden="true">
-                {pillar.number === "01" ? "</>" : pillar.number === "02" ? <Swords size={18} aria-hidden="true" /> : "+"}
+                {pillar.number === "01" ? (
+                  "</>"
+                ) : pillar.number === "02" ? (
+                  <Swords size={18} aria-hidden="true" />
+                ) : (
+                  "+"
+                )}
               </div>
               <h3>{pillar.title}</h3>
               <p>{pillar.description}</p>
@@ -245,8 +308,12 @@ export default function PublicLanding() {
 
       <section className="public-landing-how" id="how-it-works">
         <div className="public-landing-how-heading">
-          <p className="public-landing-eyebrow">Your next challenge is three steps away</p>
-          <h2>Open. Solve. <span>Clash.</span></h2>
+          <p className="public-landing-eyebrow">
+            Your next challenge is three steps away
+          </p>
+          <h2>
+            Open. Solve. <span>Clash.</span>
+          </h2>
         </div>
         <div className="public-landing-steps">
           {steps.map(([title, description], index) => (
@@ -259,11 +326,18 @@ export default function PublicLanding() {
         </div>
       </section>
 
-      <section className="public-landing-audience" aria-labelledby="public-landing-audience-title">
+      <section
+        className="public-landing-audience"
+        aria-labelledby="public-landing-audience-title"
+      >
         <div>
-          <p className="public-landing-eyebrow">Made for people who build skills together</p>
+          <p className="public-landing-eyebrow">
+            Made for people who build skills together
+          </p>
           <h2 id="public-landing-audience-title">
-            Your group.<br /><span>Your next coding battle.</span>
+            Your group.
+            <br />
+            <span>Your next coding battle.</span>
           </h2>
         </div>
         <div className="public-landing-audience-list">
@@ -310,7 +384,11 @@ export default function PublicLanding() {
       <section className="public-landing-final-cta" id="download">
         <div className="public-landing-final-glow" aria-hidden="true" />
         <p className="public-landing-eyebrow">Your next move starts here</p>
-        <h2>Ready to make it<br /><span>a CogniClash?</span></h2>
+        <h2>
+          Ready to make it
+          <br />
+          <span>a CogniClash?</span>
+        </h2>
         <p>
           Download the Windows app and bring a little more purpose to your next
           coding session.
@@ -320,10 +398,12 @@ export default function PublicLanding() {
           href={DOWNLOAD_URL}
           onClick={handleDownloadClick}
         >
-          Get CogniClash for Windows <ArrowUpRight size={15} aria-hidden="true" />
+          Get CogniClash for Windows{" "}
+          <ArrowUpRight size={15} aria-hidden="true" />
         </a>
         <span className="public-landing-final-version">
-          Version {desktopPackage.version} <span aria-hidden="true">|</span> Windows desktop app
+          Version {desktopPackage.version} <span aria-hidden="true">|</span>{" "}
+          Windows desktop app
         </span>
       </section>
 
@@ -331,9 +411,14 @@ export default function PublicLanding() {
         <div className="public-landing-footer-top">
           <a className="public-landing-footer-brand" href="#home">
             <img src={brandIcon} alt="" />
-            <span>CogniClash <small>by AMUX</small></span>
+            <span>
+              CogniClash <small>by AMUX</small>
+            </span>
           </a>
-          <nav className="public-landing-footer-links" aria-label="Footer navigation">
+          <nav
+            className="public-landing-footer-links"
+            aria-label="Footer navigation"
+          >
             <a href="#experience">Experience</a>
             <a href="#how-it-works">How it works</a>
             <Link to="/about">About</Link>
@@ -352,7 +437,9 @@ export default function PublicLanding() {
         </div>
         <div className="public-landing-footer-bottom">
           <span>Practice with purpose. Compete with confidence.</span>
-          <span>&copy; {new Date().getFullYear()} AMUX · All rights reserved</span>
+          <span>
+            &copy; {new Date().getFullYear()} AMUX · All rights reserved
+          </span>
         </div>
       </footer>
     </main>

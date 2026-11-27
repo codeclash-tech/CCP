@@ -17,7 +17,11 @@
   border: 1px solid var(--border-color);
   border-radius: 16px;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(13, 122, 235, 0.12), transparent 55%),
+    radial-gradient(
+      ellipse at 50% 0%,
+      rgba(13, 122, 235, 0.12),
+      transparent 55%
+    ),
     var(--bg-card);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
   text-align: center;
@@ -100,7 +104,10 @@
   font-size: 13.5px;
   font-weight: 700;
   text-decoration: none;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
 }
 
 .install-desktop-download:hover {

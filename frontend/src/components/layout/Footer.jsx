@@ -24,7 +24,9 @@ export default function Footer() {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <Brain size={14} />
-        <span>CogniClash · an AMUX product &copy; {new Date().getFullYear()}</span>
+        <span>
+          CogniClash · an AMUX product &copy; {new Date().getFullYear()}
+        </span>
       </div>
       <div
         style={{
