@@ -15,6 +15,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import PageSkeleton from "../components/layout/PageSkeleton";
+import { isDesktopRuntime } from "../utils/desktopDownload";
 import {
   challengeTypeLabel,
   savedChallengeIds,
@@ -104,6 +105,7 @@ export function PremiumChallengeCard({
 export default function Challenges() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isDesktop = isDesktopRuntime();
   const userKey = user?.id || user?._id || user?.email || "user";
   const [daily, setDaily] = useState(null);
   const [activeRooms, setActiveRooms] = useState([]);
@@ -269,7 +271,13 @@ export default function Challenges() {
                 assessment={assessment}
                 saved={savedIds.has(String(assessment.id))}
                 onToggleSave={toggleSave}
-                onOpen={() => navigate(`/strict-assessment/${assessment.id}`)}
+                onOpen={() =>
+                  navigate(
+                    isDesktop
+                      ? `/strict-assessment/${assessment.id}`
+                      : `/install-desktop?from=strict-assessment`,
+                  )
+                }
               />
             ))}
           </div>

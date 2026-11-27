@@ -7,10 +7,10 @@ import {
   useLocation,
   Link,
 } from "react-router-dom";
-import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
-import { Monitor, Download, ShieldCheck, ArrowUpRight, Menu, X } from "lucide-react";
-import desktopPackage from "../../../desktop/package.json";
+import { ArrowUpRight, Monitor, ShieldCheck } from "lucide-react";
 import { AuthProvider } from "../context/AuthContext";
+import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
+import desktopPackage from "../../../desktop/package.json";
 
 import Navbar from "../components/layout/Navbar";
 import DesktopTitleBar from "../components/layout/DesktopTitleBar";
@@ -25,11 +25,9 @@ import {
 } from "./roleAccess";
 
 const Home = lazy(() => import("../pages/Home"));
-const InstallDesktop = lazy(() => import("../pages/InstallDesktop"));
 const BattleRoom = lazy(() => import("../pages/BattleRoom"));
 const CreateBattleRoom = lazy(() => import("../pages/CreateBattleRoom"));
 const RoomParticipants = lazy(() => import("../pages/RoomParticipants"));
-const AdminQuestions = lazy(() => import("../pages/AdminQuestions"));
 const BattleRoomChallenge = lazy(() => import("../pages/BattleRoomChallenge"));
 const BattleRoomLeaderboard = lazy(
   () => import("../pages/BattleRoomLeaderboard"),
@@ -37,38 +35,50 @@ const BattleRoomLeaderboard = lazy(
 const AuthPage = lazy(() => import("../pages/AuthPage"));
 const Profile = lazy(() => import("../pages/Profile"));
 const WeeklyAssessment = lazy(() => import("../pages/WeeklyAssessment"));
-const GlobalChallengeAdmin = lazy(() => import("../pages/GlobalChallengeAdmin"));
+const GlobalChallengeAdmin = lazy(
+  () => import("../pages/GlobalChallengeAdmin"),
+);
 const LearningCenter = lazy(() => import("../pages/LearningCenter"));
 const About = lazy(() => import("../pages/About"));
 const Terms = lazy(() => import("../pages/Terms"));
 const PublicLanding = lazy(() => import("../pages/PublicLanding"));
+const InstallDesktop = lazy(() => import("../pages/InstallDesktop"));
 const Challenges = lazy(() => import("../pages/Challenges"));
 const StrictAssessment = lazy(() => import("../pages/StrictAssessment"));
 const MyChallenges = lazy(() => import("../pages/MyChallenges"));
 const Organisation = lazy(() => import("../pages/Organisation"));
 const AdminOrganisations = lazy(() => import("../pages/AdminOrganisations"));
 
+const isDesktop = isDesktopRuntime();
+
+/* ------------------------------------------------------------------ */
+/* Shared layout — identical shell on web and desktop                  */
+/* ------------------------------------------------------------------ */
+
 function AppLayout({ children }) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(
-    () => typeof document !== "undefined" && Boolean(document.fullscreenElement),
+    () =>
+      typeof document !== "undefined" && Boolean(document.fullscreenElement),
   );
   const { user } = useAuth();
-  const isDesktop = isDesktopRuntime();
 
-  const webLinks = [
-    { to: "/", label: "Home" },
-    { to: "/about", label: "About" },
-    { to: "/terms", label: "Terms" },
-    { to: "/install-desktop", label: "Get the app", download: true },
-  ];
+  useEffect(() => {
+    const updateFullscreenState = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () => {
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+    };
+  }, []);
 
   return (
     <div
       className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
     >
       {isDesktop && !isFullscreen && <DesktopTitleBar />}
-      {!isFullscreen && !isDesktop && <WebNavbar links={webLinks} />}
+      {!isFullscreen && <Navbar />}
       <div
         className={`app-shell-body${user ? " app-shell-body-authenticated" : ""}${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
       >
@@ -91,58 +101,14 @@ function AppLayout({ children }) {
           <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
         </main>
       </div>
-      {!isFullscreen && !isDesktop && <Footer />}
+      {!isFullscreen && <Footer />}
     </div>
   );
 }
 
-function WebNavbar({ links = [] }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const close = () => setMenuOpen(false);
-
-  return (
-    <header className="app-navbar">
-      <div className="app-navbar-brand-group">
-        <Link to="/" className="app-navbar-brand" onClick={close}>
-          <Brain size={27} aria-hidden="true" />
-          <span>CogniClash</span>
-        </Link>
-      </div>
-      <nav className="app-navbar-links web-navbar-links" aria-label="Main navigation">
-        {links.map(({ to, label, download }) => (
-          <Link
-            key={`${to}-${label}`}
-            to={to}
-            className={download ? "app-navbar-download-link" : undefined}
-            onClick={close}
-          >
-            {download && <Download size={13} aria-hidden="true" />}
-            <span>{label}</span>
-          </Link>
-        ))}
-      </nav>
-      <button
-        type="button"
-        className="app-navbar-mobile-toggle"
-        aria-label={menuOpen ? "Close menu" : "Open menu"}
-        aria-expanded={menuOpen}
-        onClick={() => setMenuOpen((open) => !open)}
-      >
-        {menuOpen ? <X size={20} /> : <Menu size={20} />}
-      </button>
-      {menuOpen && (
-        <div className="app-navbar-mobile-menu" role="menu">
-          {links.map(({ to, label, download }) => (
-            <Link key={`${to}-${label}`} to={to} onClick={close}>
-              {download && <Download size={15} aria-hidden="true" />}
-              <span>{label}</span>
-            </Link>
-          ))}
-        </div>
-      )}
-    </header>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Strict-evaluation desktop gate (web only)                           */
+/* ------------------------------------------------------------------ */
 
 function StrictDesktopGate() {
   return (
@@ -153,7 +119,8 @@ function StrictDesktopGate() {
         </div>
         <p className="install-desktop-eyebrow">Desktop required</p>
         <h1>
-          Strict evaluations run in the<br />
+          Strict evaluations run in the
+          <br />
           <span>CogniClash desktop app</span>
         </h1>
         <p className="install-desktop-copy">
@@ -177,7 +144,7 @@ function StrictDesktopGate() {
           Download CogniClash <ArrowUpRight size={15} />
         </a>
         <Link to="/" className="btn-secondary install-desktop-back">
-          Back to web experience
+          Back to CogniClash
         </Link>
         <ol className="install-desktop-steps">
           <li>Download and run the installer.</li>
@@ -189,58 +156,9 @@ function StrictDesktopGate() {
   );
 }
 
-function LegacyAppLayout({ children }) {
-  const [navigationOpen, setNavigationOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(
-    () => typeof document !== "undefined" && Boolean(document.fullscreenElement),
-  );
-  const { user } = useAuth();
-  const isDesktop = isDesktopRuntime();
-
-  useEffect(() => {
-    const updateFullscreenState = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener("fullscreenchange", updateFullscreenState);
-    return () => {
-      document.removeEventListener("fullscreenchange", updateFullscreenState);
-    };
-  }, []);
-
-  return (
-    <div
-      className={`app-shell${isDesktop ? " desktop-app-shell" : ""}${isFullscreen ? " fullscreen-app-shell" : ""}`}
-    >
-      {isDesktop && !isFullscreen && (
-        <DesktopTitleBar />
-      )}
-      {!isFullscreen && !isDesktop && <Navbar />}
-      <div
-        className={`app-shell-body${user ? " app-shell-body-authenticated" : ""}${isDesktop && !user ? " desktop-app-shell-unauthenticated" : ""}`}
-      >
-        {user && (
-          <RoleNavigation
-            open={navigationOpen}
-            onNavigate={() => setNavigationOpen(false)}
-            onToggle={setNavigationOpen}
-          />
-        )}
-        {user && navigationOpen && (
-          <button
-            type="button"
-            className="role-navigation-backdrop"
-            aria-label="Close navigation"
-            onClick={() => setNavigationOpen(false)}
-          />
-        )}
-        <main className="app-shell-content">
-          <Suspense fallback={<RouteSkeleton />}>{children}</Suspense>
-        </main>
-      </div>
-      {!isFullscreen && !isDesktop && <Footer />}
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Guards                                                              */
+/* ------------------------------------------------------------------ */
 
 function ProtectedLayout({ children, allowedRoles, fullScreen = false }) {
   const { user, isAuthenticated, loading, sessionError } = useAuth();
@@ -420,75 +338,18 @@ function RouteSkeleton({ fullScreen = false }) {
   );
 }
 
-function WebRouter() {
-  // HashRouter keeps deep links (e.g. /#/install-desktop) working when the
-  // docs site is hosted statically from the repo's docs folder.
-  const Router = HashRouter;
-  return (
-    <Router>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<PublicLanding />} />
-          <Route
-            path="/about"
-            element={
-              <AppLayout>
-                <About />
-              </AppLayout>
-            }
-          />
-          <Route
-            path="/terms"
-            element={
-              <AppLayout>
-                <Terms />
-              </AppLayout>
-            }
-          />
-          <Route
-            path="/install-desktop"
-            element={
-              <AppLayout>
-                <InstallDesktop />
-              </AppLayout>
-            }
-          />
-          <Route
-            path="/strict-assessment/:moduleId"
-            element={
-              <AppLayout>
-                <StrictDesktopGate />
-              </AppLayout>
-            }
-          />
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/register" element={<Navigate to="/" replace />} />
-          <Route path="/weekly-assessment" element={<Navigate to="/" replace />} />
-          <Route path="/challenges" element={<Navigate to="/" replace />} />
-          <Route path="/battle-room" element={<Navigate to="/" replace />} />
-          <Route path="/my-challenges" element={<Navigate to="/" replace />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </Router>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* Router — one shared table for web and desktop                       */
+/* ------------------------------------------------------------------ */
 
 export default function AppRouter() {
-  if (!isDesktopRuntime()) {
-    return (
-      <Suspense fallback={<RouteSkeleton />}>
-        <WebRouter />
-      </Suspense>
-    );
-  }
-
   const Router = HashRouter;
 
   return (
     <Router>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<AuthAwareHome />} />
           <Route
             path="/login"
             element={<UnauthenticatedOnlyPage mode="login" />}
@@ -513,34 +374,40 @@ export default function AppRouter() {
               </AppLayout>
             }
           />
+          {!isDesktop && (
+            <Route
+              path="/install-desktop"
+              element={
+                <AppLayout>
+                  <InstallDesktop />
+                </AppLayout>
+              }
+            />
+          )}
           <Route
-            path="/"
+            path="/strict-assessment/:moduleId"
             element={
-              <ProtectedLayout>
-                <DashboardRoute />
-              </ProtectedLayout>
+              isDesktop ? (
+                <ProtectedLayout
+                  allowedRoles={[
+                    ASSESSMENT_ROLES.CANDIDATE,
+                    ASSESSMENT_ROLES.ORGANIZATION_USER,
+                  ]}
+                >
+                  <StrictAssessment />
+                </ProtectedLayout>
+              ) : (
+                <AppLayout>
+                  <StrictDesktopGate />
+                </AppLayout>
+              )
             }
           />
-          <Route path="/assessments" element={<Navigate to="/battle-room" replace />} />
-          <Route path="/daily-assessment" element={<Navigate to="/weekly-assessment" replace />} />
           <Route
             path="/challenges"
             element={
               <ProtectedLayout>
                 <Challenges />
-              </ProtectedLayout>
-            }
-          />
-          <Route
-            path="/strict-assessment/:moduleId"
-            element={
-              <ProtectedLayout
-                allowedRoles={[
-                  ASSESSMENT_ROLES.CANDIDATE,
-                  ASSESSMENT_ROLES.ORGANIZATION_USER,
-                ]}
-              >
-                <StrictAssessment />
               </ProtectedLayout>
             }
           />
@@ -563,9 +430,7 @@ export default function AppRouter() {
           <Route
             path="/admin/organisations"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <AdminOrganisations />
               </ProtectedLayout>
             }
@@ -599,11 +464,11 @@ export default function AppRouter() {
               </ProtectedLayout>
             }
           />
-          <Route path="/certificates" element={<Navigate to="/my-challenges" replace />} />
           <Route
-            path="/settings"
-            element={<Navigate to="/" replace />}
+            path="/certificates"
+            element={<Navigate to="/my-challenges" replace />}
           />
+          <Route path="/settings" element={<Navigate to="/" replace />} />
           <Route
             path="/assessments/edit"
             element={
@@ -638,13 +503,14 @@ export default function AppRouter() {
               </ProtectedLayout>
             }
           />
-          <Route path="/results" element={<Navigate to="/my-challenges" replace />} />
+          <Route
+            path="/results"
+            element={<Navigate to="/my-challenges" replace />}
+          />
           <Route
             path="/admin"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <GlobalChallengeAdmin />
               </ProtectedLayout>
             }
@@ -652,29 +518,15 @@ export default function AppRouter() {
           <Route
             path="/admin/weekly-assessment"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <Navigate to="/admin" replace />
-              </ProtectedLayout>
-            }
-          />
-          <Route
-            path="/admin/organisations"
-            element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
-                <AdminOrganisations />
               </ProtectedLayout>
             }
           />
           <Route
             path="/admin/rankings"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <Navigate to="/admin" replace />
               </ProtectedLayout>
             }
@@ -682,9 +534,7 @@ export default function AppRouter() {
           <Route
             path="/admin/questions"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <Navigate to="/admin" replace />
               </ProtectedLayout>
             }
@@ -692,21 +542,43 @@ export default function AppRouter() {
           <Route
             path="/admin/learning"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <LearningCenter adminView />
               </ProtectedLayout>
             }
           />
-          <Route path="/admin/weekly-roster" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/participants" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/rankings/individual" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/rankings/organizations" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/weekly-history" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/certificates" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/assessments" element={<Navigate to="/admin" replace />} />
-          <Route path="/admin/organizations-users" element={<Navigate to="/admin" replace />} />
+          <Route
+            path="/admin/weekly-roster"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/participants"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/rankings/individual"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/rankings/organizations"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/weekly-history"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/certificates"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/assessments"
+            element={<Navigate to="/admin" replace />}
+          />
+          <Route
+            path="/admin/organizations-users"
+            element={<Navigate to="/admin" replace />}
+          />
           <Route
             path="/admin/settings"
             element={<Navigate to="/admin" replace />}
@@ -714,9 +586,7 @@ export default function AppRouter() {
           <Route
             path="/admin/*"
             element={
-              <ProtectedLayout
-                allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}
-              >
+              <ProtectedLayout allowedRoles={[ASSESSMENT_ROLES.SUPER_ADMIN]}>
                 <AccessDeniedPage />
               </ProtectedLayout>
             }
@@ -791,4 +661,25 @@ export default function AppRouter() {
       </AuthProvider>
     </Router>
   );
+}
+
+/* Logged-out users see the landing/docs experience at "/", logged-in
+   users land directly in the app dashboard — on both web and desktop. */
+function AuthAwareHome() {
+  const { user, isAuthenticated, loading } = useAuth();
+  if (loading) {
+    return (
+      <AppLayout>
+        <RouteSkeleton />
+      </AppLayout>
+    );
+  }
+  if (isAuthenticated && user) {
+    return (
+      <ProtectedLayout>
+        <DashboardRoute />
+      </ProtectedLayout>
+    );
+  }
+  return <PublicLanding />;
 }

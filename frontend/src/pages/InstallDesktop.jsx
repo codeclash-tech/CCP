@@ -1,7 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   Monitor,
-  Download,
   ShieldCheck,
   ArrowUpRight,
   CheckCircle2,
@@ -15,15 +14,19 @@ import "./InstallDesktop.css";
  * strict / coding evaluation — those run only inside the desktop app.
  */
 export default function InstallDesktop() {
+  const [searchParams] = useSearchParams();
+  const fromStrict = searchParams.get("from") === "strict-assessment";
   return (
     <div className="install-desktop-page">
       <div className="install-desktop-card">
         <div className="install-desktop-icon" aria-hidden="true">
           <Monitor size={26} />
         </div>
-        <p className="install-desktop-eyebrow">Desktop required</p>
+        <p className="install-desktop-eyebrow">
+          {fromStrict ? "Strict evaluation" : "Desktop required"}
+        </p>
         <h1>
-          Strict evaluations run in the
+          {fromStrict ? "This strict evaluation runs in the" : "Strict evaluations run in the"}
           <br />
           <span>CogniClash desktop app</span>
         </h1>

@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import { Brain, ShieldCheck, Download } from "lucide-react";
 import { DOWNLOAD_URL, isDesktopRuntime } from "../../utils/desktopDownload";
 

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import desktopPackage from "../../../desktop/package.json";
 import brandIcon from "../../../desktop/assets/codeclash.ico";
-import { DOWNLOAD_URL, isDesktopRuntime } from "../utils/desktopDownload";
+import { DOWNLOAD_URL } from "../utils/desktopDownload";
 import "./PublicLanding.css";
 
 const MOBILE_DEVICE_PATTERN =
